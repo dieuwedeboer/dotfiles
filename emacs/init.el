@@ -29,13 +29,14 @@
 
 (straight-use-package 'use-package)
 
-;; Install some universally used packages.
+;; Git setup.
 (use-package magit
   :straight t)
 (use-package gitconfig-mode
   :straight t)
 (use-package gitignore-mode
   :straight t)
+;; Docker support.
 (use-package dockerfile-mode
   :straight t)
 

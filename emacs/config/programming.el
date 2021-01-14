@@ -4,9 +4,11 @@
 ;; Guru-mode encourages good emacs practice.
 (use-package guru-mode
   :straight t
-  :custom
-  (guru-warn-only t "guru-mode should only warn")
-  :hook ((prog-mode . guru-mode)))
+  :config (guru-global-mode +1)
+  ;;:custom
+  ;;(guru-warn-only t "guru-mode should only warn")
+  ;;:hook ((prog-mode . guru-mode))
+  )
 
 ;; Hex colours highlighted.
 (use-package rainbow-mode
