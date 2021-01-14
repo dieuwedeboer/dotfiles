@@ -6,8 +6,8 @@ Useful environment configuration for various applications.
 ## Installation
 
 ```
-git clone https://github.com/dieuwedeboer/dotfiles ~/dotfiles
-~/dotfiles/install.sh
+git clone git@github.com:dieuwedeboer/dotfiles.git ~/.dotfiles
+~/.dotfiles/install.sh
 ```
 ## TODO
 
@@ -17,3 +17,5 @@ git clone https://github.com/dieuwedeboer/dotfiles ~/dotfiles
 * Bash and ZSH config.
 * TMUX and Tmuxinator config.
 * Emacs in the terminal.
+* Optionally install/update lando (root only)
+* Set up global drush tools?
