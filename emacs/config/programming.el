@@ -5,9 +5,9 @@
 (use-package guru-mode
   :straight t
   :config (guru-global-mode +1)
-  ;;:custom
-  ;;(guru-warn-only t "guru-mode should only warn")
-  ;;:hook ((prog-mode . guru-mode))
+  :custom
+  (guru-warn-only t "guru-mode should only warn")
+  :hook ((prog-mode . guru-mode))
   )
 
 ;; Hex colours highlighted.

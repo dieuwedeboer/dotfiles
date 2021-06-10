@@ -9,7 +9,11 @@
   :magic ("<\\?xml" . nxml-mode))
 
 (use-package json-mode
-  :straight t)
+  :straight t
+  :hook (json-mode . (lambda ()
+    (when (string= (file-name-nondirectory (buffer-file-name)) "composer.json")
+      (make-local-variable 'js-indent-level)
+      (setq js-indent-level 4)))))
 
 (use-package yaml-mode
   :straight t

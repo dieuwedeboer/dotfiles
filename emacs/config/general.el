@@ -64,6 +64,10 @@
 (setq auto-save-file-name-transforms
       `((".*" ,temporary-file-directory t)))
 
+;; Play with restoring ssh buffers between sessions.
+;; Emacs does not do this by default because it is slow.
+(setq desktop-files-not-to-save "^$")
+
 ;; revert buffers automatically when underlying files are changed externally
 (global-auto-revert-mode t)
 
