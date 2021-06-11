@@ -1,15 +1,17 @@
-(use-package zenburn-theme
+(use-package doom-themes
   :straight t
   :config
-  (custom-theme-set-faces
-   'zenburn
-   '(font-lock-comment-face ((t (:foreground "#7f9f7f" :slant italic))))
-   '(mode-line-inactive ((t (:foreground "#5F7F5F"
-                             :background "#303030"
-                             :box (:line-width -1 :style released-button)))))
-   )
-  )
+  ;; Global settings (defaults)
+  (setq doom-themes-enable-bold t    ; if nil, bold is universally disabled
+        doom-themes-enable-italic t) ; if nil, italics is universally disabled
 
-;; @todo Decide on best spellcheck formatting.
-;; '(flyspell-duplicate ((t (:foreground "peachpuff1" :underline nil :weight normal :slant italic))))
-;;'(flyspell-incorrect ((t (:foreground "rosybrown1" :underline nil :weight normal :slant italic))))
+  ;; For theme list see https://github.com/hlissner/emacs-doom-themes#theme-list
+  (load-theme 'doom-one t)
+
+  ;; Enable flashing mode-line on errors
+  (doom-themes-visual-bell-config)
+  ;; Corrects (and improves) org-mode's native fontification.
+  (doom-themes-org-config))
+
+;; Emoji support 👌
+(set-fontset-font t 'symbol "Noto Color Emoji" nil 'append)

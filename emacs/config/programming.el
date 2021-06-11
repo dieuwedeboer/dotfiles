@@ -15,9 +15,10 @@
   :straight t
   :hook ((prog-mode . rainbow-mode)))
 
-(use-package smartparens
-  :straight t
-  :hook ((prog-mode . smartparens-mode)))
+;; @see lisp.el as I find this a bit annoying in PHP/JS modes
+;;(use-package smartparens
+;;  :straight t
+;;  :hook ((prog-mode . smartparens-mode)))
 
 ;; show the name of the current function definition in the modeline
 (use-package which-func
