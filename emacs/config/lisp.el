@@ -20,6 +20,7 @@
               ;; interactive modes don't need whitespace checks
               (whitespace-mode -1))))
 
+;; Elisp
 (defun my-elisp ()
   (eldoc-mode +1)
   (setq mode-name "EL"))
@@ -27,6 +28,8 @@
 (add-hook 'emacs-lisp-mode-hook (lambda () (run-hooks 'my-elisp-hook)))
 (add-hook 'ielm-mode-hook (lambda () (run-hooks 'my-elisp-hook)))
 
+(define-key emacs-lisp-mode-map (kbd "C-c C-r") 'eval-region)
+(define-key emacs-lisp-mode-map (kbd "C-c C-b") 'eval-buffer)
 
 ;; Extra minor modes
 

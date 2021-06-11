@@ -11,11 +11,8 @@ git clone git@github.com:dieuwedeboer/dotfiles.git ~/.dotfiles
 ```
 ## TODO
 
-* Use doom-themes instead of zenburn.
+* Finish basic tool/bin setup.
 * Keep `.emacs.d` clean.
-* Switch to Ivy and Swiper?
-* Projectile for Emacs project management.
-* Setup gTags for Drupal.
 * Bash and ZSH config.
 * TMUX and Tmuxinator config.
 * Emacs in the terminal (nw) or as a window manager (exwm).

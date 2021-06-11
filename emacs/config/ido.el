@@ -36,3 +36,13 @@
   (smex-save-file (expand-file-name ".smex-items" emacs-dir) "Remember recently and most frequently used commands")
   :config
   (smex-initialize))
+
+;; @todo consider replacing ido with helm, or enabling them side-by-side
+;;(use-package helm
+;;  :straight t
+;;  :bind (("M-x" . helm-M-x)
+;;         ("C-x r b" . helm-filtered-bookmarks)
+;;         ("C-x C-f" . helm-find-files))
+;;  :config
+;;  (helm-mode 1)
+;;)

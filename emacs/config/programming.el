@@ -25,9 +25,14 @@
   :config
   (which-function-mode 1))
 
+;; Project management
+(use-package projectile
+  :straight t
+  :config (projectile-mode)
+  :bind-keymap
+  ("C-c p" . projectile-command-map))
 
-;; OCTAVE
-
-(use-package octave
-  :bind (("C-c C-j" . octave-send-line)
-         ("C-c C-k" . octave-send-defun)))
+;; Set up ggtags (ctags) integration
+(use-package ggtags
+  :straight t
+  :hook ((prog-mode . ggtags-mode)))
