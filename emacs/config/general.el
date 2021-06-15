@@ -245,10 +245,15 @@
   (global-set-key [remap move-beginning-of-line] #'crux-move-beginning-of-line))
 
 ;; Automatically save files on buffer and windows switch
+;; Disabled by default due to annoyance on remote buffers and mouse clicks
 (use-package super-save
   :straight t
   :config
-  (super-save-mode +1))
+  ;;(super-save-mode +1)
+  )
+
+;; Swiper
+(use-package swiper :straight t)
 
 ;; MISC KEY BINDINGS
 
