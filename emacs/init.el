@@ -51,3 +51,4 @@
 (load (expand-file-name "web.el" config-dir))
 (load (expand-file-name "php.el" config-dir))
 (load (expand-file-name "lisp.el" config-dir))
+(load (expand-file-name "music.el" config-dir))
