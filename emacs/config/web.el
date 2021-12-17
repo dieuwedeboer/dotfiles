@@ -9,8 +9,10 @@
    ("\\.as[cp]x\\'" . web-mode)
    ("\\.erb\\'" . web-mode)
    ("\\.html?\\'" . web-mode)
-   ;; ES6/JSX (https://gist.github.com/CodyReichert/9dbc8bd2a104780b64891d8736682cea)
+   ("\\.twig?\\'" . web-mode)
    ("\\.jsx?$" . js2-mode)
+   ("\\.ts?\\'" . web-mode)
+   ("\\.tsx?$" . web-mode)
    ("/\\(views\\|html\\|theme\\|templates\\)/.*\\.php\\'" . web-mode))
   :custom
   (web-mode-code-indent-offset 2)
@@ -56,3 +58,6 @@
   :straight t
   :custom
   (scss-compile-at-save nil "turn off annoying auto-compile on save"))
+
+(use-package apache-mode
+  :straight t)

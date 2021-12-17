@@ -206,7 +206,8 @@
   :config
   (global-diff-hl-mode +1)
   ;; Show in margin for terminal (no fringe available)
-  (when (display-graphic-p) (diff-hl-margin-mode -1))
+  ;; @todo this is broken as display-graphic-p is always set
+  (when (display-graphic-p) (diff-hl-margin-mode +1))
   (unless (display-graphic-p) (diff-hl-margin-mode +1)))
 
 ;; use settings from .editorconfig file when present
