@@ -32,7 +32,41 @@
   :bind-keymap
   ("C-c p" . projectile-command-map))
 
-;; Set up ggtags (ctags) integration
-(use-package ggtags
+;; LSP
+(use-package lsp-mode
   :straight t
-  :hook ((prog-mode . ggtags-mode)))
+  :init
+  ;; set prefix for lsp-command-keymap (few alternatives - "C-l", "C-c l")
+  (setq lsp-keymap-prefix "C-c l")
+  :hook (
+         (php-mode . lsp-deferred)
+         ;; if you want which-key integration
+         (lsp-mode . lsp-enable-which-key-integration))
+  :commands lsp)
+
+(load (expand-file-name "custom-lsp-clients.el" config-dir))
+
+;; optionally
+(use-package lsp-ui :straight t :commands lsp-ui-mode)
+;; if you are helm user
+;;(use-package helm-lsp :commands helm-lsp-workspace-symbol)
+;; if you are ivy user
+;;(use-package lsp-ivy :commands lsp-ivy-workspace-symbol)
+;;(use-package lsp-treemacs :commands lsp-treemacs-errors-list)
+
+;; Auto-complete
+(use-package company
+  :straight t
+  :bind (("M-/" . company-complete))
+  :config
+  (global-company-mode))
+
+;; optionally if you want to use debugger
+(use-package dap-mode :straight t)
+;; (use-package dap-LANGUAGE) to load the dap adapter for your language
+
+;; optional if you want which-key integration
+(use-package which-key
+    :straight t
+    :config
+    (which-key-mode))

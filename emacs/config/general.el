@@ -92,6 +92,7 @@
 
 (add-hook 'text-mode-hook 'enable-flyspell)
 (add-hook 'text-mode-hook 'enable-whitespace)
+(add-hook 'prog-mode-hook 'enable-whitespace)
 
 ;; always delete and copy recursively
 (setq dired-recursive-deletes 'always)

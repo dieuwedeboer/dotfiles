@@ -9,3 +9,9 @@ places
 transient/
 straight/
 tramp
+.cache/
+.dap-breakpoints
+.lsp-session-*
+lsp-cache/
+projectile-bookmarks.eld
+session.*
