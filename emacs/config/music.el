@@ -223,10 +223,6 @@ process and trigger keystroke events."
     (when (eq key 64)
       (setq midi-record (>= value 64)))))
 
-;; Keybindings
-(use-package lilypond-mode
-  :straight t)
-
 (if (require 'lilypond-mode)
     (progn
       (define-key LilyPond-mode-map (kbd "<Ch1> <MIDI_ON>") 'midi-on)
