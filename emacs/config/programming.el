@@ -70,3 +70,13 @@
     :straight t
     :config
     (which-key-mode))
+
+;; optionally show indentation guides
+(use-package highlight-indent-guides
+  :straight t
+  ;;:hook (
+  ;;       (prog-mode . highlight-indent-guides))
+  :config
+  (setq highlight-indent-guides-method 'character
+        highlight-indent-guides-responsive 'top)
+  )

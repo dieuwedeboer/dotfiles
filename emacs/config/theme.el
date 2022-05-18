@@ -9,7 +9,7 @@
   (load-theme 'doom-one t)
 
   ;; @todo change comment color to the green, and then quoted text to a yellow
-  
+
   ;; Enable flashing mode-line on errors
   (doom-themes-visual-bell-config)
   ;; Corrects (and improves) org-mode's native fontification.

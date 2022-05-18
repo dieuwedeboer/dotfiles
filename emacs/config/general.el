@@ -211,6 +211,9 @@
   (when (display-graphic-p) (diff-hl-margin-mode +1))
   (unless (display-graphic-p) (diff-hl-margin-mode +1)))
 
+;; enable line numbers (linum is incompatible with diff-hl)
+(global-display-line-numbers-mode +1)
+
 ;; use settings from .editorconfig file when present
 (use-package editorconfig
   :straight t

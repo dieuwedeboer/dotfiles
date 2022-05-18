@@ -10,3 +10,11 @@ Most attention has been given to:
 ## Installation
 
 Run: `./install.sh`
+
+# Updating Packages
+
+1. `M-x straight-thaw-versions`
+2. `M-x straight-pull-recipe-repositories`
+3. `M-x straight-pull-all`
+4. `M-x straight-freeze-versions`
+5. Commit the updated `straight/versions/default.el`

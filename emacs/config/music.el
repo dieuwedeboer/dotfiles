@@ -224,6 +224,8 @@ process and trigger keystroke events."
       (setq midi-record (>= value 64)))))
 
 ;; Keybindings
+(use-package lilypond-mode
+  :straight t)
 
 (if (require 'lilypond-mode)
     (progn
