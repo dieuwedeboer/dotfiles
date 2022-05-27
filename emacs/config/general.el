@@ -261,6 +261,11 @@
 ;; Swiper
 (use-package swiper :straight t)
 
+;; Org-mode improvements (@todo move to own file?)
+(use-package org-superstar
+  :straight t
+  :hook (org-mode . org-superstar-mode))
+
 ;; MISC KEY BINDINGS
 
 ;; Font size (only for graphical interface)
