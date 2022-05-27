@@ -24,3 +24,9 @@
   (define-key helm-map (kbd "C-z")  'helm-select-action) ; list actions using C-z
   (global-set-key (kbd "M-y") 'helm-show-kill-ring)
   (helm-mode 1))
+
+(use-package helm-tramp
+  :straight t
+  :config
+  (setq tramp-default-method "ssh")
+  (define-key global-map (kbd "C-c s") 'helm-tramp))

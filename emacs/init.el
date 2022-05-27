@@ -32,9 +32,7 @@
 ;; Git setup.
 (use-package magit
   :straight t)
-(use-package gitconfig-mode
-  :straight t)
-(use-package gitignore-mode
+(use-package git-modes
   :straight t)
 ;; Docker support.
 (use-package dockerfile-mode

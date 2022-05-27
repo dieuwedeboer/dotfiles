@@ -31,5 +31,5 @@
                                                      :licenceKey lsp-intelephense-licence-key
                                                      :clearCache lsp-intelephense-clear-cache))
                      :completion-in-comments? t
-                     :multi-root lsp-intelephense-multi-root
+                     ;;:multi-root lsp-intelephense-multi-root
                      :server-id 'iph-remote))
