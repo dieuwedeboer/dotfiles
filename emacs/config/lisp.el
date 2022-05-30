@@ -1,8 +1,5 @@
 ;; Major language modes
 
-(use-package hy-mode
-  :straight t)
-
 (use-package clojure-mode
   :straight t)
 
@@ -38,13 +35,11 @@
   :hook ((clojure-mode . smartparens-strict-mode)
          (cider-mode . smartparens-strict-mode)
          (emacs-lisp-mode . smartparens-strict-mode)
-         (ielm-mode . smartparens-strict-mode)
-         (hy-mode . smartparens-strict-mode)))
+         (ielm-mode . smartparens-strict-mode)))
 
 (use-package rainbow-delimiters
   :straight t
   :hook ((clojure-mode . rainbow-delimiters-mode)
          (cider-mode . rainbow-delimiters-mode)
          (emacs-lisp-mode . rainbow-delimiters-mode)
-         (ielm-mode . rainbow-delimiters-mode)
-         (hy-mode . rainbow-delimiters-mode)))
+         (ielm-mode . rainbow-delimiters-mode)))

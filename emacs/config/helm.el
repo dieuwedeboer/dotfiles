@@ -1,5 +1,8 @@
 ;; Helm is like ido-mode, but lists options vertically instead of
 ;; horizontally in the mini-buffer.
+(setq straight-recipe-overrides nil)
+(straight-override-recipe '(helm :files ("*.el" "emacs-helm.sh" (:exclude "helm-core.el" "helm-lib.el" "helm-source.el" "helm-multi-match.el"))))
+(straight-override-recipe '(helm-core :files ("helm-core.el" "helm-lib.el" "helm-source.el" "helm-multi-match.el")))
 (use-package helm
   :straight t
   ;; Based on http://tuhdo.github.io/helm-intro.html
