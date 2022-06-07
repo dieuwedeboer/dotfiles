@@ -16,6 +16,21 @@
 ;; Or is it caused by Doom?
 ;; https://github.com/doomemacs/doomemacs/issues/3390
 
+(defcustom-lsp lsp-intelephense-document-root "core/index.php"
+  "Document root."
+  :type 'string
+  :group 'lsp-intelephense
+  :package-version '(lsp-mode . "6.1")
+  :lsp-path "intelephense.environment.documentRoot")
+(defcustom-lsp lsp-intelephense-braces "k&r"
+  "Document root."
+  :type 'string
+  :group 'lsp-intelephense
+  :package-version '(lsp-mode . "6.1")
+  :lsp-path "intelephense.format.braces")
+;; @todo does this work? And we we just append rather than replace?
+(setq lsp-intelephense-files-associations '("*.php" "*.phtml" "*.module"))
+
 ;; Run intelephense on the remote server with similar settings
 ;; to its local default.
 (lsp-register-client
