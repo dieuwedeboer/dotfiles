@@ -24,11 +24,6 @@ composer --version
 wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
 ### END nvm ###
 
-### Yarn ###
-# [echos its own install/update messages]
-wget -qO- https://yarnpkg.com/install.sh | bash
-### END yarn ###
-
 ### ack (beyond grep) ###
 echo "Installing ack!"
 wget -qO- https://beyondgrep.com/ack-v3.5.0 > ~/bin/ack
