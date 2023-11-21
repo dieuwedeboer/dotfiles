@@ -2,7 +2,6 @@
   "The root dir of the Emacs configuration.")
 
 (desktop-save-mode 1)
-
 ;; Reduce the frequency of garbage collection by making it happen on
 ;; each 50MB of allocated data (the default is on every 0.76MB).
 (setq gc-cons-threshold 50000000)
@@ -12,6 +11,9 @@
 
 ;; Config changes made through the customize UI will be store here.
 (setq custom-file (expand-file-name "custom.el" emacs-dir))
+
+;; Prevent warning buffer from popping up.
+(setq native-comp-async-report-warnings-errors 'silent)
 
 ;; Set up Straight as the package manager.
 (defvar bootstrap-version)
@@ -41,6 +43,7 @@
 ;; Load environment/language specific configuration.
 (defvar config-dir (expand-file-name "config" emacs-dir))
 
+;; Custom everything else.
 (load (expand-file-name "theme.el" config-dir))
 (load (expand-file-name "general.el" config-dir))
 (load (expand-file-name "helm.el" config-dir))
@@ -49,4 +52,4 @@
 (load (expand-file-name "web.el" config-dir))
 (load (expand-file-name "php.el" config-dir))
 (load (expand-file-name "lisp.el" config-dir))
-(load (expand-file-name "music.el" config-dir))
+;;(load (expand-file-name "music.el" config-dir))

@@ -17,3 +17,9 @@
 
 ;; Emoji support 👌
 (set-fontset-font t 'symbol "Noto Color Emoji" nil 'append)
+
+;; @todo work on getting some more Doom features
+;; such as per the https://github.com/doomemacs/doomemacs/issues/3390
+;; screenshots, such as:
+;; hotter toolbar
+;; sidebar with folder structure

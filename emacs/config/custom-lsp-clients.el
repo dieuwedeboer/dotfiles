@@ -16,18 +16,18 @@
 ;; Or is it caused by Doom?
 ;; https://github.com/doomemacs/doomemacs/issues/3390
 
-(defcustom-lsp lsp-intelephense-document-root "core/index.php"
-  "Document root."
-  :type 'string
-  :group 'lsp-intelephense
-  :package-version '(lsp-mode . "6.1")
-  :lsp-path "intelephense.environment.documentRoot")
-(defcustom-lsp lsp-intelephense-braces "k&r"
-  "Document root."
-  :type 'string
-  :group 'lsp-intelephense
-  :package-version '(lsp-mode . "6.1")
-  :lsp-path "intelephense.format.braces")
+;; (defcustom-lsp lsp-intelephense-document-root "core/index.php"
+;;   "Document root."
+;;   :type 'string
+;;   :group 'lsp-intelephense
+;;   :package-version '(lsp-mode . "6.1")
+;;   :lsp-path "intelephense.environment.documentRoot")
+;; (defcustom-lsp lsp-intelephense-braces "k&r"
+;;   "Document root."
+;;   :type 'string
+;;   :group 'lsp-intelephense
+;;   :package-version '(lsp-mode . "6.1")
+;;   :lsp-path "intelephense.format.braces")
 ;; @todo does this work? And we we just append rather than replace?
 (setq lsp-intelephense-files-associations '("*.php" "*.phtml" "*.module"))
 
@@ -35,16 +35,15 @@
 ;; to its local default.
 (lsp-register-client
  (make-lsp-client :new-connection (lsp-tramp-connection '("intelephense" "--stdio"))
-                     :major-modes '(php-mode)
-                     :remote? t
-                     :priority -1
-                     :notification-handlers (ht ("indexingStarted" #'ignore)
-                                                ("indexingEnded" #'ignore))
-                     :initialization-options (lambda ()
-                                               (list :storagePath lsp-intelephense-storage-path
-                                                     :globalStoragePath lsp-intelephense-global-storage-path
-                                                     :licenceKey lsp-intelephense-licence-key
-                                                     :clearCache lsp-intelephense-clear-cache))
-                     :completion-in-comments? t
-                     ;;:multi-root lsp-intelephense-multi-root
-                     :server-id 'iph-remote))
+                  :major-modes '(php-mode)
+                  :remote? t
+                  :priority -1
+                  :notification-handlers (ht ("indexingStarted" #'ignore)
+                                             ("indexingEnded" #'ignore))
+                  :initialization-options (lambda ()
+                                            (list :storagePath lsp-intelephense-storage-path
+                                                  :globalStoragePath lsp-intelephense-global-storage-path
+                                                  :licenceKey lsp-intelephense-licence-key
+                                                  :clearCache lsp-intelephense-clear-cache))
+                  :completion-in-comments? t
+                  :server-id 'iph-remote))

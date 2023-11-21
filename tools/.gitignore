@@ -1,3 +1,2 @@
 # Ignore downloaded files
-/composer
-/ack
+/bin
