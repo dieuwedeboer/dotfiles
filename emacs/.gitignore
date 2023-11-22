@@ -15,3 +15,6 @@ tramp
 lsp-cache/
 projectile-bookmarks.eld
 session.*
+eln-cache/
+undo/
+recentf
