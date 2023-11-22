@@ -1,3 +1,28 @@
 name: home
 root: ~/
 
+# See https://github.com/tmuxinator/tmuxinator#create-a-project for full list of
+# hook and configuration.
+
+# Runs on project start, always
+# on_project_start: command
+
+# Run on project start, the first time
+on_project_first_start:
+  - if [ -e ~/.emacs.d/.emacs.desktop.lock ]; then echo "Emacs lock file exists"; exit 1; fi
+  - if ! pgrep --count -u <%= ENV["USER"] %> emacs ; then emacs --daemon; fi
+
+# Run on project exit (detaching from tmux session)
+on_project_exit:
+  - emacsclient -e "(kill-emacs)"
+
+# Run on project stop
+#on_project_stop:
+#  - emacsclient -e "(kill-emacs)"
+
+windows:
+  - bash:
+      layout: main-vertical
+      panes:
+        - ""
+        - "emacsclient -nw"
