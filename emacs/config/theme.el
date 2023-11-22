@@ -5,10 +5,11 @@
   (setq doom-themes-enable-bold t    ; if nil, bold is universally disabled
         doom-themes-enable-italic t) ; if nil, italics is universally disabled
 
-  ;; For theme list see https://github.com/hlissner/emacs-doom-themes#theme-list
-  (load-theme 'doom-one t)
+  ;; For theme list see https://github.com/doomemacs/themes#theme-list
+  (load-theme 'doom-dark+ t)
 
-  ;; @todo change comment color to the green, and then quoted text to a yellow
+  ;; Customisations
+  (set-face-attribute 'region nil :foreground "#ffffff")
 
   ;; Enable flashing mode-line on errors
   (doom-themes-visual-bell-config)
@@ -19,7 +20,6 @@
 (set-fontset-font t 'symbol "Noto Color Emoji" nil 'append)
 
 ;; @todo work on getting some more Doom features
-;; such as per the https://github.com/doomemacs/doomemacs/issues/3390
-;; screenshots, such as:
+;; per the https://github.com/doomemacs/doomemacs screenshots, such as:
 ;; hotter toolbar
 ;; sidebar with folder structure

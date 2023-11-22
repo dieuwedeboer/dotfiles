@@ -1,24 +1,28 @@
 ;; General configuration - much taken from prelude
 
-;; Disable tool-bar
+;; Disable toolbar.
 (when (fboundp 'tool-bar-mode)
   (tool-bar-mode -1))
 
-;; Enable menu-bar in graphical interface only, and disable in
-;; terminal.
-(when (display-graphic-p)
-  (menu-bar-mode 1))
-(unless (display-graphic-p)
-  (menu-bar-mode -1))
+;; Disable menubar by default (see f12 keybinding to toggle).
+(menu-bar-mode -1)
 
-;; No scroll bar (graphical mode only)
-(when (display-graphic-p)
-  (scroll-bar-mode -1))
+;; Enable mouse support for terminals (e.g. tmux sessions).
+(unless (display-graphic-p)
+  (xterm-mouse-mode t))
+
+;; Mouse-select in terminal emacs should also copy to primary selection.
+(setq mouse-drag-copy-region t)
+(setq x-select-enable-primary t)
+(setq x-select-enable-clipboard t)
+
+;; Disable the scroll bar
+(scroll-bar-mode -1)
 
 ;; enable y/n answers
 (fset 'yes-or-no-p 'y-or-n-p)
 
-;; the blinking cursor is nothing, but an annoyance
+;; The blinking cursor is nothing but an annoyance.
 (blink-cursor-mode -1)
 
 ;; disable the annoying bell ring
@@ -39,18 +43,13 @@
                                             (abbreviate-file-name (buffer-file-name))
                                           "%b"))))
 
-;; Death to the tabs!  However, tabs historically indent to the next
-;; 8-character offset; specifying anything else will cause *mass*
-;; confusion, as it will change the appearance of every existing file.
-;; In some cases (python), even worse -- it will change the semantics
-;; (meaning) of the program.
-;;
+;; Death to tabs!
 ;; Emacs modes typically provide a standard means to change the
 ;; indentation width -- eg. c-basic-offset: use that to adjust your
 ;; personal indentation width, while maintaining the style (and
 ;; meaning) of any files you load.
 (setq-default indent-tabs-mode nil)   ;; don't use tabs to indent
-(setq-default tab-width 8)            ;; but maintain correct appearance
+(setq-default tab-width 4)            ;; but maintain correct appearance
 
 ;; Newline at end of file
 (setq require-final-newline t)
@@ -207,10 +206,9 @@
          (magit-post-refresh . diff-hl-magit-post-refresh))
   :config
   (global-diff-hl-mode +1)
-  ;; Show in margin for terminal (no fringe available)
-  ;; @todo this is broken as display-graphic-p is always set
-  (when (display-graphic-p) (diff-hl-margin-mode +1))
-  (unless (display-graphic-p) (diff-hl-margin-mode +1)))
+  ;; Show in margin for terminal
+  (unless (display-graphic-p)
+    (diff-hl-margin-mode +1)))
 
 ;; enable line numbers (linum is incompatible with diff-hl)
 (global-display-line-numbers-mode +1)
@@ -261,6 +259,12 @@
 ;; Swiper
 (use-package swiper :straight t)
 
+;; XClip for better terminal copy/paste integration (sudo apt install xclip)
+(use-package xclip
+  :straight t
+  :config
+  (xclip-mode +1))
+
 ;; Org-mode improvements (@todo move to own file?)
 (use-package org-superstar
   :straight t
@@ -298,10 +302,16 @@
 ;; Goto line
 (global-set-key [f7] 'goto-line)
 
-;; Toggle buffer
-(global-set-key [C-tab] '(lambda ()
-                           (interactive)
-                           (switch-to-buffer (other-buffer))))
+(defun switch-to-previous-buffer ()
+  "Toggle between the previous buffer"
+  (interactive)
+  (switch-to-buffer (other-buffer)))
+
+;; Easy buffer toggling (C-tab does not escape on terminals to use S-tab).
+(when (display-graphic-p)
+  (global-set-key [C-tab] 'switch-to-previous-buffer))
+(unless (display-graphic-p)
+  (global-set-key (kbd "<backtab>") 'switch-to-previous-buffer))
 
 ;; Rebind delete key to delete-char function
 (global-set-key [delete] 'delete-char)
@@ -318,9 +328,9 @@
 (global-set-key (kbd "M-p") 'unfill-region)
 
 ;; Don't use standard beginning/end commands that set mark.
-(global-set-key (kbd "M-<") '(lambda ()
+(global-set-key (kbd "M-<") #'(lambda ()
                                (interactive)
                                (goto-char (point-min))))
-(global-set-key (kbd "M->") '(lambda ()
+(global-set-key (kbd "M->") #'(lambda ()
                                (interactive)
                                (goto-char (point-max))))
