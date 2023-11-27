@@ -259,12 +259,6 @@
 ;; Swiper
 (use-package swiper :straight t)
 
-;; XClip for better terminal copy/paste integration (sudo apt install xclip)
-(use-package xclip
-  :straight t
-  :config
-  (xclip-mode +1))
-
 ;; Org-mode improvements (@todo move to own file?)
 (use-package org-superstar
   :straight t
