@@ -45,10 +45,10 @@
   :init
   ;; set prefix for lsp-command-keymap (few alternatives - "C-l", "C-c l")
   (setq lsp-keymap-prefix "C-c l")
-  :hook (
-         (php-mode . lsp-deferred)
-         ;; if you want which-key integration
-         (lsp-mode . lsp-enable-which-key-integration))
+  ;; Do not auto-start but activate manually with "M-x lsp".
+  ;;:hook (
+  ;;(php-mode . lsp-deferred)
+  ;;(lsp-mode . lsp-enable-which-key-integration))
   :commands lsp)
 
 (load (expand-file-name "custom-lsp-clients.el" config-dir))
