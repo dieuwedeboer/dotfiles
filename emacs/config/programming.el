@@ -51,7 +51,9 @@
   ;;(lsp-mode . lsp-enable-which-key-integration))
   :commands lsp)
 
-(load (expand-file-name "custom-lsp-clients.el" config-dir))
+;; We're currently not using LSP remotely and it causes
+;; forbidden reentrant call of tramp due to a response trunctation bug.
+;;(load (expand-file-name "custom-lsp-clients.el" config-dir))
 
 ;; optionally
 (use-package lsp-ui :straight t :commands lsp-ui-mode)
