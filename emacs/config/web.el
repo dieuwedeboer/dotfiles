@@ -61,3 +61,6 @@
 
 (use-package apache-mode
   :straight t)
+
+(use-package elm-mode
+  :straight t)
