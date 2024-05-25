@@ -19,6 +19,9 @@
 ;; Emoji support 👌
 (set-fontset-font t 'symbol "Noto Color Emoji" nil 'append)
 
+;; Font size (need this to differ between screen types)
+(set-face-attribute 'default nil :height 140)
+
 ;; @todo work on getting some more Doom features
 ;; per the https://github.com/doomemacs/doomemacs screenshots, such as:
 ;; hotter toolbar

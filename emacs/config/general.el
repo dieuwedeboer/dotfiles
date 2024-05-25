@@ -250,6 +250,7 @@
 
 ;; Automatically save files on buffer and windows switch
 ;; Disabled by default due to annoyance on remote buffers and mouse clicks
+;; @todo see if we can offload this async?
 (use-package super-save
   :straight t
   :config
@@ -259,17 +260,27 @@
 ;; Swiper
 (use-package swiper :straight t)
 
-;; Org-mode improvements (@todo move to own file?)
+;; Org-mode improvements
 (use-package org-superstar
   :straight t
   :hook (org-mode . org-superstar-mode))
 
-;; MISC KEY BINDINGS
+;; Make the modeline look sexy.
+(use-package nerd-icons
+  :straight t)
+(use-package doom-modeline
+  :straight t
+  :init (doom-modeline-mode 1))
+
+;; Misc KEY BINDINGS
 
 ;; Font size (only for graphical interface)
 (when (display-graphic-p)
  (global-set-key (kbd "C-+") 'text-scale-increase)
  (global-set-key (kbd "C--") 'text-scale-decrease))
+
+;; Press ze escape key? WHERE IS ZE ESCAPE KEY?!
+(global-set-key (kbd "<escape>") 'keyboard-escape-quit)
 
 ;; replace zap-to-char functionality with the more powerful zop-to-char
 (use-package zop-to-char
