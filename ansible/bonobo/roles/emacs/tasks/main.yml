@@ -1,0 +1,77 @@
+---
+
+- name: install dependencies to compile emacs
+  apt:
+    name:
+      - gnutls-dev
+      - aspell
+      - aspell-en
+      - ncurses-dev
+      - libgccjit-{{libgccjit_version}}-dev # must match gcc version
+      - libsystemd-dev
+      - libjansson-dev
+      - texinfo
+      - libtree-sitter-dev
+      - libdbus-1-dev
+      - pipx
+      - libxml2-dev
+      - libgpm-dev
+    state: present
+  become: true
+
+- name: make sure ~/src/emacs exists
+  file:
+    path: ~/src/emacs
+    state: directory
+    mode: "0755"
+
+- name: get Emacs {{emacs_version}}
+  unarchive:
+    src: "https://ftp.gnu.org/gnu/emacs/emacs-{{emacs_version}}.tar.xz"
+    dest: "~/src/emacs/"
+    remote_src: true
+    creates: ~/src/emacs/emacs-{{emacs_version}}/configure
+
+- name: configure Emacs
+  command:
+    argv:
+      - ./configure --without-x --with-native-compilation --with-json --with-tree-sitter
+    chdir: ~/src/emacs/emacs-{{emacs_version}}
+    creates: ~/src/emacs/emacs-{{emacs_version}}/src/emacs
+
+- name: make Emacs (takes a while)
+  command:
+    argv:
+      - make
+    chdir: ~/src/emacs/emacs-{{emacs_version}}
+    creates: ~/src/emacs/emacs-{{emacs_version}}/src/emacs
+
+- name: install emacs
+  command:
+    argv:
+      - make install
+    chdir: "{{ansible_user_dir}}/src/emacs/emacs-{{emacs_version}}"
+    creates: "/usr/local/bin/emacs-{{emacs_version}}"
+  become: true
+
+- name: create .emacs.d
+  file: name=~/.emacs.d state=directory
+
+- name: create .emacs.d/init
+  file: name=~/.emacs.d/init state=directory
+
+- name: install Emacs init files
+  copy:
+    src: init.el
+    dest: ~/.emacs.d/init.el
+
+- name: install aider
+  command: pipx install aider-install
+  tags: aider
+
+- name: install aider
+  command:
+    argv:
+      - aider-install
+    creates: ~/.local/bin/aider
+  tags: aider

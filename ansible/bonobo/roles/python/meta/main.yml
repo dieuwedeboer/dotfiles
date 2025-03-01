@@ -1,0 +1,12 @@
+---
+dependencies: []
+
+galaxy_info:
+  author: Your Name
+  description: Installs Python and related packages
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all

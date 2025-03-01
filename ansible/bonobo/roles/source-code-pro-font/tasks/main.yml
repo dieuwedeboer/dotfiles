@@ -1,0 +1,11 @@
+---
+- name: make sure the .fonts directory exists
+  file: name=~/.fonts state=directory
+
+- name: install Nerd Font
+  unarchive:
+    src: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/SourceCodePro.zip
+    dest: ~/.fonts/
+    remote_src: yes
+  notify:
+    - rebuild font cache

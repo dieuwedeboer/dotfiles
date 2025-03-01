@@ -1,0 +1,3 @@
+---
+- name: make sure ~/.local/bin exists
+  file: name=~/.local/bin state=directory

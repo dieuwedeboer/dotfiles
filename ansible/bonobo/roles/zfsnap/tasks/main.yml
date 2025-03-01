@@ -1,0 +1,15 @@
+---
+
+- name: install zfsnap
+  apt: name=zfsnap
+  become: true
+
+- name: snapshot home directory every hour, keep 14 days
+  cron:
+    cron_file: zfsnap
+    name: "Hourly snap of home directory"
+    minute: 5
+    hour: 6-21
+    job: "/usr/sbin/zfSnap -d -a 14d rpool/berend"
+    user: "root"
+  become: true

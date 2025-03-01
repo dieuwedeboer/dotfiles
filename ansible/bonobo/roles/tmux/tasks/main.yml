@@ -1,0 +1,35 @@
+---
+- name: install tmux
+  apt:
+    name:
+      - tmux
+      - xsel
+    state: present
+  become: true
+
+- name: install tmuxinator
+  command: gem install tmuxinator creates=/usr/local/bin/tmuxinator
+  become: true
+
+- name: create ~/.tmuxinator directory
+  file: name=~/.tmuxinator state=directory
+
+- name: create first tmuxinator project
+  copy: src=main.yml dest=~/.tmuxinator/ force=false backup=yes
+
+- name: install .tmux
+  git:
+    repo: "https://github.com/gpakosz/.tmux.git"
+    dest: ~/.tmux
+
+- name: create .tmux.conf
+  file: src=~/.tmux/.tmux.conf dest=~/.tmux.conf state=link
+
+- name: create .tmux.conf.local
+  copy: src=.tmux.conf.local dest=~/.tmux.conf.local force=true backup=yes
+
+- name: install tpm
+  git:
+    repo: https://github.com/tmux-plugins/tpm
+    dest: ~/.tmux/plugins/tpm
+    force: true

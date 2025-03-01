@@ -1,0 +1,29 @@
+---
+- name: install nvm
+  shell: >
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v{{nvm_version}}/install.sh | bash
+  args:
+    creates: "{{ ansible_env.HOME }}/.nvm/nvm.sh"
+
+- name: install node {{node_version}}
+  shell: bash -c ". {{ ansible_env.HOME }}/.nvm/nvm.sh && nvm install {{node_version}}" creates="{{ ansible_env.HOME }}/.nvm/versions/node/v{{node_version}}/bin/node"
+
+# not sure this works when updating
+- name: switch to that version
+  shell: bash -c ". {{ ansible_env.HOME }}/.nvm/nvm.sh && nvm alias default {{node_version}} && nvm use default"
+
+- name: install yarn
+  npm:
+    name: yarn
+    global: true
+    state: present
+  environment:
+    PATH: "{{ ansible_env.HOME }}/.nvm/versions/node/v{{ node_version }}/bin:{{ ansible_env.PATH }}"
+
+- name: install pnpm
+  npm:
+    name: pnpm
+    global: true
+    state: present
+  environment:
+    PATH: "{{ ansible_env.HOME }}/.nvm/versions/node/v{{ node_version }}/bin:{{ ansible_env.PATH }}"

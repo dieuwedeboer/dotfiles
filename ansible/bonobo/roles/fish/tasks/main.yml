@@ -1,0 +1,48 @@
+---
+- name: Fish really likes to have a .ssh directory
+  file: name=~/.ssh state=directory mode=0700
+
+- name: install fish
+  apt:
+    name: fish
+    state: present
+  become: true
+
+- name: install starship prompt
+  shell: curl -sS https://starship.rs/install.sh | sh -s -- --yes
+
+- name: install starship config file
+  copy: src=starship.toml dest=~/.config/ force=no
+
+- name: install basic config.fish
+  copy: src=config.fish dest=~/.config/fish/ force=yes backup=yes
+  tags:
+    - config.fish
+
+- name: make sure completion directory exists
+  file: name=~/.config/fish/completions/ state=directory
+
+- name: install tmuxinator completion
+  copy:
+    src: tmuxinator.fish
+    dest: ~/.config/fish/completions/
+
+# else install omf will fail
+- name: run fish for the first time
+  command: fish -c "echo first"
+
+- name: get omf
+  get_url:
+    url: https://raw.githubusercontent.com/oh-my-fish/oh-my-fish/master/bin/install
+    dest: /tmp/install-omf
+    mode: 0755
+
+- name: install omf
+  command: /tmp/install-omf --noninteractive creates=~/.config/fish/conf.d/omf.fish
+
+- name: install nvm support
+  command: fish -c "omf install nvm" creates=~/.local/share/omf/pkg/nvm/init.fish
+
+# - name: install java sdkman support
+#   command: fish -c "omf install sdk" creates=~/.local/share/omf/pkg/sdk/init.fish
+#   tags: java

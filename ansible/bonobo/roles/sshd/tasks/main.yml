@@ -1,0 +1,9 @@
+---
+
+- name: install sshd
+  apt: name=openssh-server
+  become: true
+
+- name: enable sshd
+  systemd: name=ssh enabled=true state=started
+  become: true

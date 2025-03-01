@@ -1,0 +1,6 @@
+---
+- name: install direnv
+  apt:
+    name: direnv
+    state: present
+  become: true

@@ -1,0 +1,15 @@
+---
+
+- name: install git and related utilities
+  apt:
+    name:
+      - git
+      - pre-commit
+  become: true
+
+# - name: install pre-commit
+#   pip:
+#     name: pre-commit
+
+# might need this too:
+#pip install --force-reinstall git-remote-codecommit

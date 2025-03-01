@@ -1,0 +1,25 @@
+---
+
+# Setup mail.berenddeboer.net container: install appropriate binaries.
+
+- hosts: machines
+  gather_facts: true
+
+  vars:
+    nvm_version: 0.40.1
+    node_version: 20.18.1
+    emacs_version: 29.4
+    libgccjit_version: 13 # must match gcc version
+
+  roles:
+    - { name: "base", tags: ["base"] }
+    - { name: "git", tags: ["git"] }
+    - { name: "sshd", tags: ["sshd"] }
+    - { name: "alacritty", tags: ["terminal", "alacritty"] }
+    - { role: "tmux", tags: ["tmux"] }
+    - { role: "direnv", tags: ["direnv"] }
+    - { role: "fish", tags: ["fish"] }
+    - { role: "python", tags: ["python", "python3"] }
+    - { role: "nodejs", tags: ["nodejs", "node", "nvm"] }
+    - { name: "emacs", tags: ["emacs"] }
+    - { name: "zfsnap", tags: ["zfsnap"] }
