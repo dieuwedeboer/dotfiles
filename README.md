@@ -1,7 +1,8 @@
 # Dieuwe's Dotfiles
 
-Useful environment configuration for various applications.
+More than just dotfiles - repeatable system setups.
 
+Useful environment configuration for various applications.
 
 ## Installation
 
@@ -11,13 +12,14 @@ git clone git@github.com:dieuwedeboer/dotfiles.git ~/.dotfiles
 ```
 ## TODO
 
-* Finish basic tool/bin setup.
-* Keep `.emacs.d` clean.
-* Bash and ZSH config.
-* TMUX and Tmuxinator config.
-* Emacs in the terminal (nw) or as a window manager (exwm).
-* Optionally install/update lando (root only)
-* Set up global drush tools?
+* Finish shift to ansible.
+* Tweak fish to show directory and git remotes.
+* Once again symlink dotfiles rather than copying them.
+* Eglot (PHP/TS) and Aidermacs out-of-the-box.
+* Keep `.emacs.d` clean and re-theme for terminal.
+* Install/update lando.
+* Include GNOME top bar config.
+* Decide how to handle tmuxinator privately.
 
 ## Further inspiration
 

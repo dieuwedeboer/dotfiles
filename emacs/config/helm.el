@@ -1,3 +1,5 @@
+;; No longer loaded - we use fido now.
+
 ;; Helm is like ido-mode, but lists options vertically instead of
 ;; horizontally in the mini-buffer.
 (setq straight-recipe-overrides nil)

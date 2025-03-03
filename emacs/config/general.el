@@ -16,10 +16,10 @@
 (setq x-select-enable-clipboard t)
 
 ;; icomplete / fido for autocompletion
-(fido-mode t)
+(fido-vertical-mode t)
 
 ;; Disable the scroll bar
-(scroll-bar-mode -1)
+;;(scroll-bar-mode -1)
 
 ;; enable y/n answers
 (fset 'yes-or-no-p 'y-or-n-p)

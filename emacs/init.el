@@ -46,14 +46,12 @@
 ;; Custom everything else.
 ;;(load (expand-file-name "theme.el" config-dir))
 (load (expand-file-name "general.el" config-dir))
-;;(load (expand-file-name "helm.el" config-dir))
 (load (expand-file-name "programming.el" config-dir))
 (load (expand-file-name "markup.el" config-dir))
 (load (expand-file-name "web.el" config-dir))
 (load (expand-file-name "php.el" config-dir))
 (load (expand-file-name "lisp.el" config-dir))
 ;;(load (expand-file-name "music.el" config-dir))
-
 
 ;; WIP
 
@@ -63,3 +61,10 @@
   :config
   (smooth-scrolling-mode 1)
   (setq smooth-scroll-margin 4))
+
+;; No longer using a theme, we simply change only the minimum we need
+(custom-set-faces
+ '(diff-hl-insert ((t (:foreground "#333" :background "#00AB00"))))
+ '(diff-hl-delete ((t (:foreground "#EEE" :background "#AB0000"))))
+ '(diff-hl-change ((t (:foreground "#EEE" :background "#0000AB"))))
+ )
