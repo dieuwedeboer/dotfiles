@@ -43,6 +43,3 @@
 - name: install nvm support
   command: fish -c "omf install nvm" creates=~/.local/share/omf/pkg/nvm/init.fish
 
-# - name: install java sdkman support
-#   command: fish -c "omf install sdk" creates=~/.local/share/omf/pkg/sdk/init.fish
-#   tags: java

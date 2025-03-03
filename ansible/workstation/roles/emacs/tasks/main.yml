@@ -19,12 +19,6 @@
     state: present
   become: true
 
-- name: make sure ~/src/emacs exists
-  file:
-    path: ~/src/emacs
-    state: directory
-    mode: "0755"
-
 - name: get Emacs {{emacs_version}}
   unarchive:
     src: "https://ftp.gnu.org/gnu/emacs/emacs-{{emacs_version}}.tar.xz"
@@ -34,44 +28,47 @@
 
 - name: configure Emacs
   command:
-    argv:
-      - ./configure --without-x --with-native-compilation --with-json --with-tree-sitter
+    cmd: "./configure --without-x --with-native-compilation --with-json --with-tree-sitter"
     chdir: ~/src/emacs/emacs-{{emacs_version}}
     creates: ~/src/emacs/emacs-{{emacs_version}}/src/emacs
 
 - name: make Emacs (takes a while)
   command:
-    argv:
-      - make
+    cmd: "make"
     chdir: ~/src/emacs/emacs-{{emacs_version}}
     creates: ~/src/emacs/emacs-{{emacs_version}}/src/emacs
 
-- name: install emacs
+- name: install Emacs
   command:
-    argv:
-      - make install
+    cmd: "make install"
     chdir: "{{ansible_user_dir}}/src/emacs/emacs-{{emacs_version}}"
     creates: "/usr/local/bin/emacs-{{emacs_version}}"
   become: true
 
-- name: create .emacs.d
-  file: name=~/.emacs.d state=directory
+- name: check if ~/.emacs.d exists and is a directory
+  stat:
+    path: "~/.emacs.d"
+  register: emacs_dir_stat
 
-- name: create .emacs.d/init
-  file: name=~/.emacs.d/init state=directory
+- name: move existing ~/.emacs.d to a backup if it’s a directory
+  command:
+    cmd: "mv ~/.emacs.d ~/.emacs.d.bak"
+  when: emacs_dir_stat.stat.exists and emacs_dir_stat.stat.isdir
 
-- name: install Emacs init files
-  copy:
-    src: init.el
-    dest: ~/.emacs.d/init.el
+- name: ensure ~/.emacs.d is a symlink to ~/src/emacs
+  file:
+    src: "~/src/emacs"
+    dest: "~/.emacs.d"
+    state: link
+    force: yes
 
 - name: install aider
-  command: pipx install aider-install
+  command:
+    cmd: "pipx install aider-install"
   tags: aider
 
 - name: install aider
   command:
-    argv:
-      - aider-install
+    cmd: "aider-install"
     creates: ~/.local/bin/aider
   tags: aider

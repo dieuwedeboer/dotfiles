@@ -8,7 +8,7 @@ set PATH $PATH ~/.local/bin
 
 # use vim
 alias vi vim
-alias emacs="emacsclient -nw"
+alias e="emacsclient -nw"
 
 # better prompt
 starship init fish | source

@@ -8,7 +8,7 @@ sudo apt install ansible-core
 
 # Deploy
 
-When direnv is not available:
+When `direnv` is not available:
 
 ```sh
 . .envrc

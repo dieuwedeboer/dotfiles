@@ -14,7 +14,7 @@ root: ~/
 # on_project_first_start: command
 on_project_first_start:
   #- if [ -e ~/.emacs.d/.emacs.desktop.lock ]; then echo Oops, lock file exists; exit 1; fi
-  #- if ! pgrep emacs ; then emacs --daemon; fi
+  - if ! pgrep emacs ; then emacs --daemon; fi
 # Run on project start, after the first time
 # on_project_restart: command
 # Run on project exit ( detaching from tmux session )
