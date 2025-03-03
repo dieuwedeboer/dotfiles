@@ -1,6 +1,6 @@
 ---
 
-# Setup mail.berenddeboer.net container: install appropriate binaries.
+# Setup personal workstation
 
 - hosts: machines
   gather_facts: true

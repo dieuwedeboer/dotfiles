@@ -7,14 +7,16 @@
 ;; Disable menubar by default (see f12 keybinding to toggle).
 (menu-bar-mode -1)
 
-;; Enable mouse support for terminals (e.g. tmux sessions).
-(unless (display-graphic-p)
-  (xterm-mouse-mode t))
+;; Enable mouse support for terminal.
+(xterm-mouse-mode t)
 
 ;; Mouse-select in terminal emacs should also copy to primary selection.
 (setq mouse-drag-copy-region t)
 (setq x-select-enable-primary t)
 (setq x-select-enable-clipboard t)
+
+;; icomplete / fido for autocompletion
+(fido-mode t)
 
 ;; Disable the scroll bar
 (scroll-bar-mode -1)
@@ -313,10 +315,8 @@
   (switch-to-buffer (other-buffer)))
 
 ;; Easy buffer toggling (C-tab does not escape on terminals to use S-tab).
-(when (display-graphic-p)
-  (global-set-key [C-tab] 'switch-to-previous-buffer))
-(unless (display-graphic-p)
-  (global-set-key (kbd "<backtab>") 'switch-to-previous-buffer))
+(global-set-key [C-tab] 'switch-to-previous-buffer)
+(global-set-key (kbd "<backtab>") 'switch-to-previous-buffer)
 
 ;; Rebind delete key to delete-char function
 (global-set-key [delete] 'delete-char)

@@ -1,4 +1,4 @@
-;; Berend's .emacs file
+;; TODO .emacs file
 
 (setq load-path (cons "~/.emacs.d/init" load-path))
 ;;(load "init-key-bindings.el")

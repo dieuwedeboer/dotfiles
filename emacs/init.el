@@ -44,12 +44,22 @@
 (defvar config-dir (expand-file-name "config" emacs-dir))
 
 ;; Custom everything else.
-(load (expand-file-name "theme.el" config-dir))
+;;(load (expand-file-name "theme.el" config-dir))
 (load (expand-file-name "general.el" config-dir))
-(load (expand-file-name "helm.el" config-dir))
+;;(load (expand-file-name "helm.el" config-dir))
 (load (expand-file-name "programming.el" config-dir))
 (load (expand-file-name "markup.el" config-dir))
 (load (expand-file-name "web.el" config-dir))
 (load (expand-file-name "php.el" config-dir))
 (load (expand-file-name "lisp.el" config-dir))
 ;;(load (expand-file-name "music.el" config-dir))
+
+
+;; WIP
+
+;; scroll before reaching end of bottom, and also scroll without jumping
+(use-package smooth-scrolling
+  :straight t
+  :config
+  (smooth-scrolling-mode 1)
+  (setq smooth-scroll-margin 4))
