@@ -9,7 +9,7 @@
   shell: bash -c ". {{ ansible_env.HOME }}/.nvm/nvm.sh && nvm install {{node_version}}" creates="{{ ansible_env.HOME }}/.nvm/versions/node/v{{node_version}}/bin/node"
 
 # not sure this works when updating
-- name: switch to that version
+- name: switch to default node version
   shell: bash -c ". {{ ansible_env.HOME }}/.nvm/nvm.sh && nvm alias default {{node_version}} && nvm use default"
 
 - name: install yarn
@@ -23,6 +23,30 @@
 - name: install pnpm
   npm:
     name: pnpm
+    global: true
+    state: present
+  environment:
+    PATH: "{{ ansible_env.HOME }}/.nvm/versions/node/v{{ node_version }}/bin:{{ ansible_env.PATH }}"
+
+- name: install intelephense
+  npm:
+    name: intelephense
+    global: true
+    state: present
+  environment:
+    PATH: "{{ ansible_env.HOME }}/.nvm/versions/node/v{{ node_version }}/bin:{{ ansible_env.PATH }}"
+
+- name: install typescript
+  npm:
+    name: typescript
+    global: true
+    state: present
+  environment:
+    PATH: "{{ ansible_env.HOME }}/.nvm/versions/node/v{{ node_version }}/bin:{{ ansible_env.PATH }}"
+
+- name: install typescript-language-server
+  npm:
+    name: typescript-language-server
     global: true
     state: present
   environment:

@@ -15,11 +15,6 @@
   :straight t
   :hook ((prog-mode . rainbow-mode)))
 
-;; @see lisp.el as I find this a bit annoying in PHP/JS modes
-;;(use-package smartparens
-;;  :straight t
-;;  :hook ((prog-mode . smartparens-mode)))
-
 ;; show the name of the current function definition in the modeline
 (use-package which-func
   :config
@@ -32,55 +27,21 @@
   :bind-keymap
   ("C-c p" . projectile-command-map))
 
-(use-package helm-projectile
-  :straight t
-  :config
-  (setq projectile-completion-system 'helm)
-  (helm-projectile-on)
-  (global-set-key (kbd "C-c p") 'helm-projectile))
-
-;; LSP
-(use-package lsp-mode
-  :straight t
-  :init
-  ;; set prefix for lsp-command-keymap (few alternatives - "C-l", "C-c l")
-  (setq lsp-keymap-prefix "C-c l")
-  ;; Do not auto-start but activate manually with "M-x lsp".
-  ;;:hook (
-  ;;(php-mode . lsp-deferred)
-  ;;(lsp-mode . lsp-enable-which-key-integration))
-  :commands lsp)
-
-;; We're currently not using LSP remotely and it causes
-;; forbidden reentrant call of tramp due to a response trunctation bug.
-;;(load (expand-file-name "custom-lsp-clients.el" config-dir))
-
-;; optionally
-(use-package lsp-ui :straight t :commands lsp-ui-mode)
-;; if you are helm user
-(use-package helm-lsp :commands helm-lsp-workspace-symbol)
-;; if you are ivy user
-(use-package lsp-ivy :commands lsp-ivy-workspace-symbol)
-(use-package lsp-treemacs :commands lsp-treemacs-errors-list)
-
 ;; Auto-complete
 (use-package company
   :straight t
-  :bind (("M-/" . company-complete))
+  ;;:bind (("M-/" . company-complete))
   :config
   (global-company-mode))
 
-;; optionally if you want to use debugger
-(use-package dap-mode :straight t)
-;; (use-package dap-LANGUAGE) to load the dap adapter for your language
 
-;; optional if you want which-key integration
+;; Keybinding help
 (use-package which-key
     :straight t
     :config
     (which-key-mode))
 
-;; optionally show indentation guides
+;; Indentation guides
 (use-package highlight-indent-guides
   :straight t
   ;;:hook (
@@ -89,3 +50,17 @@
   (setq highlight-indent-guides-method 'character
         highlight-indent-guides-responsive 'top)
   )
+
+;; Eglot for PHP and React
+(use-package eglot
+  :hook
+  (php-mode . eglot-ensure)  ;; Start Eglot for PHP files
+  (web-mode . (lambda ()     ;; Start Eglot for JSX/TSX in web-mode
+                (when (string-match-p "\\.jsx\\|\\.tsx\\'" buffer-file-name)
+                  (eglot-ensure))))
+  :config
+  (add-to-list 'eglot-server-programs
+               '(php-mode "intelephense" "--stdio"))
+  (add-to-list 'eglot-server-programs
+               '((web-mode :language-id "typescriptreact" "javascriptreact")
+                 "typescript-language-server" "--stdio")))

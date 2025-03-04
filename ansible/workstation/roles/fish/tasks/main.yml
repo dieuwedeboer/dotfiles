@@ -1,45 +1,29 @@
 ---
-- name: Fish really likes to have a .ssh directory
+- name: ensure .ssh directory exists as prerequisite
   file: name=~/.ssh state=directory mode=0700
 
+# config files for fish are handled by chezmoi
 - name: install fish
   apt:
     name: fish
     state: present
   become: true
 
-- name: install starship prompt
+- name: install Starship prompt
   shell: curl -sS https://starship.rs/install.sh | sh -s -- --yes
-
-- name: install starship config file
-  copy: src=starship.toml dest=~/.config/ force=no
-
-- name: install basic config.fish
-  copy: src=config.fish dest=~/.config/fish/ force=yes backup=yes
-  tags:
-    - config.fish
-
-- name: make sure completion directory exists
-  file: name=~/.config/fish/completions/ state=directory
-
-- name: install tmuxinator completion
-  copy:
-    src: tmuxinator.fish
-    dest: ~/.config/fish/completions/
 
 # else install omf will fail
 - name: run fish for the first time
   command: fish -c "echo first"
 
-- name: get omf
+- name: get oh-my-fish (this is obsolete)
   get_url:
     url: https://raw.githubusercontent.com/oh-my-fish/oh-my-fish/master/bin/install
     dest: /tmp/install-omf
     mode: 0755
 
-- name: install omf
+- name: install omf (deprecated)
   command: /tmp/install-omf --noninteractive creates=~/.config/fish/conf.d/omf.fish
 
-- name: install nvm support
+- name: install fish/omf nvm support (deprecated)
   command: fish -c "omf install nvm" creates=~/.local/share/omf/pkg/nvm/init.fish
-

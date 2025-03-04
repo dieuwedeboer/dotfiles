@@ -51,6 +51,5 @@ windows:
       # 'before' represents legacy functionality and will be deprecated in a future release, in favour of 'after'
       # synchronize: after
       panes:
-        - main: emacsclient -nw ~/.emacs.d/init.el
-        - main:
+        - main: e
         - shell:

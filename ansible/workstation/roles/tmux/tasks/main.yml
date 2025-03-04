@@ -7,26 +7,16 @@
     state: present
   become: true
 
+# config files are handled by chezmoi
 - name: install tmuxinator
   command: gem install tmuxinator creates=/usr/local/bin/tmuxinator
   become: true
 
-- name: create ~/.tmuxinator directory
-  file: name=~/.tmuxinator state=directory
-
-- name: create first tmuxinator project
-  copy: src=main.yml dest=~/.tmuxinator/ force=false backup=yes
-
+# config files are handled by chezmoi
 - name: install .tmux
   git:
     repo: "https://github.com/gpakosz/.tmux.git"
     dest: ~/.tmux
-
-- name: create .tmux.conf
-  file: src=~/.tmux/.tmux.conf dest=~/.tmux.conf state=link
-
-- name: create .tmux.conf.local
-  copy: src=.tmux.conf.local dest=~/.tmux.conf.local force=true backup=yes
 
 - name: install tpm
   git:

@@ -1,0 +1,16 @@
+---
+- name: install Chezmoi
+  shell:
+    cmd: sh -c "$(curl -fsLS get.chezmoi.io)" -- -b $HOME/.local/bin
+    creates: "~/.local/bin/chezmoi"
+
+- name: init Chezmoi via symlink of ~/src to ~/.local/share/chezmoi
+  file:
+    src: "~/src"
+    dest: "~/.local/share/chezmoi"
+    state: link
+    force: yes
+
+- name: apply Chezmoi dotfiles
+  command:
+    cmd: "chezmoi apply"

@@ -23,3 +23,4 @@
     - { role: "nodejs", tags: ["nodejs", "node", "nvm"] }
     - { name: "emacs", tags: ["emacs"] }
     - { name: "zfsnap", tags: ["zfsnap"] }
+    - { name: "chezmoi", tags: ["chezmoi", "dotfiles"] }
