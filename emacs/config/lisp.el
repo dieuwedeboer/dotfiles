@@ -31,7 +31,7 @@
 ;; Extra minor modes
 
 (use-package smartparens
-  :straight t
+  ;; :straight t ;; see general.el for base config
   :hook ((clojure-mode . smartparens-strict-mode)
          (cider-mode . smartparens-strict-mode)
          (emacs-lisp-mode . smartparens-strict-mode)

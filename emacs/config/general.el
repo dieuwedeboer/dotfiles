@@ -151,18 +151,32 @@
 
 ;; DOWNLOADED PACKAGES
 
+;; Cursor for Emacs (https://github.com/MatthewZMD/aidermacs)
+(use-package aidermacs
+  :straight (:host github :repo "MatthewZMD/aidermacs" :files ("*.el"))
+  :custom
+  (aidermacs-default-model "anthropic/claude-3-5-sonnet-20241022")
+  :config
+  (global-set-key (kbd "C-c a") 'aidermacs-transient-menu))
+
+;; direnv support
+(use-package envrc
+  :straight t
+  :config
+  (envrc-global-mode))
+
 ;; show available keybindings after you start typing
 (use-package which-key
   :straight t
   :config
-  (which-key-mode +1))
+  (which-key-mode t))
 
 (use-package exec-path-from-shell
   :straight t
   :config
   (exec-path-from-shell-initialize))
 
-;; smart pairing for all
+;; smart pairing (see lisp.el for hooks)
 (use-package smartparens
   :straight t
   :custom
