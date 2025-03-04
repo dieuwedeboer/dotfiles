@@ -7,16 +7,23 @@
     state: present
   become: true
 
-# config files are handled by chezmoi
 - name: install tmuxinator
   command: gem install tmuxinator creates=/usr/local/bin/tmuxinator
   become: true
 
-# config files are handled by chezmoi
-- name: install .tmux
+- name: install .tmux from Gregory Pakosz's oh-my-tmux
   git:
     repo: "https://github.com/gpakosz/.tmux.git"
     dest: ~/.tmux
+
+- name: ensure .config/tmux directory exists
+  file: name=~/.config/tmux state=directory mode=0700
+
+- name: symlink that .tmux.conf
+  file: src=~/.tmux/.tmux.conf dest=~/.config/tmux/tmux.conf state=link
+
+- name: copy that .tmux.conf.local (is also managed by chezmoi)
+  copy: src=~/.tmux/.tmux.conf.local dest=~/.config/tmux/tmux.conf.local force=true backup=yes
 
 - name: install tpm
   git:

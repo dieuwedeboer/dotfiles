@@ -16,7 +16,7 @@
 - name: run fish for the first time
   command: fish -c "echo first"
 
-- name: get oh-my-fish (this is obsolete)
+- name: get omf (warning this project is deprecated)
   get_url:
     url: https://raw.githubusercontent.com/oh-my-fish/oh-my-fish/master/bin/install
     dest: /tmp/install-omf
