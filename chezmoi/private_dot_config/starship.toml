@@ -1,10 +1,10 @@
 # Get editor completions based on the config schema
 "$schema" = 'https://starship.rs/config-schema.json'
 
-# Inserts a blank line between shell prompts
+# Insert a blank line between shell prompts
 add_newline = false
 
-# Improve format
+# Customise format
 format = """
 $username\
 $hostname\
@@ -30,14 +30,16 @@ $status\
 $shell\
 $character"""
 
-[username]
-show_always = true
-format = "[$user]($style)@"
+# [username]
+# show_always = true
+# format = "[$user]($style)@"
 
-[hostname]
-ssh_only = false
+# [hostname]
+# ssh_only = false
 
 # Replace the "❯" symbol in the prompt with "➜"
 [character]
 success_symbol = "[➜](bold green)"
 error_symbol = "[❯](bold red)"
+
+# for docs see: https://starship.rs/config/
