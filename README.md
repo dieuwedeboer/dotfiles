@@ -6,23 +6,17 @@ Useful environment configuration for various applications.
 
 ## Installation
 
-See ansible directory for new steps.
+See ansible directory for new installation steps.
 
-These are legacy instructions:
+Ansible will run `chezmoi apply` and put all the dotfiles in place.
 
-```
-git clone git@github.com:dieuwedeboer/dotfiles.git ~/.dotfiles
-~/.dotfiles/install.sh
-```
-## TODO
+## Todo
 
 * Finish shift to ansible with variable docroot (`~/src` is hardcoded).
-* Tweak fish to show directory and git remotes.
-* Use chezmoi for dotfiles (so remove them from ansible)
-* Eglot (PHP/TS) and Aidermacs out-of-the-box.
+* Tweak fish to show git remote.
 * Keep `.emacs.d` clean and re-theme for terminal.
 * Install/update lando.
-* Include GNOME top bar config.
+* Include bits of GNOME config and theme.
 
 ## Further inspiration
 
