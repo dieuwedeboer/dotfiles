@@ -2,28 +2,26 @@
 - name: ensure .ssh directory exists as prerequisite
   file: name=~/.ssh state=directory mode=0700
 
-# config files for fish are handled by chezmoi
 - name: install fish
   apt:
     name: fish
     state: present
   become: true
 
-- name: install Starship prompt
+- name: install Starship cross-shell prompt
   shell: curl -sS https://starship.rs/install.sh | sh -s -- --yes
 
-# else install omf will fail
-- name: run fish for the first time
+- name: run fish for the first time to prime it for omf
   command: fish -c "echo first"
 
-- name: get omf (warning this project is deprecated)
+- name: get omf to manage fish packages (unmaintained)
   get_url:
     url: https://raw.githubusercontent.com/oh-my-fish/oh-my-fish/master/bin/install
     dest: /tmp/install-omf
     mode: 0755
 
-- name: install omf (deprecated)
+- name: install omf (unmaintained)
   command: /tmp/install-omf --noninteractive creates=~/.config/fish/conf.d/omf.fish
 
-- name: install fish/omf nvm support (deprecated)
+- name: install fish/omf nvm support
   command: fish -c "omf install nvm" creates=~/.local/share/omf/pkg/nvm/init.fish

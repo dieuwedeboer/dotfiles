@@ -14,19 +14,16 @@
 - name: install .tmux from Gregory Pakosz's oh-my-tmux
   git:
     repo: "https://github.com/gpakosz/.tmux.git"
-    dest: ~/.tmux
+    dest: ~/src/.gpakosz-tmux
 
 - name: ensure .config/tmux directory exists
   file: name=~/.config/tmux state=directory mode=0700
 
-- name: symlink that .tmux.conf
-  file: src=~/.tmux/.tmux.conf dest=~/.config/tmux/tmux.conf state=link
-
-- name: copy that .tmux.conf.local (is also managed by chezmoi)
-  copy: src=~/.tmux/.tmux.conf.local dest=~/.config/tmux/tmux.conf.local force=true backup=yes
+- name: symlink .tmux.conf (.local will be applied by chezmoi)
+  file: src=~/src/.gpakosz-tmux/.tmux.conf dest=~/.config/tmux/tmux.conf state=link
 
 - name: install tpm
   git:
     repo: https://github.com/tmux-plugins/tpm
-    dest: ~/.tmux/plugins/tpm
+    dest: ~/.config/tmux/plugins/tpm
     force: true

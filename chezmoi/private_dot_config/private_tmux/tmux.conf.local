@@ -1,10 +1,6 @@
 # : << EOF
-# Oh my tmux!
-# 💛🩷💙🖤❤️🤍
-# https://github.com/gpakosz/.tmux
-# (‑●‑●)> dual licensed under the WTFPL v2 license and the MIT license,
-#         without any warranty.
-#         Copyright 2012— Gregory Pakosz (@gpakosz).
+# see https://github.com/gpakosz/.tmux for instructions and copyright
+# fully customised for personal use (see ~/.config/tmux/tmux.conf for base setup)
 
 
 # -- bindings ------------------------------------------------------------------
@@ -370,24 +366,22 @@ tmux_conf_theme_clock_style="24"
 #   - false (default)
 #   - disabled
 # on Linux, this requires xsel, xclip or wl-copy
-tmux_conf_copy_to_os_clipboard=false
-
-
-# -- urlscan -------------------------------------------------------------------
-
-# options passed to urlscan
-tmux_conf_urlscan_options="--compact --dedupe"
+tmux_conf_copy_to_os_clipboard=true
 
 
 # -- user customizations -------------------------------------------------------
 
 # this is the place to override or undo settings
 
+# Add a special key to paste from system clipboard
+#unbind-key -n v
+bind-key v run-shell "xsel -o -b | tmux load-buffer - ; tmux paste-buffer"
+
 # increase history size
-#set -g history-limit 10000
+set -g history-limit 10000
 
 # start with mouse mode enabled
-#set -g mouse on
+set -g mouse on
 
 # force Vi mode
 #   really you should export VISUAL or EDITOR environment variable, see manual
@@ -395,11 +389,13 @@ tmux_conf_urlscan_options="--compact --dedupe"
 #set -g mode-keys vi
 
 # replace C-b by C-a instead of using both prefixes
-# set -gu prefix2
-# unbind C-a
+set -gu prefix2
+unbind C-a
 # unbind C-b
+set -gu prefix
 # set -g prefix C-a
 # bind C-a send-prefix
+set -g prefix C-\\ # needed to recognise backslash
 
 # if you don't want Oh my tmux! to alter a binding or a setting, use #!important
 # bind c new-window -c '#{pane_current_path}' #!important
@@ -407,6 +403,48 @@ tmux_conf_urlscan_options="--compact --dedupe"
 # move status line to top
 #set -g status-position top
 
+# split current window vertically
+unbind _
+bind | split-window -h
+
+# use Alt-Left and Alt-Right to navigate between page
+#unbind -n M-left
+#unbind -n M-Right
+#bind -n M-Left previous-window
+#bind -n M-Right next-window
+bind -n M-Left select-pane -L  # move left
+bind -n M-Right select-pane -R # move right
+bind -n M-Up select-pane -U    # move up
+bind -n M-Down select-pane -D  # move down
+
+# Use Alt-Shift-Left/Right to navigate between windows
+bind -n M-S-Left previous-window
+bind -n M-S-Right next-window
+
+# Select window with Alt-<num>
+bind -n M-1 select-window -t 1
+bind -n M-2 select-window -t 2
+bind -n M-3 select-window -t 3
+bind -n M-4 select-window -t 4
+bind -n M-5 select-window -t 5
+bind -n M-6 select-window -t 6
+bind -n M-7 select-window -t 7
+bind -n M-8 select-window -t 8
+bind -n M-9 select-window -t 9
+
+# Join a window as pane to another
+# start in the window where you want your selected pane to appear, then
+# pick the pane you want to have in your window.
+bind-key          S choose-window "join-pane -v -s "%%""
+bind-key          V choose-window "join-pane -h -s "%%""
+
+# tip: if you want to make a window the first in the list, do: ": swap-window t 1"
+
+# pane resizing should give me more time
+bind -r H resize-pane -L 3
+bind -r J resize-pane -D 3
+bind -r K resize-pane -U 3
+bind -r L resize-pane -R 3
 
 # -- tpm -----------------------------------------------------------------------
 
@@ -449,6 +487,12 @@ tmux_conf_uninstall_plugins_on_reload=true
 #set -g @plugin 'tmux-plugins/tmux-continuum'
 #set -g @continuum-restore 'on'
 
+set -g @plugin 'tmux-plugins/tmux-open'
+set -g @open-s 'https://www.google.com.br/search?q='
+
+# much better experience selecting with mouse
+set -g @plugin 'tmux-plugins/tmux-yank'
+set -g @yank_action 'copy-pipe-no-clear'
 
 # -- custom variables ----------------------------------------------------------
 

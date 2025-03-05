@@ -36,3 +36,6 @@ if status is-interactive
 	echo Emacs lock file exists, will not start tmux. >&2
     end
 end
+
+export PATH="/home/dieuwe/.lando/bin:$PATH"; #landopath
+

@@ -18,3 +18,5 @@ session.*
 eln-cache/
 undo/
 recentf
+auto-save-list/
+emacs-*/
