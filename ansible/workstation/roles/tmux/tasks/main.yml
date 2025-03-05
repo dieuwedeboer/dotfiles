@@ -17,7 +17,7 @@
     dest: ~/src/.gpakosz-tmux
 
 - name: ensure .config/tmux directory exists
-  file: name=~/.config/tmux state=directory mode=0700
+  file: name=~/.config/tmux state=directory mode=0775
 
 - name: symlink .tmux.conf (.local will be applied by chezmoi)
   file: src=~/src/.gpakosz-tmux/.tmux.conf dest=~/.config/tmux/tmux.conf state=link
