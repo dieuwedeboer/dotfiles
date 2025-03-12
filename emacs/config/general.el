@@ -25,6 +25,7 @@
 (fset 'yes-or-no-p 'y-or-n-p)
 
 ;; The blinking cursor is nothing but an annoyance.
+;; TODO still blinks on terminal
 (blink-cursor-mode -1)
 
 ;; disable the annoying bell ring
@@ -152,11 +153,12 @@
 ;; DOWNLOADED PACKAGES
 
 ;; Cursor for Emacs (https://github.com/MatthewZMD/aidermacs)
+;; envars should be loaded into shell (source ~/.envrc)
+;; default model is free to use (currently Google is best on offer)
 (use-package aidermacs
   :straight (:host github :repo "MatthewZMD/aidermacs" :files ("*.el"))
-  :custom
-  (aidermacs-default-model "anthropic/claude-3-5-sonnet-20241022")
   :config
+  (setq aidermacs-default-model "gemini/gemini-2.0-flash")
   (global-set-key (kbd "C-c a") 'aidermacs-transient-menu))
 
 ;; direnv support

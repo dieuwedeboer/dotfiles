@@ -6,8 +6,8 @@ fundle init
 # make sure .local/bin is in path
 set PATH $PATH ~/.local/bin
 
-# use vim
-alias vi vim
+# indispensable aliases
+alias vi vim # use vim
 alias e="emacsclient -nw"
 
 # better prompt
@@ -20,6 +20,7 @@ set PATH $PATH ~/go/bin
 nvm use default
 
 # direnv
+# [workstation variable exports and keys load from ~/.envrc]
 direnv hook fish | source
 
 # start tmux immediately
@@ -39,10 +40,3 @@ end
 
 # lando
 export PATH="/home/dieuwe/.lando/bin:$PATH";
-
-# default AWS profile
-export AWS_PROFILE=xplainhosting
-
-# enable ibus hybrid asynchronous processing
-# IBUS default results in laggy keyboard input in 24.10
-export IBUS_ENABLE_SYNC_MODE=2
