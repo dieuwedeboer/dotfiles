@@ -37,5 +37,12 @@ if status is-interactive
     end
 end
 
-export PATH="/home/dieuwe/.lando/bin:$PATH"; #landopath
+# lando
+export PATH="/home/dieuwe/.lando/bin:$PATH";
 
+# default AWS profile
+export AWS_PROFILE=xplainhosting
+
+# enable ibus hybrid asynchronous processing
+# IBUS default results in laggy keyboard input in 24.10
+export IBUS_ENABLE_SYNC_MODE=2

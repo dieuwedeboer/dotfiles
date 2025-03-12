@@ -55,16 +55,9 @@
 
 ;; WIP
 
-;; scroll before reaching end of bottom, and also scroll without jumping
-(use-package smooth-scrolling
-  :straight t
-  :config
-  (smooth-scrolling-mode 1)
-  (setq smooth-scroll-margin 4))
-
 ;; No longer using a theme, we simply change only the minimum we need
 (custom-set-faces
- '(diff-hl-insert ((t (:foreground "#333" :background "#00AB00"))))
- '(diff-hl-delete ((t (:foreground "#EEE" :background "#AB0000"))))
- '(diff-hl-change ((t (:foreground "#EEE" :background "#0000AB"))))
+ '(diff-hl-insert ((t (:foreground "#5fff00" :background "none"))))
+ '(diff-hl-delete ((t (:foreground "#d70000" :background "none"))))
+ '(diff-hl-change ((t (:foreground "#00afff" :background "none"))))
  )
