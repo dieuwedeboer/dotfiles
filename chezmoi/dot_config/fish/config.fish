@@ -4,23 +4,20 @@ fundle plugin 'danhper/fish-ssh-agent'
 fundle init
 
 # make sure .local/bin is in path
-set PATH $PATH ~/.local/bin
+fish_add_path ~/.local/bin
 
-# indispensable aliases
-alias vi vim # use vim
-alias e="emacsclient -nw"
+# indispensable aliases (prefer abbreviations)
+alias vi vim
+abbr e 'emacsclient -nw'
+abbr drush 'lando drush'
 
 # better prompt
 starship init fish | source
-
-# access go installs
-set PATH $PATH ~/go/bin
 
 # switch to default node
 nvm use default
 
 # direnv
-# [workstation variable exports and keys load from ~/.envrc]
 direnv hook fish | source
 
 # start tmux immediately
@@ -39,4 +36,7 @@ if status is-interactive
 end
 
 # lando
-export PATH="/home/dieuwe/.lando/bin:$PATH";
+fish_add_path ~/.lando/bin
+
+# local exports and overrides
+source ~/.config/fish/local.fish
