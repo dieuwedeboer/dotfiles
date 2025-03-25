@@ -11,9 +11,36 @@
 (xterm-mouse-mode t)
 
 ;; Mouse-select in terminal emacs should also copy to primary selection.
-(setq mouse-drag-copy-region t)
-(setq x-select-enable-primary t)
-(setq x-select-enable-clipboard t)
+;; Better copy and paste behaviour (with special Wayland integration).
+;; (Bug: ctrl shift c has never worked - why?)
+;; (Bug: copying outside emacs resets the kill-ring to underlying terminal text)
+(use-package select
+  :demand t
+  :custom
+  (mouse-drag-copy-region t)
+  (save-interprogram-paste-before-kill t)
+  (select-enable-clipboard t)
+  (select-enable-primary t)
+  (selection-coding-system 'utf-8)
+  :config
+  (global-set-key [mouse-2] 'mouse-yank-at-click)
+  :init
+  (setq-default wl-copy-process nil)
+  (when (string-prefix-p "wayland" (getenv "WAYLAND_DISPLAY"))
+    (defun wl-copy-handler (text)
+      (setq wl-copy-process (make-process :name "wl-copy"
+                                          :buffer nil
+                                          :command '("wl-copy" "-f" "-n")
+                                          :connection-type 'pipe))
+      (process-send-string wl-copy-process text)
+      (process-send-eof wl-copy-process))
+    (defun wl-paste-handler ()
+      (if (and wl-copy-process (process-live-p wl-copy-process))
+          nil ; should return nil if we're the current paste owner
+        (shell-command-to-string "wl-paste -n | tr -d \r")))
+    (setq interprogram-cut-function 'wl-copy-handler
+          interprogram-paste-function 'wl-paste-handler))
+)
 
 ;; icomplete / fido for autocompletion
 (fido-vertical-mode t)
