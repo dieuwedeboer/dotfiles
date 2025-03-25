@@ -1,3 +1,10 @@
 ---
 - name: make sure ~/.local/bin exists
   file: name=~/.local/bin state=directory
+
+- name: download ack
+  get_url:
+    url: https://beyondgrep.com/ack-v3.8.1
+    dest: ~/.local/bin/ack
+    mode: '0755'
+    force: yes
