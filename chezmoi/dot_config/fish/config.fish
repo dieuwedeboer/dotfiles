@@ -10,30 +10,28 @@ fish_add_path ~/.local/bin
 alias vi vim
 abbr e 'emacsclient -nw'
 abbr drush 'lando drush'
+abbr t 'tmuxinator start main'
 
 # better prompt
 starship init fish | source
-
-# switch to default node
-nvm use default
 
 # direnv
 direnv hook fish | source
 
 # start tmux immediately
-if status is-interactive
-    and not set -q TMUX
-    if not test -e ~/.emacs.d/.emacs.desktop.lock
-	tmux has-session -t main 2> /dev/null
-	if [ $status -ne 0 ]
-	    exec tmuxinator start main
-	else
-	    echo "tmux session already running; to return to it, type: tmuxinator start main"
-	end
-    else
-	echo Emacs lock file exists, will not start tmux. >&2
-    end
-end
+#if status is-interactive
+#    and not set -q TMUX
+#    if not test -e ~/.emacs.d/.emacs.desktop.lock
+#	tmux has-session -t main 2> /dev/null
+#	if [ $status -ne 0 ]
+#	    exec tmuxinator start main
+#	else
+#	    echo "tmux session already running; to return to it, type: tmuxinator start main"
+#	end
+#    else
+#	echo Emacs lock file exists, will not start tmux. >&2
+#    end
+#end
 
 # lando
 fish_add_path ~/.lando/bin

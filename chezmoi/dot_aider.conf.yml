@@ -1,0 +1,12 @@
+read:
+  - CONVENTIONS.md
+architect: true
+auto-commits: false
+yes-always: true
+detect-urls: false
+dark-mode: true
+
+model: gemini-2.5-pro
+#model: deepseek/deepseek-chat
+#model: openrouter/google/gemini-2.5-pro-exp-03-25:free
+#editor-model: gemini-2.5-pro

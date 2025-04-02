@@ -18,9 +18,6 @@ $git_state\
 $git_metrics\
 $git_status\
 $docker_context\
-$php\
-$nodejs\
-$elm\
 $helm\
 $nim\
 $python\
