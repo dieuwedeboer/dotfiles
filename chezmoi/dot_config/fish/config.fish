@@ -11,6 +11,9 @@ alias vi vim
 abbr e 'emacsclient -nw'
 abbr drush 'lando drush'
 abbr t 'tmuxinator start main'
+abbr texit 'tmuxinator stop main'
+# fix common misspellings
+abbr got git
 
 # better prompt
 starship init fish | source
@@ -35,6 +38,9 @@ direnv hook fish | source
 
 # lando
 fish_add_path ~/.lando/bin
+
+# composer
+fish_add_path ~/.composer/vendor/bin
 
 # local exports and overrides
 source ~/.config/fish/local.fish
