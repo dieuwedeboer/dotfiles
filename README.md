@@ -4,6 +4,9 @@ More than just dotfiles - repeatable system setups.
 
 Useful environment configuration for various applications.
 
+Alacrity with fish and tmux form the basis for a full in-terminal development
+experience.
+
 ## Installation
 
 ```

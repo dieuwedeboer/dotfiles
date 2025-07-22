@@ -13,7 +13,6 @@
       - texinfo
       - libtree-sitter-dev
       - libdbus-1-dev
-      - pipx
       - libxml2-dev
       - libgpm-dev
     state: present
@@ -61,14 +60,3 @@
     dest: "~/.emacs.d"
     state: link
     force: yes
-
-- name: install aider
-  command:
-    cmd: "pipx install aider-install"
-  tags: aider
-
-- name: install aider
-  command:
-    cmd: "aider-install"
-    creates: ~/.local/bin/aider
-  tags: aider

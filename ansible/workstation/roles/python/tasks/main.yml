@@ -1,11 +1,31 @@
 ---
-# Install Python and related packages
-
-- name: install python packages
+- name: Install Python and base packages
   apt:
     name:
       - python3
       - python3-pip
       - python3-venv
+      - python3-dev
+      - pipx
     state: present
   become: true
+
+- name: Download aider installer using pipx
+  command:
+    cmd: "pipx install aider-install"
+  tags: aider
+- name: Install aider
+  command:
+    cmd: "aider-install"
+    creates: ~/.local/bin/aider
+  tags: aider
+
+- name: Install git-remote-codecommit using pipx
+  command: "pipx install git-remote-codecommit"
+  become: false
+
+- name: Install playwright using pipx
+  command: "pipx install playwright --include-deps"
+
+- name: Install playwright browsers
+  command: "playwright install"
