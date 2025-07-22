@@ -51,3 +51,11 @@
     state: present
   environment:
     PATH: "{{ ansible_env.HOME }}/.nvm/versions/node/v{{ node_version }}/bin:{{ ansible_env.PATH }}"
+
+- name: install claude-code
+  npm:
+    name: "@anthropic-ai/claude-code"
+    global: true
+    state: present
+  environment:
+    PATH: "{{ ansible_env.HOME }}/.nvm/versions/node/v{{ node_version }}/bin:{{ ansible_env.PATH }}"
