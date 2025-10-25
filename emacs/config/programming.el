@@ -64,3 +64,7 @@
   (add-to-list 'eglot-server-programs
                '((web-mode :language-id "typescriptreact" "javascriptreact")
                  "typescript-language-server" "--stdio")))
+
+;; Shaders
+(use-package glsl-mode
+    :straight t)

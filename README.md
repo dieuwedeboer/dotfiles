@@ -26,7 +26,8 @@ removed in the future.
 * Finish shift to ansible with variable docroot (`~/src` is hardcoded).
 * Tweak fish to show git remote and add ~/bin to path.
 * Keep `.emacs.d` clean.
-* Install ack.
+* Install ack. (DONE?)
+* Install composer and drupalorg plus drupal-check global.
 * Install/update lando.
 * Improve both tmux and emacs themes to my liking.
 * Include bits of GNOME config and theme.
