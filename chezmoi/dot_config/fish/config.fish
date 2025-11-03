@@ -14,6 +14,7 @@ fish_add_path ~/.local/bin
 # indispensable aliases (prefer abbreviations)
 alias vi vim
 abbr e 'emacsclient -nw'
+abbr z 'zellij'
 abbr drush 'lando drush'
 abbr t 'tmuxinator start main'
 abbr texit 'tmuxinator stop main'
@@ -44,8 +45,8 @@ direnv hook fish | source
 # lando
 fish_add_path ~/.lando/bin
 
-# composer
-fish_add_path ~/.composer/vendor/bin
+# composer global
+fish_add_path ~/.config/composer/vendor/bin
 
 # local exports and overrides
 source ~/.config/fish/local.fish

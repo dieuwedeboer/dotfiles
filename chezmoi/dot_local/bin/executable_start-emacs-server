@@ -1,0 +1,19 @@
+#!/bin/bash
+
+LOCKFILE="$HOME/.emacs.d/.emacs.desktop.lock"
+
+if [ -f "$LOCKFILE" ]; then
+    PID=$(cat "$LOCKFILE")
+    if kill -0 "$PID" 2>/dev/null; then
+        echo "Emacs server already running (PID $PID)"
+        exit 0
+    else
+        echo "Stale lockfile found, removing..."
+        rm "$LOCKFILE"
+    fi
+fi
+
+# Start the daemon
+emacs --daemon &
+PID=$!
+echo "Started Emacs server (PID $PID)"

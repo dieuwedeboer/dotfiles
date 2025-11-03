@@ -12,5 +12,8 @@
     force: yes
 
 - name: apply Chezmoi dotfiles
-  command:
-    cmd: "chezmoi apply"
+  expect:
+    command: chezmoi apply
+    responses:
+      'overwrite\?': 's'
+    timeout: 10

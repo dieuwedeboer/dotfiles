@@ -8,8 +8,7 @@
   vars:
     nvm_version: 0.40.1
     node_version: 20.18.1
-    emacs_version: 29.4
-    libgccjit_version: 14 # must match gcc version
+    emacs_version: 30.2
 
   roles:
     - { name: "base", tags: ["base"] }

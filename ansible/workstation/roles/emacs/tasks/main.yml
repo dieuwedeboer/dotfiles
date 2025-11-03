@@ -1,5 +1,12 @@
 ---
 
+- name: get gcc major version for libgccjit
+  shell: gcc --version | head -1 | awk '{print $3}' | cut -d. -f1
+  register: gcc_major
+
+- set_fact:
+    libgccjit_version: "{{ gcc_major.stdout }}"
+
 - name: install dependencies to compile emacs
   apt:
     name:
@@ -15,6 +22,7 @@
       - libdbus-1-dev
       - libxml2-dev
       - libgpm-dev
+      - libgtk-3-dev
     state: present
   become: true
 
@@ -27,7 +35,7 @@
 
 - name: configure Emacs
   command:
-    cmd: "./configure --without-x --with-native-compilation --with-json --with-tree-sitter"
+    cmd: "./configure --with-pgtk --with-native-compilation --with-json --with-tree-sitter"
     chdir: ~/src/emacs/emacs-{{emacs_version}}
     creates: ~/src/emacs/emacs-{{emacs_version}}/src/emacs
 

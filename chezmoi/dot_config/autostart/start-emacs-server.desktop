@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Exec=start-emacs-server
+Terminal=true
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name[en_GB]=Emacs Server
+Name=Emacs Server
+Comment[en_GB]=See script in ~/.local/bin
+Comment=See script in ~/.local/bin

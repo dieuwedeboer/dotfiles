@@ -4,12 +4,16 @@
   apt: name=zfsnap
   become: true
 
+- name: install libpam-zfs
+  apt: name=libpam-zfs
+  become: true
+
 - name: snapshot home directory every hour, keep 14 days
   cron:
     cron_file: zfsnap
     name: "Hourly snap of home directory"
     minute: 5
     hour: 6-21
-    job: "/usr/sbin/zfSnap -d -a 14d rpool/dieuwe"
+    job: "/usr/sbin/zfSnap -d -a 14d rpool/home/{{ ansible_user }}"
     user: "root"
   become: true
