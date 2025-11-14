@@ -16,5 +16,7 @@
       - libgc-dev
       - silversearcher-ag
       - wl-clipboard
+      - bible-kjv
+      - nvim
     state: present
   become: true

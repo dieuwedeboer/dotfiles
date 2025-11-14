@@ -1,23 +1,33 @@
 # introduction
 function fish_greeting
-  echo $(randverse) | sed -E 's/  +/:/g'
+    echo $(randverse) | sed -E 's/  +/:/g'
 end
 
 # install fundle
-if not functions -q fundle; eval (curl -sfL https://git.io/fundle-install); end
-fundle plugin 'danhper/fish-ssh-agent'
+if not functions -q fundle
+    eval (curl -sfL https://git.io/fundle-install)
+end
+fundle plugin danhper/fish-ssh-agent
 fundle init
+
+# allow sudo to expand user fish alias and abbr by wrapping args
+function sudo
+    command sudo -sE $argv
+end
 
 # make sure .local/bin is in path
 fish_add_path ~/.local/bin
 
-# indispensable aliases (prefer abbreviations)
-alias vi vim
+# aliases (discouraged - not transparent)
+alias vi nvim
+
+# abbreviations (encouraged)
 abbr e 'emacsclient -nw'
 abbr z 'zellij'
 abbr drush 'lando drush'
 abbr t 'tmuxinator start main'
 abbr texit 'tmuxinator stop main'
+
 # fix common misspellings
 abbr got git
 
