@@ -1,8 +1,0 @@
-read: [README.md]
-architect: true
-auto-commits: false
-yes-always: true
-detect-urls: false
-dark-mode: true
-
-model: openrouter/deepseek/deepseek-chat:free
