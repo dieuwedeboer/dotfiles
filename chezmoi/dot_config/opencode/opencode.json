@@ -1,9 +1,9 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "lsp": {
-    "custom-lsp": {
-      "command": ["intelephense", "--stdio"],
-      "extensions": [".php", ".module"]
+  "mcp": {
+    "chrome-devtools": {
+      "type": "local",
+      "command": ["npx", "-y", "chrome-devtools-mcp@latest"]
     }
   }
 }
