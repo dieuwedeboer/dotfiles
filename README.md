@@ -13,6 +13,7 @@ experience.
 
 ```
 git clone git@github.com:dieuwedeboer/dotfiles.git
+ln -s ~/dotfiles/chezmoi ~/.local/share/chezmoi
 cd ~/dotfiles/ansible/workstation
 cat README.md
 ```
