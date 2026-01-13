@@ -1,22 +1,13 @@
-# introduction
+# cachyos defaults (todo - only take what I want from here or write a summary of features)
+source /usr/share/cachyos-fish-config/cachyos-config.fish
+
+# introduction (todo - still run fastfetch on first start up)
 function fish_greeting
     echo $(randverse) | sed -E 's/  +/:/g'
 end
 
-# install fundle
-if not functions -q fundle
-    eval (curl -sfL https://git.io/fundle-install)
-end
-fundle plugin danhper/fish-ssh-agent
-fundle init
-
-# allow sudo to expand user fish alias and abbr by wrapping args
-function sudo
-    command sudo -sE $argv
-end
-
-# make sure .local/bin is in path
-fish_add_path ~/.local/bin
+# local bin
+#fish_add_path ~/.local/bin
 
 # aliases (discouraged - not transparent)
 alias vi nvim
@@ -25,8 +16,6 @@ alias vi nvim
 abbr e 'emacsclient -nw'
 abbr z 'zellij'
 abbr drush 'lando drush'
-abbr t 'tmuxinator start main'
-abbr texit 'tmuxinator stop main'
 
 # fix common misspellings
 abbr got git
@@ -37,26 +26,15 @@ starship init fish | source
 # direnv
 direnv hook fish | source
 
-# start tmux immediately
-#if status is-interactive
-#    and not set -q TMUX
-#    if not test -e ~/.emacs.d/.emacs.desktop.lock
-#	tmux has-session -t main 2> /dev/null
-#	if [ $status -ne 0 ]
-#	    exec tmuxinator start main
-#	else
-#	    echo "tmux session already running; to return to it, type: tmuxinator start main"
-#	end
-#    else
-#	echo Emacs lock file exists, will not start tmux. >&2
-#    end
-#end
+# opencode
+fish_add_path ~/.opencode/bin
 
 # lando
 fish_add_path ~/.lando/bin
 
-# composer global
+# composer
 fish_add_path ~/.config/composer/vendor/bin
 
 # local exports and overrides
 source ~/.config/fish/local.fish
+

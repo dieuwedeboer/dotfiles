@@ -1,8 +1,0 @@
-/* Import Yaru dark theme as the base */
-@import url("/usr/share/gnome-shell/theme/Yaru-dark/gnome-shell.css");
-
-/* Customise top bar */
-#panel {
-    background-color: rgba(42, 42, 42, 0.8);
-    font-family: "SauceCodePro Nerd Font Mono", Roboto, sans-serif;
-}
