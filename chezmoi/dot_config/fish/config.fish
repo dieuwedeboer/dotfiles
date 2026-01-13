@@ -1,13 +1,14 @@
 # cachyos defaults (todo - only take what I want from here or write a summary of features)
 source /usr/share/cachyos-fish-config/cachyos-config.fish
 
-# introduction (todo - still run fastfetch on first start up)
+# introduction
 function fish_greeting
-    echo $(randverse) | sed -E 's/  +/:/g'
+    if not set -q ZELLIJ
+        fastfetch
+    else
+        echo $(randverse) | sed -E 's/  +/:/g'
+    end
 end
-
-# local bin
-#fish_add_path ~/.local/bin
 
 # aliases (discouraged - not transparent)
 alias vi nvim
@@ -37,4 +38,3 @@ fish_add_path ~/.config/composer/vendor/bin
 
 # local exports and overrides
 source ~/.config/fish/local.fish
-
