@@ -1,0 +1,17 @@
+vim.cmd("colorscheme default")
+
+vim.api.nvim_set_hl(0, "Normal", { bg = "NONE", ctermbg = "NONE" })
+vim.api.nvim_set_hl(0, "NormalNC", { bg = "NONE", ctermbg = "NONE" })
+vim.api.nvim_set_hl(0, "NormalFloat", { bg = "NONE", ctermbg = "NONE" })
+vim.api.nvim_set_hl(0, "FloatBorder", { bg = "NONE", ctermbg = "NONE" })
+vim.api.nvim_set_hl(0, "CursorLine", { bg = "NONE", ctermbg = "NONE" })
+vim.api.nvim_set_hl(0, "CursorLineNr", { bg = "NONE", ctermbg = "NONE" })
+vim.api.nvim_set_hl(0, "LineNr", { bg = "NONE", ctermbg = "NONE" })
+vim.api.nvim_set_hl(0, "Folded", { bg = "NONE", ctermbg = "NONE" })
+vim.api.nvim_set_hl(0, "EndOfBuffer", { bg = "NONE", ctermbg = "NONE" })
+vim.api.nvim_set_hl(0, "NonText", { bg = "NONE", ctermbg = "NONE" })
+vim.api.nvim_set_hl(0, "SignColumn", { bg = "NONE", ctermbg = "NONE" })
+vim.api.nvim_set_hl(0, "WinSeparator", { bg = "NONE", ctermbg = "NONE" })
+
+vim.api.nvim_set_hl(0, "StatusLine", { bg = "#2E3440", fg = "#ECEFF4", bold = true })
+vim.api.nvim_set_hl(0, "StatusLineNC", { bg = "#3B4252", fg = "#D8DEE9" })

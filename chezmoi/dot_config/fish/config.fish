@@ -1,10 +1,11 @@
 # cachyos defaults (todo - only take what I want from here or write a summary of features)
 source /usr/share/cachyos-fish-config/cachyos-config.fish
 
-# introduction
+# hello there
 function fish_greeting
-    if not set -q ZELLIJ
+    if not set -q FASTFETCH_GREETING
         fastfetch
+        set -U FASTFETCH_GREETING 1
     else
         echo $(randverse) | sed -E 's/  +/:/g'
     end
