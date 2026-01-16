@@ -3,9 +3,8 @@ source /usr/share/cachyos-fish-config/cachyos-config.fish
 
 # hello there
 function fish_greeting
-    if not set -q FASTFETCH_GREETING
+    if not set -q ZELLIJ
         fastfetch
-        set -U FASTFETCH_GREETING 1
     else
         echo $(randverse) | sed -E 's/  +/:/g'
     end
