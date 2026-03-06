@@ -125,8 +125,8 @@ else
 fi
 
 if [ -f /etc/mkinitcpio.conf ]; then
-    if grep -q "fsck" /etc/mkinitcpio.conf; then
-        sudo sed -i 's/fsck//' /etc/mkinitcpio.conf
+    if grep -q "^HOOKS.*fsck" /etc/mkinitcpio.conf; then
+        sudo sed -i '/^HOOKS/s/fsck//' /etc/mkinitcpio.conf
     else
         echo "  fsck hook already removed"
     fi
