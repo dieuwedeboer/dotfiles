@@ -36,9 +36,12 @@ AUR_PACKAGES=(
 )
 
 FLATPAK_PACKAGES=(
-    com.xmcl.XMCL
-    com.spotify.Client
+    com.xmcl.voxelum
+    com.adamcake.Bolt
     com.discord.Discord
+    com.spotify.Client
+    org.kde.kdenlive
+    org.signal.Signal
 )
 
 echo "=== Installing pacman packages ==="
