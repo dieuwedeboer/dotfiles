@@ -7,39 +7,37 @@ DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 
 echo "=== Dieuwe's Dotfiles Installer ==="
 
-if ! command -v chezmoi &> /dev/null; then
-    echo "Installing chezmoi..."
-    curl -sfL https://get.chezmoi.io | sh -s -- -b ~/.local/bin
-    export PATH="$HOME/.local/bin:$PATH"
-fi
+echo "Installing packages first..."
+"$SCRIPT_DIR/setup-packages.sh"
 
 if [ ! -L "$HOME/.local/share/chezmoi" ]; then
     if [ -d "$HOME/.local/share/chezmoi" ]; then
-        echo "Warning: ~/.local/share/chezmoi exists and is not a symlink. Skipping."
-    else
-        echo "Linking dotfiles via chezmoi..."
-        ln -s "$DOTFILES_DIR/chezmoi" "$HOME/.local/share/chezmoi"
+        echo "Moving existing chezmoi to ~/.local/share/chezmoi.bk..."
+        mv "$HOME/.local/share/chezmoi" "$HOME/.local/share/chezmoi.bk"
     fi
+    echo "Linking dotfiles via chezmoi..."
+    ln -s "$DOTFILES_DIR/chezmoi" "$HOME/.local/share/chezmoi"
 else
     echo "Chezmoi already linked."
 fi
 
+if command -v chezmoi &> /dev/null; then
+    echo "Applying chezmoi..."
+    chezmoi apply
+else
+    echo "Warning: chezmoi not installed, skipped dotfiles setup"
+fi
+
 if [ ! -L "$HOME/.emacs.d" ]; then
     if [ -d "$HOME/.emacs.d" ]; then
-        echo "Warning: ~/.emacs.d exists and is not a symlink. Skipping."
-    else
-        echo "Linking emacs config..."
-        ln -s "$DOTFILES_DIR/emacs" "$HOME/.emacs.d"
+        echo "Moving existing emacs.d to ~/.emacs.d.bk..."
+        mv "$HOME/.emacs.d" "$HOME/.emacs.d.bk"
     fi
+    echo "Linking emacs config..."
+    ln -s "$DOTFILES_DIR/emacs" "$HOME/.emacs.d"
 else
     echo "Emacs config already linked."
 fi
-
-echo "Running setup-packages.sh..."
-"$SCRIPT_DIR/setup-packages.sh"
-
-echo "Applying chezmoi..."
-chezmoi apply
 
 HOSTNAME=$(hostname)
 
