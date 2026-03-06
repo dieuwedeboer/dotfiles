@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+set -x
 
 echo "=== Arch Linux Setup Script ==="
 echo "This script is idempotent and safe to re-run."
