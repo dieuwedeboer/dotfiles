@@ -32,6 +32,7 @@ AUR_PACKAGES=(
     bible-kjv
     zoom
     cura-bin
+    opencode
 )
 
 FLATPAK_PACKAGES=(
@@ -136,11 +137,6 @@ if [ -f /etc/vconsole.conf ]; then
 fi
 
 echo "=== Installing additional tools ==="
-if ! command -v opencode &> /dev/null; then
-    curl -fsSL https://opencode.ai/install | sh
-else
-    echo "  opencode already installed"
-fi
 
 if ! command -v lando &> /dev/null; then
     /bin/bash -c "$(curl -fsSL https://get.lando.dev/setup-lando.sh)"
