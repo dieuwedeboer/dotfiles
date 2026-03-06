@@ -4,7 +4,7 @@ export const EnvProtection = async ({ client, $ }) => {
       execute: {
         before: async (input, output) => {
           if (input.tool === "read" && output.args.filePath.includes(".env")) {
-            throw new Error("Do not read .env files")
+            throw new Error("Access denied: try the .env.example instead or ask for user input")
           }
         }
       }

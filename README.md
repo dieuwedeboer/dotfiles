@@ -1,38 +1,90 @@
 # Dieuwe's Dotfiles
 
-In the process of a rewrite for Arch (CachyOS).
+Repeatable system setup for Arch Linux (CachyOS).
 
-More than just dotfiles - repeatable system setups.
+## Table of Contents
 
-Useful environment configuration for various applications.
-
-Alacrity with fish and zellij form the basis for a full in-terminal development
-experience.
+- [Installation](#installation)
+  - [Initial Setup](#initial-setup)
+  - [ZFS with Native Encryption](#zfs-with-native-encryption)
+  - [Bootloader (rEFInd + ZFSBootMenu)](#bootloader-refind--zfsbootmenu)
+  - [Dotfiles](#dotfiles)
+- [Legacy Setup](#legacy-setup)
 
 ## Installation
 
+### Initial Setup
+
+1. Boot into CachyOS live USB (UEFI mode)
+2. Use the GUI installer:
+   - Create FAT32 EFI partition (1024MB, mount at `/boot/efi`)
+   - Create ZFS root partition with encryption enabled
+   - Select KDE Plasma as desktop environment
+3. If installer crashes, try: `rm -r ~/.cache` and `sudo calamares`
+
+### ZFS with Native Encryption
+
+After initial install, configure ZFSBootMenu properties:
+
+```bash
+sudo zfs get encryption
+sudo zfs set org.zfsbootmenu:bootfs="zpcachyos/ROOT/cos/root" zpcachyos
+sudo zfs set org.zfsbootmenu:rootprefix="root=ZFS=" zpcachyos
+sudo zfs set org.zfsbootmenu:commandline="rw quiet splash" zpcachyos
+
+sudo zfs get mountpoint
+sudo zfs mount zpcachyos/ROOT/cos/root
 ```
+
+### Bootloader (rEFInd + ZFSBootMenu)
+
+```bash
+sudo arch-chroot /tmp/calamares-root-XXX
+mount /dev/nvme0n1p1 /boot/efi
+refind-install
+pacman -S zfsbootmenu
+generate-zbm --enable
+generate-zbm
+exit
+sudo zpool export zpcachyos
+reboot
+```
+
+In ZFSBootMenu, press `Ctrl+D` to set pool as default.
+
+### First Boot Setup
+
+1. Enable CachyOS updater from greeter and install the gaming packages.
+2. Create user accounts for family members.
+3. Run the setup script:
+
+```bash
 git clone git@github.com:dieuwedeboer/dotfiles.git
-ln -s ~/dotfiles/chezmoi ~/.local/share/chezmoi
-cd ~/dotfiles/ansible/workstation
-cat README.md
+cd dotfiles
+./scripts/install.sh
 ```
 
-Ansible will build Emacs, setup the terminal environemt, and run
-`chezmoi apply` to put all the dotfiles in place.
+The install script will:
+- Install chezmoi if not present
+- Link dotfiles via chezmoi
+- Link emacs config
+- Install packages and configure system
 
-## Todo
+### Double Password Solution
 
-* Tutorial on how to set up based install: ZFS native encryption with CachyOS
-* Init to set up all packages using pacman (and a few from aur/flathub)
-* Keep `.emacs.d` clean.
-* Install composer and drupalorg plus drupal-check global.
-* Install/update lando.
-* Improve emacs, nvim, and zellij themes to my liking.
-* Include Plasma and Hyprland configs.
+Avoid typing the ZFS password twice at boot:
 
-## Further inspiration
+```bash
+sudo nano /etc/zfs/zroot.key
+# Enter password (plain text, no newline at end!)
+sudo chmod 600 /etc/zfs/zroot.key
+sudo zfs change-key -o keylocation=file:///etc/zfs/zroot.key -o keyformat=passphrase zpcachyos
+echo 'FILES+=(/etc/zfs/zroot.key)' | sudo tee -a /etc/mkinitcpio.conf
+sudo mkinitcpio -P
+```
 
-I want to go through a lot of David Wilson's (System Crafters) Emacs
-config for more gems and other productivity tools that I will find
-useful: https://github.com/daviwil/dotfiles/blob/master/Emacs.org
+---
+
+## Legacy Setup
+
+The `ansible/workstation` directory contains the old Ubuntu setup using Ansible. It is no longer maintained.

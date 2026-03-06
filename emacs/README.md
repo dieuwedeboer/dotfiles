@@ -9,7 +9,7 @@ Most attention has been given to:
 
 ## Installation
 
-Run: `./install.sh`
+See: `../scripts/install.sh`
 
 # Updating Packages
 
