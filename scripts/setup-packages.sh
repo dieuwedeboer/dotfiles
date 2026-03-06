@@ -36,7 +36,7 @@ AUR_PACKAGES=(
 )
 
 FLATPAK_PACKAGES=(
-    com.xmcl.voxelum
+    app.xmcl.voxelum
     com.adamcake.Bolt
     com.discord.Discord
     com.spotify.Client
