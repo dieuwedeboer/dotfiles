@@ -29,6 +29,7 @@ PACMAN_PACKAGES=(
     wl-clipboard
     python-pipx
     opencode
+    kdenlive
 )
 
 AUR_PACKAGES=(
@@ -43,7 +44,6 @@ FLATPAK_PACKAGES=(
     com.adamcake.Bolt
     com.discordapp.Discord
     com.spotify.Client
-    org.kde.kdenlive
 )
 
 echo "=== Installing pacman packages ==="
