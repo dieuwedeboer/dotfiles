@@ -3,7 +3,7 @@
   "mcp": {
     "chrome-devtools": {
       "type": "local",
-      "command": ["npx", "-y", "chrome-devtools-mcp@latest", "--isolated"]
+      "command": ["pnpx", "chrome-devtools-mcp@latest", "--isolated"]
     }
   },
   "plugin": ["./plugin/env-protection.js", "./plugin/bash-filter.js"]
