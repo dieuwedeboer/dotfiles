@@ -1,3 +1,0 @@
-[machines]
-localhost ansible_connection=local
-#thinkpad ansible_connection=ssh host=192.168.33.92

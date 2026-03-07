@@ -1,3 +1,0 @@
----
-- name: rebuild font cache
-  command: fc-cache -fv

@@ -1,7 +1,0 @@
----
-dependencies:
-  - { role: "local-bin" }
-  - { role: "git" }
-  - { role: "direnv" }
-  - { role: "tmux" }
-  - { role: "source-code-pro-font" }

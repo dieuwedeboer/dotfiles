@@ -87,4 +87,6 @@ sudo mkinitcpio -P
 
 ## Legacy Setup
 
-The `ansible/workstation` directory contains the old Ubuntu setup using Ansible. It is no longer maintained.
+The `legacy-ubuntu` branch contains the old Ubuntu setup using Ansible.
+
+It is no longer maintained.
