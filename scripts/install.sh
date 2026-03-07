@@ -5,11 +5,12 @@ set -x
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"
 
-echo "=== Dieuwe's Dotfiles Installer ==="
+echo "=== Welcome back, commander ==="
 
-echo "Installing packages first..."
+echo "Installing system packages..."
 "$SCRIPT_DIR/setup-packages.sh"
 
+echo "=== Applying dotfiles via chezmoi ==="
 if [ ! -L "$HOME/.local/share/chezmoi" ]; then
     if [ -d "$HOME/.local/share/chezmoi" ]; then
         echo "Moving existing chezmoi to ~/.local/share/chezmoi.bk..."
@@ -28,6 +29,7 @@ else
     echo "Warning: chezmoi not installed, skipped dotfiles setup"
 fi
 
+echo "=== Symlinking emacs configuration ==="
 if [ ! -L "$HOME/.emacs.d" ]; then
     if [ -d "$HOME/.emacs.d" ]; then
         echo "Moving existing emacs.d to ~/.emacs.d.bk..."
@@ -39,6 +41,62 @@ else
     echo "Emacs config already linked."
 fi
 
+echo "=== Enabling services ==="
+if command -v systemctl &> /dev/null; then
+    if ! systemctl is-enabled docker.socket &> /dev/null; then
+        sudo systemctl enable docker.socket
+    else
+        echo "  docker.socket already enabled"
+    fi
+
+    if ! systemctl is-enabled sshd &> /dev/null; then
+        sudo systemctl enable sshd
+    else
+        echo "  sshd already enabled"
+    fi
+fi
+
+echo "=== Configuring user groups ==="
+if command -v getent &> /dev/null; then
+    if ! getent group docker | grep -q "$USER"; then
+        sudo usermod -aG docker "$USER"
+    else
+        echo "  user already in docker group"
+    fi
+fi
+
+echo "=== Configuring firewall ==="
+if command -v ufw &> /dev/null; then
+    if sudo ufw status | grep -q "Status: active"; then
+        sudo ufw allow 8010/tcp comment 'VLC Chromecast HTTP stream'
+        sudo ufw allow 1900/udp comment 'VLC Chromecast discovery (UPnP)'
+        sudo ufw allow 22/tcp comment 'SSH'
+        sudo ufw allow 25565/tcp comment 'Mincraft servers'
+        sudo ufw allow 4445/udp comment 'Minecraft LAN discovery'
+        #sudo ufw allow from 192.168.1.0/24 comment 'Trust local network'
+    else
+        echo "  ufw is disabled on this machine"
+    fi
+fi
+
+echo "=== System tweaks ==="
+# these are one-off post-install things so split into separate script
+if [ -f /etc/mkinitcpio.conf ]; then
+    if grep -q "^HOOKS.*fsck" /etc/mkinitcpio.conf; then
+        sudo sed -i '/^HOOKS/s/fsck//' /etc/mkinitcpio.conf
+    else
+        echo "  fsck hook already removed"
+    fi
+fi
+
+if [ -f /etc/vconsole.conf ]; then
+    if ! grep -q "KEYMAP=en" /etc/vconsole.conf; then
+        echo "KEYMAP=en" | sudo tee /etc/vconsole.conf
+    else
+        echo "  vconsole.conf already configured"
+    fi
+fi
+
 HOSTNAME=$(hostname)
 
 if [ "$HOSTNAME" = "kingfisher" ]; then
@@ -46,4 +104,4 @@ if [ "$HOSTNAME" = "kingfisher" ]; then
     "$SCRIPT_DIR/setup-kingfisher.sh"
 fi
 
-echo "=== Installation complete ==="
+echo "=== System installation complete ==="
