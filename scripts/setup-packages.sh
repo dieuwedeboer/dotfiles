@@ -26,6 +26,7 @@ PACMAN_PACKAGES=(
     libreoffice-fresh
     wl-clipboard
     python-pipx
+    opencode
 )
 
 AUR_PACKAGES=(
@@ -33,11 +34,10 @@ AUR_PACKAGES=(
     bible-kjv
     zoom
     cura-bin
-    opencode
+    xmcl-launcher
 )
 
 FLATPAK_PACKAGES=(
-    app.xmcl.voxelum
     com.adamcake.Bolt
     com.discordapp.Discord
     com.spotify.Client
