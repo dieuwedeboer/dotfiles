@@ -69,6 +69,7 @@ The install script will:
 - Link dotfiles via chezmoi
 - Link emacs config
 - Install packages and configure system
+- Optionally configure rEFInd with a custom theme (glow) if no custom theme is present
 
 ### Double Password Solution
 

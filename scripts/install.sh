@@ -29,6 +29,9 @@ else
     echo "Warning: chezmoi not installed, skipped dotfiles setup"
 fi
 
+echo "=== Configuring rEFInd theme ==="
+"$SCRIPT_DIR/setup-refind-theme.sh"
+
 echo "=== Symlinking emacs configuration ==="
 if [ ! -L "$HOME/.emacs.d" ]; then
     if [ -d "$HOME/.emacs.d" ]; then
@@ -40,6 +43,9 @@ if [ ! -L "$HOME/.emacs.d" ]; then
 else
     echo "Emacs config already linked."
 fi
+
+echo "=== Configuring NVIDIA suspend fix ==="
+"$SCRIPT_DIR/setup-nvidia-suspend.sh"
 
 echo "=== Enabling services ==="
 if command -v systemctl &> /dev/null; then
