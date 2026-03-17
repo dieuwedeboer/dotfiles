@@ -1,0 +1,37 @@
+[Devices][/org/freedesktop/UDisks2/block_devices/nvme0n1p1]
+EverMounted=true
+Icon=drive-harddisk
+LastNameSeen=1.0 GiB Internal Drive (nvme0n1p1)
+LastSeenMounted=true
+
+[Devices][/org/freedesktop/UDisks2/block_devices/nvme0n1p2]
+Icon=drive-harddisk
+LastNameSeen=zpcachyos
+
+[Devices][/org/freedesktop/UDisks2/block_devices/sda1]
+EverMounted=true
+Icon=drive-harddisk
+LastNameSeen=Watson
+LastSeenMounted=true
+
+[Devices][/org/freedesktop/UDisks2/block_devices/sdb1]
+EverMounted=true
+Icon=drive-harddisk
+LastNameSeen=Holmes
+LastSeenMounted=true
+
+[Devices][/org/freedesktop/UDisks2/block_devices/sdc1]
+EverMounted=true
+Icon=drive-harddisk
+LastNameSeen=Library
+LastSeenMounted=true
+
+[Devices][/org/freedesktop/UDisks2/block_devices/sdd1]
+Icon=drive-removable-media-usb
+LastNameSeen=7.4 GiB Removable Media
+
+[General]
+AutomountEnabled=true
+AutomountOnLogin=true
+AutomountOnPlugin=true
+AutomountUnknownDevices=true

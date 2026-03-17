@@ -30,6 +30,8 @@ PACMAN_PACKAGES=(
     python-pipx
     opencode
     kdenlive
+    audacity
+    extra-cmake-modules
 )
 
 AUR_PACKAGES=(
@@ -38,6 +40,7 @@ AUR_PACKAGES=(
     google-chrome
     xmcl-launcher
     zoom
+    sanoid
 )
 
 FLATPAK_PACKAGES=(

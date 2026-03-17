@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# ZFS monitoring script for KDE System Monitor
+# Dynamically detects all pools and provides disk-like sensors
+
+parse_size() {
+    local size="$1"
+    local multiplier=1
+    case "$size" in
+        *K) multiplier=1024 ;;
+        *M) multiplier=1048576 ;;
+        *G) multiplier=1073741824 ;;
+        *T) multiplier=1099511627776 ;;
+    esac
+    local num
+    num=$(echo "$size" | tr -d 'KMGT')
+    awk -v m="$multiplier" -v n="$num" 'BEGIN {printf "%.0f\n", n * m}'
+}
+
+get_pool_stats() {
+    local pool="$1"
+    local stats
+    stats=$(zpool list -H -o size,alloc,free,cap,health,frag "$pool" 2>/dev/null)
+    echo "$stats"
+}
+
+get_pool_io() {
+    local pool="$1"
+    local io
+    io=$(zpool iostat -p "$pool" 1 1 | tail -1 | awk '{print $(NF-1), $NF}')
+    echo "$io"
+}
+
+get_sensors() {
+    local pools
+    pools=$(zpool list -H -o name)
+    
+    local sensors=""
+    for pool in $pools; do
+        sensors="${sensors}${pool}_free_space	${pool}_free_pct	${pool}_total_space	${pool}_used_space	${pool}_used_pct	${pool}_read_rate	${pool}_write_rate	${pool}_health	${pool}_fragmentation	"
+    done
+    echo "${sensors%"	 "}"
+}
+
+handle_query() {
+    local sensor="$1"
+    local metric="$2"
+    
+    local pool="${sensor%%_*}"
+    
+    local size alloc free cap health frag read_rate write_rate
+    read size alloc free cap health frag <<< "$(get_pool_stats "$pool")"
+    read read_rate write_rate <<< "$(get_pool_io "$pool")"
+    
+    local free_bytes used_bytes total_bytes
+    free_bytes=$(parse_size "$free")
+    total_bytes=$(parse_size "$size")
+    used_bytes=$(parse_size "$alloc")
+    
+    local used_pct free_pct
+    used_pct=$(echo "$cap" | tr -d '%')
+    free_pct=$((100 - used_pct))
+    
+    case "$metric" in
+        "value"|"initial_value")
+            case "$sensor" in
+                *_free_space)      echo "$free_bytes" ;;
+                *_free_pct)        echo "$free_pct" ;;
+                *_total_space)     echo "$total_bytes" ;;
+                *_used_space)      echo "$used_bytes" ;;
+                *_used_pct)        echo "$used_pct" ;;
+                *_read_rate)       echo "$read_rate" ;;
+                *_write_rate)      echo "$write_rate" ;;
+                *_health)          [ "$health" = "ONLINE" ] && echo "1" || echo "0" ;;
+                *_fragmentation)   echo "$frag" | tr -d '%' ;;
+            esac
+            ;;
+        "unit")
+            case "$sensor" in
+                *_free_space|*_total_space|*_used_space|*_read_rate|*_write_rate) echo "B" ;;
+                *_free_pct|*_used_pct|*_fragmentation) echo "%" ;;
+                *_health) echo "*" ;;
+            esac
+            ;;
+        "min")
+            echo "0"
+            ;;
+        "max")
+            case "$sensor" in
+                *_free_space|*_total_space|*_used_space) echo "$total_bytes" ;;
+                *_free_pct|*_used_pct|*_fragmentation) echo "100" ;;
+                *) echo "0" ;;
+            esac
+            ;;
+        "name")
+            case "$sensor" in
+                *_free_space)      echo "$pool Free Space" ;;
+                *_free_pct)        echo "$pool Percentage Free" ;;
+                *_total_space)     echo "$pool Total Space" ;;
+                *_used_space)      echo "$pool Used Space" ;;
+                *_used_pct)        echo "$pool Percentage Used" ;;
+                *_read_rate)       echo "$pool Read Rate" ;;
+                *_write_rate)      echo "$pool Write Rate" ;;
+                *_health)          echo "$pool Health" ;;
+                *_fragmentation)   echo "$pool Fragmentation" ;;
+            esac
+            ;;
+        "short_name")
+            case "$sensor" in
+                *_free_space)      echo "$pool Free" ;;
+                *_free_pct)        echo "$pool Free%" ;;
+                *_total_space)     echo "$pool Total" ;;
+                *_used_space)      echo "$pool Used" ;;
+                *_used_pct)        echo "$pool Used%" ;;
+                *_read_rate)       echo "$pool Read" ;;
+                *_write_rate)      echo "$pool Write" ;;
+                *_health)          echo "$pool Health" ;;
+                *_fragmentation)   echo "$pool Frag%" ;;
+            esac
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
+while IFS=$'\t' read -r sensor metric; do
+    [ -z "$sensor" ] && continue
+    
+    if [ "$sensor" = "?" ]; then
+        get_sensors
+    elif [[ "$sensor" == *"_"* ]]; then
+        handle_query "$sensor" "$metric"
+    else
+        echo ""
+    fi
+done

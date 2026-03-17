@@ -110,4 +110,19 @@ if [ "$HOSTNAME" = "kingfisher" ]; then
     "$SCRIPT_DIR/setup-kingfisher.sh"
 fi
 
+echo "=== Configuring ZFS monitoring and snapshots ==="
+"$SCRIPT_DIR/setup-zfs.sh"
+
+echo "=== Installing Plasma icograph system monitor face ==="
+ICOGRAPH_DIR="$DOTFILES_DIR/plasma/icograph"
+TARGET_DIR="$HOME/.local/share/ksysguard/sensorfaces/org.kde.plasma.systemmonitor.icograph"
+mkdir -p "$(dirname "$TARGET_DIR")"
+if [ -L "$TARGET_DIR" ]; then
+    rm "$TARGET_DIR"
+elif [ -d "$TARGET_DIR" ]; then
+    rm -rf "$TARGET_DIR"
+fi
+ln -s "$ICOGRAPH_DIR" "$TARGET_DIR"
+echo "  icograph installed to: $TARGET_DIR"
+
 echo "=== System installation complete ==="

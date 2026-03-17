@@ -1,0 +1,14 @@
+[Applications][google-chrome]
+Seen=true
+
+[Applications][org.qbittorrent.qBittorrent]
+Seen=true
+
+[Applications][org.telegram.desktop]
+Seen=true
+
+[Applications][signal]
+Seen=true
+
+[Notifications]
+LowPriorityHistory=true
