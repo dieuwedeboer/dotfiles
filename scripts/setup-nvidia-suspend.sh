@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
-set -x
+[ "${VERBOSE:-0}" = 1 ] && set -x
 
 if ! command -v nvidia-smi &> /dev/null; then
     echo "nvidia-smi not found, skipping NVIDIA suspend setup"

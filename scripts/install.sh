@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -e
-set -x
+VERBOSE=0
+for arg in "$@"; do
+    case "$arg" in
+        -v|-r|--verbose) VERBOSE=1 ;;
+    esac
+done
+[ "$VERBOSE" = 1 ] && set -x
+export VERBOSE
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOTFILES_DIR="$(dirname "$SCRIPT_DIR")"

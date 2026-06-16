@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
-set -x
+[ "${VERBOSE:-0}" = 1 ] && set -x
 
 echo "=== Kingfisher-specific Setup ==="
 

@@ -30,6 +30,9 @@ direnv hook fish | source
 # opencode
 fish_add_path ~/.opencode/bin
 
+# bun global packages
+fish_add_path ~/.bun/bin
+
 # lando
 fish_add_path ~/.lando/bin
 

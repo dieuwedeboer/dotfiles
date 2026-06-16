@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
-set -x
+[ "${VERBOSE:-0}" = 1 ] && set -x
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -26,6 +26,10 @@ echo "=== Copying misc files to /etc ==="
 sudo cp -f "$SCRIPT_DIR/../misc/sanoid.conf" /etc/sanoid/sanoid.conf
 sudo mkdir -p /etc/pacman.d/hooks
 sudo cp -f "$SCRIPT_DIR/../misc/zfs-snapshot.hook" /etc/pacman.d/hooks/
+
+echo "=== Installing pre-update snapshot script ==="
+sudo mkdir -p /root/.local/bin
+sudo install -m 755 "$SCRIPT_DIR/../chezmoi/dot_local/bin/executable_zfs-snapshot-pre-update" /root/.local/bin/zfs-snapshot-pre-update.sh
 
 echo "=== Enabling Sanoid timer ==="
 sudo systemctl enable --now sanoid.timer

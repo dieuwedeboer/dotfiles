@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DATASET="zpcachyos/ROOT/cos"
+SNAP_PREFIX="pre-update"
+KEEP=3
+DEDUP_WINDOW_MIN=15
+
+NOW=$(date +%s)
+CUTOFF=$((NOW - DEDUP_WINDOW_MIN * 60))
+
+latest=$(zfs list -t snapshot -o name -H -r "$DATASET" \
+    | awk -v p="@${SNAP_PREFIX}-" '$0 ~ p' \
+    | sort \
+    | tail -n 1)
+
+if [ -n "$latest" ]; then
+    snap_ts=${latest##*@${SNAP_PREFIX}-}
+    snap_epoch=$(date -d \
+        "${snap_ts:0:4}-${snap_ts:4:2}-${snap_ts:6:2} ${snap_ts:9:2}:${snap_ts:11:2}:${snap_ts:13:2}" \
+        +%s 2>/dev/null || echo 0)
+    if [ "$snap_epoch" -ge "$CUTOFF" ]; then
+        echo "Recent pre-update snapshot exists ($latest), skipping"
+        exit 0
+    fi
+fi
+
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+zfs snapshot -r "${DATASET}@${SNAP_PREFIX}-${TIMESTAMP}"
+
+zfs list -t snapshot -o name -H -r "$DATASET" \
+    | awk -v p="@${SNAP_PREFIX}-" '$0 ~ p' \
+    | sort \
+    | head -n -"$KEEP" \
+    | xargs -r -n1 zfs destroy

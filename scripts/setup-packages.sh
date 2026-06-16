@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
-set -x
+[ "${VERBOSE:-0}" = 1 ] && set -x
 
 echo "=== Arch Linux Setup Script ==="
 echo "This script is idempotent and safe to re-run."
@@ -19,6 +19,7 @@ PACMAN_PACKAGES=(
     zellij
     starship
     pnpm
+    bun
     docker
     docker-compose
     ghostty
@@ -28,15 +29,20 @@ PACMAN_PACKAGES=(
     libreoffice-fresh
     wl-clipboard
     python-pipx
+    uv
     opencode
     kdenlive
     audacity
     extra-cmake-modules
+    aws-cli-v2
+    github-cli
 )
 
 AUR_PACKAGES=(
+    antigravity-cli
     bible-kjv
     cura-bin
+    cursor-bin
     google-chrome
     xmcl-launcher
     zoom
@@ -47,6 +53,10 @@ FLATPAK_PACKAGES=(
     com.adamcake.Bolt
     com.discordapp.Discord
     com.spotify.Client
+)
+
+NODE_PACKAGES=(
+    opencode-ai
 )
 
 echo "=== Installing pacman packages ==="
@@ -83,12 +93,28 @@ for pkg in "${FLATPAK_PACKAGES[@]}"; do
     fi
 done
 
+echo "=== Installing global node packages ==="
+for pkg in "${NODE_PACKAGES[@]}"; do
+    if [ -d "$HOME/.bun/install/global/node_modules/$pkg" ]; then
+        echo "  $pkg already installed"
+    else
+        echo "  Installing $pkg..."
+        bun add -g "$pkg"
+    fi
+done
+
 echo "=== Installing self-packaged user tools ==="
 
 if ! command -v lando &> /dev/null; then
     /bin/bash -c "$(curl -fsSL https://get.lando.dev/setup-lando.sh)"
 else
     echo "  lando already installed"
+fi
+
+if ! command -v agent &> /dev/null; then
+    curl https://cursor.com/install -fsS | bash
+else
+    echo "  cursor cli (agent) already installed"
 fi
 
 echo "=== Uninstalling unwanted packages ==="
