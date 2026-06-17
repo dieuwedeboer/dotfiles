@@ -23,7 +23,6 @@ PACMAN_PACKAGES=(
     docker
     docker-compose
     ghostty
-    openfortivpn
     telegram-desktop
     signal-desktop
     libreoffice-fresh
@@ -36,6 +35,7 @@ PACMAN_PACKAGES=(
     extra-cmake-modules
     aws-cli-v2
     github-cli
+    glab
 )
 
 AUR_PACKAGES=(
