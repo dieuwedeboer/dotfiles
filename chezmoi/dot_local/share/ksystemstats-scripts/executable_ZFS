@@ -76,7 +76,8 @@ handle_query() {
             ;;
         "unit")
             case "$sensor" in
-                *_free_space|*_total_space|*_used_space|*_read_rate|*_write_rate) echo "B" ;;
+                *_read_rate|*_write_rate) echo "B/s" ;;
+                *_free_space|*_total_space|*_used_space) echo "B" ;;
                 *_free_pct|*_used_pct|*_fragmentation) echo "%" ;;
                 *_health) echo "*" ;;
             esac
