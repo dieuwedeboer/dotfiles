@@ -1,0 +1,18 @@
+{
+    "KPackageStructure": "KSysguard/SensorFace",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Dieuwe"
+            }
+        ],
+        "Id": "org.kde.plasma.systemmonitor.icograph",
+        "License": "LGPLv2+",
+        "Name": "IcoGraph",
+        "Description": "Icon + Text + Bar + Sparkline display with optional process table",
+        "Category": "System Information",
+        "Version": "0.1.0",
+        "Website": "https://github.com/dieuwe/icograph"
+    },
+    "X-KDE-ParentApp": "org.kde.plasmashell"
+}
