@@ -43,6 +43,7 @@ AUR_PACKAGES=(
     bible-kjv
     cura-bin
     cursor-bin
+    ddev-bin
     google-chrome
     xmcl-launcher
     zoom
