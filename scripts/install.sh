@@ -51,8 +51,7 @@ else
     echo "Emacs config already linked."
 fi
 
-echo "=== Configuring NVIDIA suspend fix ==="
-"$SCRIPT_DIR/setup-nvidia-suspend.sh"
+
 
 echo "=== Enabling services ==="
 if command -v systemctl &> /dev/null; then
@@ -115,6 +114,11 @@ HOSTNAME=$(hostname)
 if [ "$HOSTNAME" = "kingfisher" ]; then
     echo "Detected Kingfisher machine, running setup-kingfisher.sh..."
     "$SCRIPT_DIR/setup-kingfisher.sh"
+fi
+
+if [ -r /sys/class/dmi/id/product_name ] && [ "$(cat /sys/class/dmi/id/product_name 2>/dev/null)" = "bonw9" ]; then
+    echo "Detected bonw9 (System76 Bonobo WS) machine, running setup-bonw9.sh..."
+    "$SCRIPT_DIR/setup-bonw9.sh"
 fi
 
 echo "=== Configuring ZFS monitoring and snapshots ==="
