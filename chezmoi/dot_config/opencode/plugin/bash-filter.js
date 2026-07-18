@@ -1,9 +1,9 @@
 export const BashFilter = async ({ client, $ }) => {
   const rewrites = [
-    { match: /\bdrush\b/, suggestion: "lando drush" },
-    { match: /\bcomposer\b/, suggestion: "lando composer" },
+    { match: /\bdrush\b/, suggestion: "ddev drush" },
+    { match: /\bcomposer\b/, suggestion: "ddev composer" },
     { match: /\bnpm\b/, suggestion: "pnpm" },
-    { match: /\bpip install\b/, suggestion: "pipx" }
+    { match: /\bpip install\b/, suggestion: "uv tool install" }
   ];
 
   return {

@@ -16,7 +16,7 @@ alias vi nvim
 # abbreviations (encouraged)
 abbr e 'emacsclient -nw'
 abbr z 'zellij'
-abbr drush 'lando drush'
+abbr drush 'ddev drush'
 
 # fix common misspellings
 abbr got git
@@ -33,11 +33,12 @@ fish_add_path ~/.opencode/bin
 # bun global packages
 fish_add_path ~/.bun/bin
 
-# lando
-fish_add_path ~/.lando/bin
-
 # composer
 fish_add_path ~/.config/composer/vendor/bin
 
 # local exports and overrides
 source ~/.config/fish/local.fish
+
+# >>> grok installer >>>
+fish_add_path $HOME/.grok/bin
+# <<< grok installer <<<

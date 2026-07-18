@@ -29,17 +29,16 @@ PACMAN_PACKAGES=(
     wl-clipboard
     python-pipx
     uv
-    opencode
     kdenlive
     audacity
     extra-cmake-modules
     aws-cli-v2
     github-cli
     glab
+    coolercontrol
 )
 
 AUR_PACKAGES=(
-    antigravity-cli
     bible-kjv
     cura-bin
     cursor-bin
@@ -54,10 +53,6 @@ FLATPAK_PACKAGES=(
     com.adamcake.Bolt
     com.discordapp.Discord
     com.spotify.Client
-)
-
-NODE_PACKAGES=(
-    opencode-ai
 )
 
 echo "=== Installing pacman packages ==="
@@ -94,22 +89,18 @@ for pkg in "${FLATPAK_PACKAGES[@]}"; do
     fi
 done
 
-echo "=== Installing global node packages ==="
-for pkg in "${NODE_PACKAGES[@]}"; do
-    if [ -d "$HOME/.bun/install/global/node_modules/$pkg" ]; then
-        echo "  $pkg already installed"
-    else
-        echo "  Installing $pkg..."
-        bun add -g "$pkg"
-    fi
-done
-
 echo "=== Installing self-packaged user tools ==="
 
-if ! command -v lando &> /dev/null; then
-    /bin/bash -c "$(curl -fsSL https://get.lando.dev/setup-lando.sh)"
+if ! command -v opencode &> /dev/null; then
+    curl -fsSL https://opencode.ai/install | bash
 else
-    echo "  lando already installed"
+    echo "  opencode already installed"
+fi
+
+if ! command -v grok &> /dev/null; then
+    curl -fsSL https://x.ai/cli/install.sh | bash
+else
+    echo "  grok already installed"
 fi
 
 if ! command -v agent &> /dev/null; then

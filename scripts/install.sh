@@ -66,6 +66,12 @@ if command -v systemctl &> /dev/null; then
     else
         echo "  sshd already enabled"
     fi
+
+    if ! systemctl is-enabled coolercontrold &> /dev/null; then
+        sudo systemctl enable coolercontrold
+    else
+        echo "  coolercontrold already enabled"
+    fi
 fi
 
 echo "=== Configuring user groups ==="
