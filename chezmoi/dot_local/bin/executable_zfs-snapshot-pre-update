@@ -28,8 +28,12 @@ fi
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 zfs snapshot -r "${DATASET}@${SNAP_PREFIX}-${TIMESTAMP}"
 
-zfs list -t snapshot -o name -H -r "$DATASET" \
-    | awk -v p="@${SNAP_PREFIX}-" '$0 ~ p' \
-    | sort \
-    | head -n -"$KEEP" \
-    | xargs -r -n1 zfs destroy
+# Prune per dataset: a flat recursive list sorted by name would only
+# keep snapshots of the alphabetically-last dataset (varlog).
+zfs list -t filesystem -o name -H -r "$DATASET" | while read -r ds; do
+    zfs list -t snapshot -o name -H -d 1 "$ds" \
+        | awk -v p="@${SNAP_PREFIX}-" '$0 ~ p' \
+        | sort \
+        | head -n -"$KEEP" \
+        | xargs -r -n1 zfs destroy
+done

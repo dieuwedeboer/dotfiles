@@ -52,6 +52,22 @@ reboot
 
 In ZFSBootMenu, press `Ctrl+D` to set pool as default.
 
+### ZFS Maintenance
+
+**Pool feature upgrades:** after OpenZFS updates, `zpool status` will suggest `zpool upgrade`. The ZFSBootMenu EFI image embeds its own ZFS module, which must understand the pool's enabled features — so always regenerate the boot image *before* upgrading the pool, never the reverse:
+
+```bash
+sudo generate-zbm
+sudo zpool upgrade zpcachyos
+```
+
+Feature flags can't be removed once enabled, and old ZBM images (and older live media) may refuse to import the pool afterwards. Keep a recent CachyOS live USB as the fallback boot path.
+
+**Snapshots:** two independent mechanisms:
+
+- `sanoid.timer` snapshots `zpcachyos/ROOT/cos/home` (`autosnap_*`, retention in `misc/sanoid.conf`). Data-only, not bootable.
+- The pacman hook (`misc/zfs-snapshot.hook`) recursively snapshots `zpcachyos/ROOT/cos` before every transaction (`pre-update-*`, keeps 3 per dataset). The `root` snapshots are bootable recovery points: boot them read-only from the ZFSBootMenu menu; clone + promote to make a rollback permanent.
+
 ### First Boot Setup
 
 1. Enable CachyOS updater from greeter and install the gaming packages.
