@@ -47,6 +47,7 @@ AUR_PACKAGES=(
     xmcl-launcher
     zoom
     sanoid
+    zotero-bin
 )
 
 FLATPAK_PACKAGES=(
