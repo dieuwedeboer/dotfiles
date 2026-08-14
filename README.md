@@ -9,6 +9,7 @@ Repeatable system setup for Arch Linux (CachyOS).
   - [ZFS with Native Encryption](#zfs-with-native-encryption)
   - [Bootloader (rEFInd + ZFSBootMenu)](#bootloader-refind--zfsbootmenu)
   - [Dotfiles](#dotfiles)
+  - [Agent Configuration](#agent-configuration)
 - [Legacy Setup](#legacy-setup)
 
 ## Installation
@@ -84,8 +85,33 @@ The install script will:
 - Install chezmoi if not present
 - Link dotfiles via chezmoi
 - Link emacs config
+- Link agent instructions and skills (see [Agent Configuration](#agent-configuration))
 - Install packages and configure system
 - Optionally configure rEFInd with a custom theme (glow) if no custom theme is present
+
+### Agent Configuration
+
+`.agents/` in this repo is the single source of truth for coding-agent config, shared
+across every agent on the machine. `install.sh` symlinks `~/.agents` to it, then points
+each tool's expected path back at that:
+
+| Path | Points to |
+| --- | --- |
+| `~/.agents` | `dotfiles/.agents` |
+| `~/.claude/CLAUDE.md` | `~/.agents/AGENTS.md` |
+| `~/.claude/skills` | `~/.agents/skills` |
+| `~/.config/opencode/AGENTS.md` | `~/.agents/AGENTS.md` (via chezmoi `symlink_` entry) |
+
+So `.agents/AGENTS.md` is the only file to edit for global agent instructions, and
+skills installed into `~/.agents/skills` land in the repo as a normal git diff —
+including updates to `.agents/.skill-lock.json`, which supersedes the old root
+`skills-lock.json`.
+
+`~/.claude/settings.json` is chezmoi-managed (`chezmoi/dot_claude/settings.json`) and
+sets `permissions.defaultMode` to `acceptEdits`, so Claude Code auto-approves file
+edits but still prompts before running commands. Note that changes made in-session via
+`/config` write to the live file and will be reverted by the next `chezmoi apply` —
+run `chezmoi re-add ~/.claude/settings.json` to keep them.
 
 ### Double Password Solution
 
