@@ -1,0 +1,10 @@
+{
+  "model": "opus[1m]",
+  "theme": "auto",
+  "permissions": {
+    "defaultMode": "acceptEdits"
+  },
+  "enabledPlugins": {
+    "mattpocock-skills@claude-plugins-official": true
+  }
+}
