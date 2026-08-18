@@ -4,7 +4,9 @@
   "permissions": {
     "defaultMode": "acceptEdits"
   },
-  "enabledPlugins": {
-    "mattpocock-skills@claude-plugins-official": true
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
   }
 }
