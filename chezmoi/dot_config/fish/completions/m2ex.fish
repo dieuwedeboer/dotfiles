@@ -1,0 +1,11 @@
+complete -c m2ex -f
+complete -c m2ex -n __fish_use_subcommand -a check -d 'Compare installed M2EX with the latest GitHub test release'
+complete -c m2ex -n __fish_use_subcommand -a update -d 'Install the latest GitHub test release'
+complete -c m2ex -n __fish_use_subcommand -a status -d 'Show install path, version, shortcut, and prefix'
+complete -c m2ex -n __fish_use_subcommand -a hook-steam -d 'Add M2EX as a non-Steam Proton game and install vcrun2022'
+complete -c m2ex -n __fish_use_subcommand -a unhook-steam -d 'Remove the M2EX Steam shortcut'
+complete -c m2ex -n __fish_use_subcommand -a setup-prefix -d 'Create the Proton prefix and install vcrun2022'
+complete -c m2ex -n __fish_use_subcommand -a launch -d 'Start M2EX through Steam'
+complete -c m2ex -n __fish_use_subcommand -a help -d 'Show help'
+complete -c m2ex -n '__fish_seen_subcommand_from update' -l force -d 'Reinstall even if the tag matches'
+complete -c m2ex -n '__fish_seen_subcommand_from launch' -a 'vanilla americas britannia crusades teutonic'
