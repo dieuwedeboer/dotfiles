@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Install, update, and Steam-launch M2EX for Medieval II: Total War.
+# Install and wrap M2EX as Medieval II (Steam app 4700).
+# Set the game's launch options to: m2ex %command%
 set -euo pipefail
 
 VANILLA_APP_ID=4700
@@ -43,21 +44,23 @@ Commands:
   update        Install the latest test release if it is newer
   update --force
                 Reinstall even if the tag matches
-  status        Show install path, version, shortcut, and prefix
-  hook-steam    Add M2EX as a non-Steam game, force Proton, install vcrun2022
-  unhook-steam  Remove the M2EX shortcut and restore vanilla Medieval II
-  setup-prefix  Create the Proton prefix and install vcrun2022
-  launch [mod]  Start M2EX through Steam (vanilla, americas, britannia,
+  status        Show install path, version, and 4700 wrap state
+  hook          Point Medieval II at this wrapper, force Proton, remove the
+                old non-Steam shortcut
+  uninstall     Remove M2EX.exe and the 4700 launch-option wrap
+  launch [mod]  Start Medieval II through Steam (vanilla, americas, britannia,
                 crusades, teutonic)
   help          Show this help
 
-Linux install follows the REX/M2EX guide: Windows Steam depot + Proton,
-M2EX.exe as a non-Steam shortcut, then vcrun2022 in that prefix.
+Put this in Medieval II's launch options:
+
+  m2ex %command%
+
+Steam still shows Definitive / Americas / Britannia / Crusades / Teutonic.
+This wrapper updates M2EX if needed, then swaps medieval2.exe for M2EX.exe.
 
 The game directory is read from Steam's libraryfolders.vdf for app 4700.
-Updates prefer GitHub prereleases (test builds). If none are published,
-the newest normal release is used. Discord-only test drops are not
-scraped automatically.
+Updates prefer GitHub prereleases. Discord-only drops are not scraped.
 
 Environment:
   M2EX_GAME_DIR      Override the game install path
@@ -143,6 +146,16 @@ m2ex_installed() {
     [[ -f "$EXE_PATH" ]]
 }
 
+prefix_dir() {
+    printf '%s\n' "$STEAM_ROOT/steamapps/compatdata/$VANILLA_APP_ID"
+}
+
+vcrun_present() {
+    local prefix
+    prefix="$(prefix_dir)"
+    [[ -f "$prefix/pfx/drive_c/windows/system32/msvcp140.dll" ]]
+}
+
 cache_name_for_tag() {
     local tag="$1"
     printf 'M2EX-%s.7z' "${tag//\//-}"
@@ -156,27 +169,6 @@ userdata_dir() {
 
 shortcuts_path() {
     printf '%s\n' "$(userdata_dir)/config/shortcuts.vdf"
-}
-
-# Quoted exe + name, matching how Steam stores shortcut fields.
-shortcut_exe_field() {
-    printf '"%s"' "$EXE_PATH"
-}
-
-shortcut_appid() {
-    python3 - "$EXE_PATH" "$SHORTCUT_NAME" <<'PY'
-import sys, zlib
-exe = f'"{sys.argv[1]}"'
-name = sys.argv[2]
-print((zlib.crc32((exe + name).encode()) & 0xffffffff) | 0x80000000)
-PY
-}
-
-shortcut_runid() {
-    python3 - "$(shortcut_appid)" <<'PY'
-import sys
-print((int(sys.argv[1]) << 32) | 0x02000000)
-PY
 }
 
 fetch_latest() {
@@ -238,41 +230,47 @@ extract_archive() {
     [[ -f "$EXE_PATH" ]] || die "extract finished but $EXE_NAME is missing"
 }
 
-protonfix_path() {
-    local appid="${1:-}"
-    if [[ -z "$appid" ]]; then
-        appid="$(shortcut_appid)"
-    fi
-    printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/protonfixes/localfixes/${appid}.py"
-}
+current_launch_options() {
+    python3 - "$(find_localconfig)" "$VANILLA_APP_ID" <<'PY'
+import re, sys
+from pathlib import Path
 
-vanilla_protonfix_path() {
-    printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/protonfixes/localfixes/${VANILLA_APP_ID}.py"
+text = Path(sys.argv[1]).read_text(errors="replace")
+app_id = sys.argv[2]
+pattern = re.compile(
+    rf'("{re.escape(app_id)}"\n(?P<indent>\t+){{)(?P<body>.*?)(\n(?P=indent)}})',
+    re.S,
+)
+for m in pattern.finditer(text):
+    body = m.group("body")
+    if '"LastPlayed"' in body or '"LaunchOptions"' in body or f'"{app_id}_eula_' in body:
+        opt = re.search(r'"LaunchOptions"\t+"(.*)"', body)
+        print(opt.group(1) if opt else "")
+        break
+PY
 }
 
 cmd_status() {
-    local tag channel appid
+    local tag
     tag="$(installed_tag)"
-    appid="$(shortcut_appid)"
     printf 'Game dir:     %s\n' "$GAME_DIR"
     printf 'Game exe:     %s\n' "$(game_ready && echo present || echo missing)"
     printf 'M2EX exe:     %s\n' "$(m2ex_installed && echo present || echo missing)"
     printf 'Installed:    %s\n' "${tag:-none}"
-    printf 'Shortcut:     %s (appid %s)\n' "$SHORTCUT_NAME" "$appid"
     printf 'Launch wrap:  %s\n' "$(launch_wrapper)"
-    if [[ -f "$(protonfix_path "$appid")" ]]; then
-        printf 'Proton hook:  %s\n' "$(protonfix_path "$appid")"
-    else
-        printf 'Proton hook:  missing\n'
-    fi
-    if [[ -f "$(vanilla_protonfix_path)" ]]; then
-        printf 'Vanilla hijack: %s (should be absent)\n' "$(vanilla_protonfix_path)"
-    fi
-    local prefix="$STEAM_ROOT/steamapps/compatdata/$appid"
+    printf '4700 options: %s\n' "$(current_launch_options || true)"
+    local prefix
+    prefix="$(prefix_dir)"
     if [[ -d "$prefix/pfx" ]]; then
         printf 'Prefix:       %s\n' "$prefix"
+        printf 'vcrun2022:    %s\n' "$(vcrun_present && echo present || echo missing)"
     else
         printf 'Prefix:       not created yet\n'
+    fi
+    local leftovers
+    leftovers="$(leftover_shortcut_appids || true)"
+    if [[ -n "$leftovers" ]]; then
+        printf 'Old shortcut: %s (run m2ex hook to remove)\n' "$leftovers"
     fi
 }
 
@@ -346,7 +344,7 @@ rewrite_steam_command() {
         fi
     done
     if [[ $replaced -eq 0 ]]; then
-        die "Steam command did not contain M2EX.exe, medieval2.exe, or kingdoms.exe"
+        die "Steam command did not contain M2EX.exe, medieval2.exe, or kingdoms.exe. Set Medieval II's compatibility tool to Proton."
     fi
     printf '%s\0' "${out[@]}"
 }
@@ -368,6 +366,9 @@ cmd_wrap_launch() {
     [[ $# -gt 0 ]] || die "missing Steam command"
     maybe_update_for_launch
     m2ex_installed || die "$EXE_NAME is not installed in $GAME_DIR"
+    if ! vcrun_present; then
+        warn "vcrun2022 not found in prefix $(prefix_dir). Run: m2ex hook"
+    fi
 
     local -a rewritten=()
     mapfile -d '' -t rewritten < <(rewrite_steam_command "$@")
@@ -419,7 +420,7 @@ wait_for_steam_start() {
 
 ensure_steam_stopped() {
     if steam_is_running; then
-        log "shutting Steam down so shortcut and prefix changes persist"
+        log "shutting Steam down so config changes persist"
         steam -shutdown >/dev/null 2>&1 || true
         if ! wait_for_steam_exit; then
             die "Steam is still running; close it and retry"
@@ -436,7 +437,7 @@ start_steam() {
     wait_for_steam_start || warn "Steam did not come back within 60s"
 }
 
-set_vanilla_launch_options() {
+set_launch_options() {
     local value="$1"
     local cfg
     cfg="$(find_localconfig)"
@@ -460,7 +461,7 @@ app_matches = [
     or f'"{app_id}_eula_' in m.group("body")
 ]
 if not app_matches:
-    sys.exit(0)
+    sys.exit("could not find app %s in localconfig.vdf" % app_id)
 m = app_matches[0]
 indent = m.group("indent") + "\t"
 body = re.sub(r'\n\t+"LaunchOptions"\t+".*?"', "", m.group("body"))
@@ -483,7 +484,7 @@ from pathlib import Path
 cfg = Path(sys.argv[1])
 appid, tool = sys.argv[2], sys.argv[3]
 text = cfg.read_text(errors="replace")
-if re.search(rf'"{re.escape(appid)}"\s*\n\s*\{{\s*\n\s*"name"\s*"{re.escape(tool)}"', text):
+if re.search(rf'"{re.escape(appid)}"\s*\n\s*\{{[\s\S]*?"name"\s*"{re.escape(tool)}"', text):
     sys.exit(0)
 block = (
     f'\t\t\t\t\t"{appid}"\n'
@@ -493,7 +494,6 @@ block = (
     f'\t\t\t\t\t\t"priority"\t\t"250"\n'
     f'\t\t\t\t\t}}\n'
 )
-# Drop any previous mapping for this id, then insert at the mapping start.
 text = re.sub(
     rf'\t\t\t\t\t"{re.escape(appid)}"\n\t\t\t\t\t\{{.*?\n\t\t\t\t\t\}}\n',
     "",
@@ -513,71 +513,51 @@ cfg.write_text(text)
 PY
 }
 
-write_m2ex_shortcut() {
-    local appid wrapper
-    appid="$(shortcut_appid)"
-    wrapper="$(launch_wrapper)"
-    python3 - "$(shortcuts_path)" "$EXE_PATH" "$GAME_DIR" "$SHORTCUT_NAME" "$appid" "$wrapper" <<'PY'
+remove_compat_tool() {
+    local appid="$1"
+    local cfg="$STEAM_ROOT/config/config.vdf"
+    [[ -f "$cfg" ]] || return 0
+    python3 - "$cfg" "$appid" <<'PY'
+import re, sys
+from pathlib import Path
+
+cfg = Path(sys.argv[1])
+appid = sys.argv[2]
+text = cfg.read_text(errors="replace")
+new, n = re.subn(
+    rf'\t\t\t\t\t"{re.escape(appid)}"\n\t\t\t\t\t\{{.*?\n\t\t\t\t\t\}}\n',
+    "",
+    text,
+    count=1,
+    flags=re.S,
+)
+if n:
+    cfg.write_text(new)
+PY
+}
+
+leftover_shortcut_appids() {
+    local path
+    path="$(shortcuts_path)"
+    [[ -f "$path" ]] || return 0
+    python3 - "$path" "$SHORTCUT_NAME" "${EXE_PATH:-}" <<'PY'
 import sys
 from pathlib import Path
 import vdf
 
 path = Path(sys.argv[1])
-exe = sys.argv[2]
-start_dir = sys.argv[3].rstrip("/") + "/"
-name = sys.argv[4]
-appid = int(sys.argv[5])
-launch = sys.argv[6]
-exe_field = f'"{exe}"'
-start_field = f'"{start_dir}"'
-
-if path.exists() and path.stat().st_size:
-    data = vdf.binary_loads(path.read_bytes(), raise_on_remaining=False)
-else:
-    data = {"shortcuts": {}}
-
-shortcuts = data.setdefault("shortcuts", {})
-# Normalise keys to strings.
-shortcuts = {str(k): v for k, v in shortcuts.items()}
-
-entry = None
-entry_key = None
-for key, item in shortcuts.items():
+name, exe = sys.argv[2], sys.argv[3]
+exe_field = f'"{exe}"' if exe else ""
+if not path.exists() or path.stat().st_size == 0:
+    sys.exit(0)
+data = vdf.binary_loads(path.read_bytes(), raise_on_remaining=False)
+for item in data.get("shortcuts", {}).values():
     lower = {str(k).lower(): v for k, v in item.items()}
-    if lower.get("appname") == name or lower.get("exe") == exe_field:
-        entry = item
-        entry_key = key
-        break
-if entry is None:
-    idx = 0
-    while str(idx) in shortcuts:
-        idx += 1
-    entry_key = str(idx)
-    entry = {}
-    shortcuts[entry_key] = entry
-
-# Steam stores the high bit as a negative int32.
-appid_stored = appid - (1 << 32) if appid >= 1 << 31 else appid
-entry["appid"] = appid_stored
-entry["AppName"] = name
-entry["Exe"] = exe_field
-entry["StartDir"] = start_field
-entry["icon"] = entry.get("icon", "")
-entry["ShortcutPath"] = ""
-entry["LaunchOptions"] = launch
-entry["IsHidden"] = 0
-entry["AllowDesktopConfig"] = 1
-entry["AllowOverlay"] = 1
-entry["OpenVR"] = 0
-entry["Devkit"] = 0
-entry["DevkitGameID"] = ""
-entry["LastPlayTime"] = int(entry.get("LastPlayTime") or 0)
-entry["FlatpakAppID"] = ""
-entry.setdefault("tags", {})
-
-path.parent.mkdir(parents=True, exist_ok=True)
-path.write_bytes(vdf.binary_dumps({"shortcuts": shortcuts}))
-print(appid)
+    if lower.get("appname") == name or (exe_field and lower.get("exe") == exe_field):
+        appid = int(lower.get("appid") or 0)
+        if appid < 0:
+            appid += 1 << 32
+        print(appid)
 PY
 }
 
@@ -585,55 +565,59 @@ remove_m2ex_shortcut() {
     local path
     path="$(shortcuts_path)"
     [[ -f "$path" ]] || return 0
-    python3 - "$path" "$SHORTCUT_NAME" "$EXE_PATH" <<'PY'
+    python3 - "$path" "$SHORTCUT_NAME" "${EXE_PATH:-}" <<'PY'
 import sys
 from pathlib import Path
 import vdf
 
 path = Path(sys.argv[1])
 name, exe = sys.argv[2], sys.argv[3]
-exe_field = f'"{exe}"'
+exe_field = f'"{exe}"' if exe else ""
 if not path.exists() or path.stat().st_size == 0:
     sys.exit(0)
 data = vdf.binary_loads(path.read_bytes(), raise_on_remaining=False)
 shortcuts = {str(k): v for k, v in data.get("shortcuts", {}).items()}
 keep = {}
 idx = 0
+removed = 0
 for item in shortcuts.values():
     lower = {str(k).lower(): v for k, v in item.items()}
-    if lower.get("appname") == name or lower.get("exe") == exe_field:
+    if lower.get("appname") == name or (exe_field and lower.get("exe") == exe_field):
+        removed += 1
         continue
     keep[str(idx)] = item
     idx += 1
-path.write_bytes(vdf.binary_dumps({"shortcuts": keep}))
+if removed:
+    path.write_bytes(vdf.binary_dumps({"shortcuts": keep}))
+    print(removed)
 PY
 }
 
-install_protonfix() {
-    local appid dest
-    appid="$(shortcut_appid)"
-    dest="$(protonfix_path "$appid")"
-    mkdir -p "$(dirname "$dest")"
-    cat >"$dest" <<'PY'
-"""M2EX non-Steam shortcut.
-
-Updates run on the host via the Steam launch wrapper. This file only
-marks the prefix so CachyOS Proton does not skip localfixes.
-"""
-
-from protonfixes.logger import log
-
-
-def main() -> None:
-    log.info("M2EX prefix ready (vcrun2022 + host m2ex wrapper)")
-PY
-    : >>"$(dirname "$dest")/__init__.py"
-    rm -f "$(vanilla_protonfix_path)"
-    log "installed Proton hook at $dest"
-}
-
-remove_protonfix() {
-    rm -f "$(protonfix_path)" "$(vanilla_protonfix_path)"
+remove_shortcut_artefacts() {
+    local appid userdata
+    userdata="$(userdata_dir)"
+    while IFS= read -r appid; do
+        [[ -n "$appid" ]] || continue
+        log "removing leftover non-Steam shortcut $appid"
+        remove_compat_tool "$appid"
+        rm -f "$userdata/config/librarycache/${appid}.json"
+        rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/protonfixes/localfixes/${appid}.py"
+        local old_prefix="$STEAM_ROOT/steamapps/compatdata/$appid"
+        local new_prefix
+        new_prefix="$(prefix_dir)"
+        if [[ -d "$old_prefix" ]]; then
+            if [[ ! -d "$new_prefix" ]]; then
+                log "moving Proton prefix $appid -> $VANILLA_APP_ID"
+                mv "$old_prefix" "$new_prefix"
+            else
+                log "removing leftover prefix $old_prefix"
+                rm -rf "$old_prefix"
+            fi
+        fi
+    done < <(leftover_shortcut_appids || true)
+    remove_m2ex_shortcut >/dev/null || true
+    rm -f "$userdata/config/localconfig.vdf.m2ex.bak"
+    rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/protonfixes/localfixes/${VANILLA_APP_ID}.py"
 }
 
 find_proton_bin() {
@@ -647,40 +631,43 @@ find_proton_bin() {
             return 0
         fi
     done
-    die "Proton tool '$name' not found under /usr/share/steam/compatibilitytools.d or $STEAM_ROOT/compatibilitytools.d. Set M2EX_PROTON."
+    die "Proton tool '$name' not found. Set M2EX_PROTON."
 }
 
 cmd_setup_prefix() {
-    local appid prefix proton
+    local prefix proton
     need_cmd protontricks
-    appid="$(shortcut_appid)"
-    prefix="$STEAM_ROOT/steamapps/compatdata/$appid"
+    prefix="$(prefix_dir)"
     proton="$(find_proton_bin)"
     mkdir -p "$prefix"
     log "creating Proton prefix $prefix"
     STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_ROOT" \
         STEAM_COMPAT_DATA_PATH="$prefix" \
         "$proton" run wineboot --init >/dev/null 2>&1 || true
-    log "installing vcrun2022 into prefix $appid (this can take a few minutes)"
+    if vcrun_present; then
+        log "vcrun2022 already present"
+        return 0
+    fi
+    log "installing vcrun2022 into prefix $VANILLA_APP_ID (this can take a few minutes)"
     WINEDEBUG="-all" WINETRICKS_LATEST_VERSION_CHECK="disabled" \
-        protontricks --no-bwrap "$appid" -q vcrun2022
+        protontricks --no-bwrap "$VANILLA_APP_ID" -q vcrun2022
     log "vcrun2022 installed"
 }
 
-cmd_hook_steam() {
-    local restart=0 appid
+cmd_hook() {
+    local restart=0
+    if [[ ! -f "$EXE_PATH" ]]; then
+        cmd_update
+    fi
     m2ex_installed || die "install M2EX first (m2ex update --force)"
     if ensure_steam_stopped; then
         restart=1
     fi
-    set_vanilla_launch_options ""
-    appid="$(write_m2ex_shortcut)"
-    set_compat_tool "$appid" "$PROTON_TOOL"
-    install_protonfix
-    log "added non-Steam shortcut '$SHORTCUT_NAME' (appid $appid) with Proton $PROTON_TOOL"
-    local prefix="$STEAM_ROOT/steamapps/compatdata/$appid"
-    if [[ -f "$prefix/pfx/drive_c/windows/system32/msvcp140.dll" ]]; then
-        log "vcrun2022 already present; skipping prefix setup"
+    remove_shortcut_artefacts
+    set_compat_tool "$VANILLA_APP_ID" "$PROTON_TOOL"
+    set_launch_options "$(launch_wrapper)"
+    if vcrun_present; then
+        log "vcrun2022 already present in prefix $VANILLA_APP_ID"
     else
         cmd_setup_prefix
     fi
@@ -688,18 +675,34 @@ cmd_hook_steam() {
         start_steam
         sleep 8
     fi
-    log "Play M2EX from your Steam library (not the vanilla Medieval II entry)"
+    log "Medieval II launch options set to: $(launch_wrapper)"
+    log "Play Medieval II from Steam. Campaigns use the normal Play menu."
 }
 
-cmd_unhook_steam() {
+cmd_uninstall() {
+    if [[ "${1:-}" == "--yes" ]]; then
+        shift || true
+    elif [[ -t 0 ]]; then
+        read -r -p "Remove M2EX.exe and the 4700 wrap? [y/N] " ans
+        case "$ans" in
+            y|Y|yes|YES) ;;
+            *) echo "Aborted."; return 1 ;;
+        esac
+    else
+        die "uninstall needs --yes when not interactive"
+    fi
+
     local restart=0
     if ensure_steam_stopped; then
         restart=1
     fi
-    remove_m2ex_shortcut
-    remove_protonfix
-    set_vanilla_launch_options ""
-    log "removed M2EX shortcut; vanilla Medieval II is unchanged"
+    remove_shortcut_artefacts
+    set_launch_options ""
+    if [[ -n "$EXE_PATH" ]]; then
+        rm -f "$EXE_PATH" "$GAME_DIR/M2EX.xdb" "$VERSION_FILE"
+    fi
+    rm -rf "$STATE_DIR"
+    log "removed M2EX. Verify Medieval II files in Steam if you want stock data back."
     if [[ $restart -eq 1 ]]; then
         start_steam
     fi
@@ -717,13 +720,12 @@ campaign_mod() {
 }
 
 cmd_launch() {
-    local extra runid
+    local extra
     extra="$(campaign_mod "${1:-}")"
-    runid="$(shortcut_runid)"
     if [[ -n "$extra" ]]; then
-        exec steam "steam://rungameid/${runid}//${extra}"
+        exec steam "steam://rungameid/${VANILLA_APP_ID}//${extra}"
     fi
-    exec steam "steam://rungameid/${runid}"
+    exec steam "steam://rungameid/${VANILLA_APP_ID}"
 }
 
 looks_like_steam_command() {
@@ -731,7 +733,7 @@ looks_like_steam_command() {
     for arg in "$@"; do
         local lower="${arg,,}"
         case "$lower" in
-            steamlaunch|waitforexitandrun|*proton*|*medieval2.exe*|*kingdoms.exe*|*m2ex.exe*|*steam-launch-wrapper*)
+            steamlaunch|waitforexitandrun|*proton*|*medieval2.exe*|*kingdoms.exe*|*m2ex.exe*|*steam-launch-wrapper*|*medieval2.sh*)
                 return 0
                 ;;
         esac
@@ -755,8 +757,8 @@ main() {
                 check) shift; cmd_check "$@" ;;
                 update) shift; cmd_update "$@" ;;
                 status) shift; cmd_status "$@" ;;
-                hook-steam) shift; cmd_hook_steam "$@" ;;
-                unhook-steam) shift; cmd_unhook_steam "$@" ;;
+                hook|hook-steam) shift; cmd_hook "$@" ;;
+                uninstall|unhook-steam) shift; cmd_uninstall "$@" ;;
                 setup-prefix) shift; cmd_setup_prefix "$@" ;;
                 launch) shift; cmd_launch "$@" ;;
                 *)
