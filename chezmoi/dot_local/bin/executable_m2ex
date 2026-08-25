@@ -78,6 +78,13 @@ need_cmd() {
     command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
 }
 
+# Steam's runtime pins an old libcurl. Host tools (curl, 7z) must not see it.
+run_host() {
+    env -u LD_PRELOAD -u LD_LIBRARY_PATH -u STEAM_RUNTIME \
+        -u STEAM_ZENITY -u PRESSURE_VESSEL_FILESYSTEMS_RO \
+        "$@"
+}
+
 discover_game_dir() {
     local libfile="$STEAM_ROOT/steamapps/libraryfolders.vdf"
     [[ -f "$libfile" ]] || die "Steam library list not found at $libfile"
@@ -175,7 +182,10 @@ fetch_latest() {
     need_cmd curl
     need_cmd jq
     local json
-    json="$(curl -fsSL --max-time 15 -A "$USER_AGENT" "$RELEASES_URL")"
+    if ! json="$(run_host curl -fsSL --max-time 15 -A "$USER_AGENT" "$RELEASES_URL")"; then
+        warn "GitHub releases request failed"
+        return 1
+    fi
     local chosen
     chosen="$(jq -c --arg n "$ASSET_NAME" '
         def has_asset: ([.assets[].name] | index($n)) != null;
@@ -183,7 +193,10 @@ fetch_latest() {
         // ( [.[] | select(.draft == false and has_asset)] | first )
         // empty
     ' <<<"$json")"
-    [[ -n "$chosen" ]] || die "no GitHub release contains $ASSET_NAME"
+    if [[ -z "$chosen" ]]; then
+        warn "no GitHub release contains $ASSET_NAME"
+        return 1
+    fi
     local tag url digest size channel
     tag="$(jq -er '.tag_name' <<<"$chosen")"
     url="$(jq -er --arg n "$ASSET_NAME" '.assets[] | select(.name == $n) | .browser_download_url' <<<"$chosen")"
@@ -214,10 +227,14 @@ download_asset() {
     local url="$1" dest="$2" digest="$3"
     mkdir -p "$(dirname "$dest")"
     local tmp="${dest}.part"
-    curl -fL --retry 3 --retry-delay 2 -A "$USER_AGENT" -o "$tmp" "$url"
+    if ! run_host curl -fL --retry 3 --retry-delay 2 -A "$USER_AGENT" -o "$tmp" "$url"; then
+        rm -f "$tmp"
+        return 1
+    fi
     if ! verify_digest "$tmp" "$digest"; then
         rm -f "$tmp"
-        die "checksum mismatch for $ASSET_NAME"
+        warn "checksum mismatch for $ASSET_NAME"
+        return 1
     fi
     mv -f "$tmp" "$dest"
 }
@@ -226,8 +243,42 @@ extract_archive() {
     local archive="$1"
     need_cmd 7z
     game_ready || die "Medieval II install not found at $GAME_DIR"
-    7z x -y -aoa -o"$GAME_DIR" "$archive" >/dev/null
-    [[ -f "$EXE_PATH" ]] || die "extract finished but $EXE_NAME is missing"
+    [[ -f "$archive" ]] || { warn "archive missing: $archive"; return 1; }
+    if ! run_host 7z x -y -aoa -o"$GAME_DIR" "$archive" >/dev/null; then
+        warn "7z extract failed for $archive"
+        return 1
+    fi
+    [[ -f "$EXE_PATH" ]] || { warn "extract finished but $EXE_NAME is missing"; return 1; }
+}
+
+clear_wine_virtual_desktop() {
+    local reg
+    reg="$(prefix_dir)/pfx/user.reg"
+    [[ -f "$reg" ]] || return 0
+    python3 - "$reg" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text(errors="replace")
+new = re.sub(
+    r'\n\[Software\\\\Wine\\\\Explorer\][^\n]*\n(?:#[^\n]*\n)?(?:\"Desktop\"=\"[^\"]*\"\n)?',
+    "\n",
+    text,
+    count=1,
+)
+new = re.sub(
+    r'\n\[Software\\\\Wine\\\\Explorer\\\\Desktops\][^\n]*\n(?:#[^\n]*\n)?(?:\"Default\"=\"[^\"]*\"\n)?',
+    "\n",
+    new,
+    count=1,
+)
+if new != text:
+    path.write_text(new)
+    sys.exit(0)
+sys.exit(0)
+PY
 }
 
 current_launch_options() {
@@ -275,9 +326,14 @@ cmd_status() {
 }
 
 cmd_check() {
-    local tag url digest size channel installed
+    local tag url digest size channel installed latest
     installed="$(installed_tag)"
-    IFS=$'\t' read -r tag url digest size channel <<<"$(fetch_latest)"
+    if ! latest="$(fetch_latest)"; then
+        printf 'Installed: %s\n' "${installed:-none}"
+        printf 'Latest:    unknown (GitHub query failed)\n'
+        return 1
+    fi
+    IFS=$'\t' read -r tag url digest size channel <<<"$latest"
     printf 'Installed: %s\n' "${installed:-none}"
     printf 'Latest:    %s (%s)\n' "$tag" "$channel"
     if [[ -n "$installed" && "$installed" == "$tag" ]]; then
@@ -298,9 +354,16 @@ cmd_update() {
 
     game_ready || die "Medieval II install not found at $GAME_DIR"
 
-    local tag url digest size channel installed
+    local tag url digest size channel installed latest
     installed="$(installed_tag)"
-    IFS=$'\t' read -r tag url digest size channel <<<"$(fetch_latest)"
+    if ! latest="$(fetch_latest)"; then
+        return 1
+    fi
+    IFS=$'\t' read -r tag url digest size channel <<<"$latest"
+    if [[ -z "$tag" || -z "$url" ]]; then
+        warn "GitHub release parse failed"
+        return 1
+    fi
     log "latest GitHub $channel release is $tag"
 
     if [[ $force -eq 0 && -n "$installed" && "$installed" == "$tag" && -f "$EXE_PATH" ]]; then
@@ -315,13 +378,13 @@ cmd_update() {
     fi
     if [[ ! -f "$archive" ]]; then
         log "downloading $ASSET_NAME ($tag)"
-        download_asset "$url" "$archive" "$digest"
+        download_asset "$url" "$archive" "$digest" || return 1
     else
         log "using cached $archive"
     fi
 
     log "installing $tag into $GAME_DIR"
-    extract_archive "$archive"
+    extract_archive "$archive" || return 1
     printf '%s\n' "$tag" >"$VERSION_FILE"
     mkdir -p "$STATE_DIR"
     printf '%s\n' "$tag" >"$STATE_DIR/installed"
@@ -369,6 +432,7 @@ cmd_wrap_launch() {
     if ! vcrun_present; then
         warn "vcrun2022 not found in prefix $(prefix_dir). Run: m2ex hook"
     fi
+    clear_wine_virtual_desktop
 
     local -a rewritten=()
     mapfile -d '' -t rewritten < <(rewrite_steam_command "$@")
@@ -666,6 +730,7 @@ cmd_hook() {
     remove_shortcut_artefacts
     set_compat_tool "$VANILLA_APP_ID" "$PROTON_TOOL"
     set_launch_options "$(launch_wrapper)"
+    clear_wine_virtual_desktop
     if vcrun_present; then
         log "vcrun2022 already present in prefix $VANILLA_APP_ID"
     else
