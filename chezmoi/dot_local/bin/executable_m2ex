@@ -160,7 +160,21 @@ prefix_dir() {
 vcrun_present() {
     local prefix
     prefix="$(prefix_dir)"
-    [[ -f "$prefix/pfx/drive_c/windows/system32/msvcp140.dll" ]]
+    [[ -f "$prefix/pfx/drive_c/windows/system32/msvcp140.dll" \
+        && -f "$prefix/pfx/drive_c/windows/system32/mfc140.dll" ]]
+}
+
+# M2EX is 64-bit MFC. Proton will not search system32 for mfc140 unless
+# the DLL sits next to the exe or the override is native.
+ensure_mfc_next_to_exe() {
+    local src dll
+    src="$(prefix_dir)/pfx/drive_c/windows/system32"
+    for dll in mfc140.dll mfc140u.dll; do
+        if [[ -f "$src/$dll" && ! -f "$GAME_DIR/$dll" ]]; then
+            cp -- "$src/$dll" "$GAME_DIR/$dll"
+            log "copied $dll next to $EXE_NAME"
+        fi
+    done
 }
 
 cache_name_for_tag() {
@@ -430,12 +444,24 @@ cmd_wrap_launch() {
     maybe_update_for_launch
     m2ex_installed || die "$EXE_NAME is not installed in $GAME_DIR"
     if ! vcrun_present; then
-        warn "vcrun2022 not found in prefix $(prefix_dir). Run: m2ex hook"
+        warn "vcrun2022/mfc140 not found in prefix $(prefix_dir). Run: m2ex hook"
     fi
+    ensure_mfc_next_to_exe
     clear_wine_virtual_desktop
+    export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:+$WINEDLLOVERRIDES;}mfc140=n,b;mfc140u=n,b"
 
     local -a rewritten=()
     mapfile -d '' -t rewritten < <(rewrite_steam_command "$@")
+    if [[ "${M2EX_DEBUG:-}" == "1" ]]; then
+        {
+            printf 'IN\n'
+            printf '  %q\n' "$@"
+            printf 'OUT\n'
+            printf '  %q\n' "${rewritten[@]}"
+        } >"$STATE_DIR/last-wrap.log"
+        export PROTON_LOG=1
+        export PROTON_LOG_DIR="$STATE_DIR"
+    fi
     exec "${rewritten[@]}"
 }
 
@@ -731,6 +757,7 @@ cmd_hook() {
     set_compat_tool "$VANILLA_APP_ID" "$PROTON_TOOL"
     set_launch_options "$(launch_wrapper)"
     clear_wine_virtual_desktop
+    ensure_mfc_next_to_exe
     if vcrun_present; then
         log "vcrun2022 already present in prefix $VANILLA_APP_ID"
     else
@@ -764,7 +791,8 @@ cmd_uninstall() {
     remove_shortcut_artefacts
     set_launch_options ""
     if [[ -n "$EXE_PATH" ]]; then
-        rm -f "$EXE_PATH" "$GAME_DIR/M2EX.xdb" "$VERSION_FILE"
+        rm -f "$EXE_PATH" "$GAME_DIR/M2EX.xdb" "$VERSION_FILE" \
+            "$GAME_DIR/mfc140.dll" "$GAME_DIR/mfc140u.dll"
     fi
     rm -rf "$STATE_DIR"
     log "removed M2EX. Verify Medieval II files in Steam if you want stock data back."
