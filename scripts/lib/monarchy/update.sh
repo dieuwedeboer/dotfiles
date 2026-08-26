@@ -72,6 +72,14 @@ monarchy_check() {
     monarchy_check_clone_bin_classified
     monarchy_check_migrations
     monarchy_check_packages_deny
+    [ -f "$MONARCHY_MISC/omarchy.desktop" ] || monarchy_die "missing omarchy.desktop"
+    grep -q '^DesktopNames=Hyprland$' "$MONARCHY_MISC/omarchy.desktop" \
+        || monarchy_die "omarchy.desktop missing DesktopNames=Hyprland"
+    [ -f "$MONARCHY_MISC/10-monarchy" ] || monarchy_die "missing 10-monarchy"
+    [ -f "$MONARCHY_MISC/hyprland-portals.conf" ] || monarchy_die "missing hyprland-portals.conf"
+    if monarchy_filtered_packages | grep -qx sddm; then
+        monarchy_die "sddm leaked into filtered package list"
+    fi
     monarchy_log "check passed"
 }
 
@@ -94,10 +102,16 @@ monarchy_apply() {
     monarchy_link_working_prefix
     monarchy_rebuild_overlay
     monarchy_write_omarchy_conf
+    export OMARCHY_PATH
     monarchy_add_omarchy_repo
+    monarchy_install_packages
+    monarchy_install_omarchy_session
+    monarchy_install_uwsm_env
+    monarchy_install_hyprland_portals
+    monarchy_setup_user
     monarchy_skip_autologin
     monarchy_keep_family_mime
-    monarchy_log "apply complete (packages skipped until --packages / PR 4a)"
+    monarchy_log "apply complete"
 }
 
 monarchy_update() {

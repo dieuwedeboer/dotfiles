@@ -21,18 +21,23 @@ Build and review happen on kingfisher. First apply is an **older laptop**, not k
 ./scripts/setup-monarchy.sh
 ```
 
-6. Reboot. PR 2 does not yet register the greeter session (PR 3) or install Hyprland packages (PR 4a). After those land: family picks Plasma from the dropdown. If AccountsService `Session=` does not stick, pick Omarchy once on your user.
+6. Reboot. Pick Omarchy for your user if the greeter did not default to it. Family picks Plasma from the dropdown.
 
-## What PR 2 apply does
+## What apply does
 
 - Snapshot via `/root/.local/bin/zfs-snapshot-pre-update.sh` (requires `setup-zfs.sh` already run)
 - Clone `berenddeboer/omarchy` `quattro-on-zfs` at the lock commit to `/usr/local/src/monarchy/omarchy`
 - Working prefix `/usr/local/share/omarchy` (data symlinks + overlay `bin/`)
 - `/etc/omarchy.conf`
 - Append `[omarchy]` after CachyOS repos (`SigLevel = Required DatabaseOptional`) and install `omarchy-keyring`
-- Deny stubs and update wrappers under overlay `bin/` and `/usr/local/bin`
+- Install filtered leaf packages (`omarchy-base.packages` minus `packages.deny`). Hyprland and Quickshell come from CachyOS first-match
+- Register `/usr/share/wayland-sessions/omarchy.desktop` (`TryExec=uwsm`, `DesktopNames=Hyprland`). Exec is the real `uwsm start … hyprland.desktop` once that file exists, otherwise the session probe
+- Install `/usr/share/uwsm/env.d/10-monarchy` and Hyprland portal defaults if missing
+- Seed `~/.config/hypr/*` (no overwrite), branding, `TERMINAL=ghostty`, and the first-run-done marker so `omarchy-provision-first-run` no-ops
 
-It does **not** install Hyprland, uwsm, or a greeter session file. It does **not** change Plymouth or rEFInd.
+It does **not** change Plymouth or rEFInd. Splash is a later PR.
+
+`--no-packages` skips the leaf set (still does overlay, repo, and session).
 
 ## Check on kingfisher (review only)
 
@@ -58,4 +63,17 @@ If the host has no `/etc/zfs/zroot.key`, the mkinitcpio `zfs` hook prompts on th
 
 ## Family greeter
 
-Plasma Login Manager lists every file in `/usr/share/wayland-sessions/`. After PR 3, Omarchy is visible. Family members pick Plasma. Do not enable autologin.
+Plasma Login Manager lists every file in `/usr/share/wayland-sessions/`. Omarchy is visible. Family members pick Plasma. Do not enable autologin. AccountsService `Session=` is an attempt, not a proven PLM API.
+
+## Laptop test
+
+After apply and reboot:
+
+1. Greeter shows Plasma and Omarchy.
+2. Your user can start Omarchy. Hyprland + Quickshell come up. Ghostty is the terminal.
+3. Log out. Plasma still starts for a family account (or for you).
+4. `grep '^\[omarchy\]' -n /etc/pacman.conf` is after `[cachyos]`. `/etc/os-release` still `ID=cachyos`.
+5. `omarchy-refresh-pacman` prints `monarchy: blocked` and exits 2.
+6. `pacman -Q sddm` fails (not installed). `systemctl is-enabled plasmalogin` is enabled.
+
+If Hyprland fails to start, stay on Plasma, boot a `pre-update-*` snapshot from ZFSBootMenu, and keep `/var/log/monarchy-setup.log`.
