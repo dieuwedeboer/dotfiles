@@ -2,7 +2,7 @@
 
 - **Author:** TBD (Dieuwe)
 - **Date:** 2026-08-26
-- **Status:** Implementation (PR 2 scripts in tree; first apply is an older laptop, not kingfisher)
+- **Status:** Implementation (laptop apply path is wired: overlay, packages, greeter, user config. Splash is not.)
 - **Audience:** Senior engineers working in `dieuwedeboer/dotfiles`
 - **Machines in scope:** bring-up on an older laptop first. kingfisher (Gigabyte B550 / Ryzen 5 5600X) is for build and review only. bonw9 (System76 Bonobo WS / Haswell i7-4810MQ + GTX 970M) after the laptop. Then any future CachyOS+ZFS+KDE box that follows `scripts/install.sh`
 

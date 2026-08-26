@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Omarchy (Hyprland uwsm)
+Comment=Monarchy session: Omarchy Quattro on CachyOS
+Exec=/usr/local/bin/monarchy-session-probe
+TryExec=uwsm
+Type=Application
+DesktopNames=Hyprland
