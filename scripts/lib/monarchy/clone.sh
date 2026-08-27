@@ -13,7 +13,6 @@ monarchy_clone_git() {
         return 0
     fi
 
-    mkdir -p "$(dirname "$dest")"
     if [ "$as_root" = 1 ]; then
         monarchy_sudo mkdir -p "$(dirname "$dest")"
         monarchy_sudo git clone --branch "$MONARCHY_LOCK_BRANCH" --single-branch \
@@ -21,6 +20,7 @@ monarchy_clone_git() {
         monarchy_sudo git -C "$dest" fetch --quiet origin "$MONARCHY_LOCK_COMMIT"
         monarchy_sudo git -C "$dest" checkout --quiet --detach "$MONARCHY_LOCK_COMMIT"
     else
+        mkdir -p "$(dirname "$dest")"
         git clone --branch "$MONARCHY_LOCK_BRANCH" --single-branch \
             "$MONARCHY_LOCK_REMOTE" "$dest"
         git -C "$dest" fetch --quiet origin "$MONARCHY_LOCK_COMMIT"

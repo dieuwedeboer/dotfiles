@@ -170,7 +170,7 @@ Server = https://pkgs.omarchy.org/stable/$arch
 # END monarchy-omarchy
 ```
 
-`SigLevel = Required DatabaseOptional` matches the rest of CachyOS `pacman.conf`. TrustAll is not accepted for v1. PR 2 installs the standalone `omarchy-keyring` package (GPG keyring files only, no limine/sddm depends) and locally signs `40DFB630FF42BCFFB047046CF0134EE680CAC571`. If keyring import fails on CachyOS, that is a bug to fix in PR 2, not a reason to fall back to TrustAll.
+`SigLevel = Required DatabaseOptional` matches the rest of CachyOS `pacman.conf`. TrustAll is not accepted for v1. `monarchy_add_omarchy_repo` recvs `40DFB630FF42BCFFB047046CF0134EE680CAC571` from keys.openpgp.org (ubuntu keyserver fallback), prints the fingerprint, prompts once to locally sign, then installs standalone `omarchy-keyring` (GPG keyring files only, no limine/sddm depends). Re-runs skip the prompt when the key is already signed. `MONARCHY_TRUST_OMARCHY_KEY=1` skips it. If keyring import fails on CachyOS, that is a bug to fix here, not a reason to fall back to TrustAll.
 
 Order matters. Pacman uses the **first** match. CachyOS repos stay above `[omarchy]`, so `hyprland`, `quickshell`, `nvim`, `linux`, `zfs-utils` keep resolving from CachyOS/Arch. That is deliberate: Hyprland and Quickshell come from CachyOS. Packages that exist only in Omarchy (`omarchy-nvim`, `omacalc`, `omacut`, `omawrite`, `herdr`, `ttfx`, `tensaku`, `aether`, `omarchy-keyring`, …) resolve from `[omarchy]`.
 
@@ -435,7 +435,7 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 | --- | --- |
 | `monarchy_assert_zfs_layout` | Require `findmnt -o FSTYPE /` is `zfs` and `SOURCE` matches `zpcachyos/ROOT/cos/root` (or `$MONARCHY_ROOT_DATASET`). Refuse Btrfs/ext4. Refuse `zroot/ROOT/default` |
 | `monarchy_preserve_pacman_conf` | Abort if `/etc/pacman.conf` lacks `[cachyos]` / `[cachyos-v3]` before `[omarchy]`. Assert `/etc/pacman.d/cachyos-v3-mirrorlist`, `cachyos-mirrorlist`, and Arch `mirrorlist` still exist and are Included. Never copy Omarchy `pacman-*.conf` or Omarchy `mirrorlist-*` |
-| `monarchy_add_omarchy_repo` | Idempotent marker-block append. Install `omarchy-keyring`. `SigLevel = Required DatabaseOptional`. `pacman -Sy` (not `-Syyuu`) |
+| `monarchy_add_omarchy_repo` | Recv+fingerprint-confirm+lsign Omarchy packaging key (once). Idempotent marker-block append. Install `omarchy-keyring`. `SigLevel = Required DatabaseOptional`. `pacman -Sy` (not `-Syyuu`) |
 | `monarchy_refuse_archzfs` | Fail if `[archzfs]` appears. Do not install archzfs keys |
 | `monarchy_refuse_omarchy_zfs_repo` | Fail if `[omarchy-zfs]` is present |
 | `monarchy_refuse_kernel_swap` | Never install `linux` / `linux-headers`. Assert running pkgbase is `linux-cachyos*` |

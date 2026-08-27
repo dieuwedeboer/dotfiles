@@ -25,11 +25,11 @@ Build and review happen on kingfisher. First apply is an **older laptop**, not k
 
 ## What apply does
 
-- Snapshot via `/root/.local/bin/zfs-snapshot-pre-update.sh` (requires `setup-zfs.sh` already run)
+- Snapshot via `/root/.local/bin/zfs-snapshot-pre-update.sh`. If that helper is missing or still has the varlog-only prune, apply installs the current copy from this repo, then asserts a `@pre-update-*` exists on `zpcachyos/ROOT/cos/root`.
 - Clone `berenddeboer/omarchy` `quattro-on-zfs` at the lock commit to `/usr/local/src/monarchy/omarchy`
 - Working prefix `/usr/local/share/omarchy` (data symlinks + overlay `bin/`)
 - `/etc/omarchy.conf`
-- Append `[omarchy]` after CachyOS repos (`SigLevel = Required DatabaseOptional`) and install `omarchy-keyring`
+- Recv and locally sign Omarchy packaging key `40DFB630FF42BCFFB047046CF0134EE680CAC571` (prompts once; later runs skip). Append `[omarchy]` after CachyOS repos (`SigLevel = Required DatabaseOptional`) and install `omarchy-keyring`
 - Install filtered leaf packages (`omarchy-base.packages` minus `packages.deny`). Hyprland and Quickshell come from CachyOS first-match
 - Register `/usr/share/wayland-sessions/omarchy.desktop` (`TryExec=uwsm`, `DesktopNames=Hyprland`). Exec is the real `uwsm start … hyprland.desktop` once that file exists, otherwise the session probe
 - Install `/usr/share/uwsm/env.d/10-monarchy` and Hyprland portal defaults if missing

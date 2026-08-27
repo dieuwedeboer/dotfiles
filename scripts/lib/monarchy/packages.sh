@@ -45,6 +45,12 @@ monarchy_install_packages() {
         fi
     done
 
+    # zbook-only leftover: TLP's tlp-pd Provides/Conflicts power-profiles-daemon.
+    # Omarchy's session calls powerprofilesctl; keep the real daemon, not TLP.
+    if monarchy_in_list power-profiles-daemon "${pkgs[@]}" && monarchy_pkg_installed tlp-pd; then
+        monarchy_die "tlp-pd conflicts with power-profiles-daemon. Remove TLP first: sudo pacman -Rns tlp-pd tlp-rdw tlp && sudo systemctl unmask power-profiles-daemon.service"
+    fi
+
     monarchy_log "pacman -Sy then install ${#pkgs[@]} filtered leaf packages"
     monarchy_sudo pacman -Sy --noconfirm
     monarchy_sudo pacman -S --needed --noconfirm "${pkgs[@]}"

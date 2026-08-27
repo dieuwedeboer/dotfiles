@@ -2,6 +2,7 @@
 set -euo pipefail
 
 DATASET="zpcachyos/ROOT/cos"
+ROOT_DATASET="${DATASET}/root"
 SNAP_PREFIX="pre-update"
 KEEP=3
 DEDUP_WINDOW_MIN=15
@@ -9,7 +10,10 @@ DEDUP_WINDOW_MIN=15
 NOW=$(date +%s)
 CUTOFF=$((NOW - DEDUP_WINDOW_MIN * 60))
 
-latest=$(zfs list -t snapshot -o name -H -r "$DATASET" \
+# Dedup against the bootable root dataset only. A recursive list sorted by
+# name ends on varlog; that used to skip a new snapshot when only varlog
+# had been kept.
+latest=$(zfs list -t snapshot -o name -H -d 1 "$ROOT_DATASET" \
     | awk -v p="@${SNAP_PREFIX}-" '$0 ~ p' \
     | sort \
     | tail -n 1)
