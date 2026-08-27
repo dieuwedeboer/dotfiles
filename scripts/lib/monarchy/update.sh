@@ -80,7 +80,22 @@ monarchy_check() {
     if monarchy_filtered_packages | grep -qx sddm; then
         monarchy_die "sddm leaked into filtered package list"
     fi
+    [ -f "$monarchy_lib_dir/switch-user.sh" ] || monarchy_die "missing switch-user.sh"
+    monarchy_check_session_lock_overlay
     monarchy_log "check passed"
+}
+
+# Quickshell lock refuses without /etc/pam.d/omarchy-lock-password.
+# Omarchy install/config/lockscreen-pam.sh is this one command.
+monarchy_apply_lock() {
+    local bin="$MONARCHY_PATH/bin/omarchy-apply-lock"
+    [ -x "$bin" ] || monarchy_die "missing $bin"
+    export OMARCHY_PATH
+    export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
+    monarchy_log "omarchy-apply-lock"
+    "$bin"
+    [ -f /etc/pam.d/omarchy-lock-password ] \
+        || monarchy_die "omarchy-apply-lock did not write /etc/pam.d/omarchy-lock-password"
 }
 
 monarchy_apply() {
@@ -100,10 +115,13 @@ monarchy_apply() {
     monarchy_sync_omarchy_clone
     monarchy_link_working_prefix
     monarchy_rebuild_overlay
+    monarchy_overlay_session_lock
+    monarchy_install_switch_user
     monarchy_write_omarchy_conf
     export OMARCHY_PATH
     monarchy_add_omarchy_repo
     monarchy_install_packages
+    monarchy_apply_lock
     monarchy_install_omarchy_session
     monarchy_install_uwsm_env
     monarchy_install_hyprland_portals

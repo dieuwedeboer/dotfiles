@@ -18,6 +18,7 @@ WRAP = {
     "omarchy-plymouth-set",
     "omarchy-plymouth-reset",
     "omarchy-refresh-plymouth",
+    "omarchy-screensaver",
 }
 
 HARD_DENY = {

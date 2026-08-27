@@ -219,6 +219,7 @@ monarchy_splash_only() {
     monarchy_sync_omarchy_clone
     monarchy_link_working_prefix
     monarchy_rebuild_overlay
+    monarchy_overlay_session_lock
     export OMARCHY_PATH
     monarchy_pkg_installed plymouth || monarchy_die "plymouth is not installed"
     monarchy_splash
