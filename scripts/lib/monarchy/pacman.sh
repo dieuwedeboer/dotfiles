@@ -1,5 +1,10 @@
 # shellcheck shell=bash
 
+# Official Omarchy packaging key. Recv + local-sign before the first
+# `pacman -S omarchy-keyring`; SigLevel Required cannot install it otherwise.
+MONARCHY_OMARCHY_KEY="${MONARCHY_OMARCHY_KEY:-40DFB630FF42BCFFB047046CF0134EE680CAC571}"
+MONARCHY_OMARCHY_KEY_UID="${MONARCHY_OMARCHY_KEY_UID:-Omarchy <pkgs@omarchy.org>}"
+
 monarchy_preserve_pacman_conf() {
     local conf=${MONARCHY_PACMAN_CONF:-/etc/pacman.conf}
     [ -f "$conf" ] || monarchy_die "missing $conf"
@@ -33,6 +38,105 @@ monarchy_refuse_omarchy_zfs_repo() {
     return 0
 }
 
+monarchy_omarchy_key_present() {
+    monarchy_sudo pacman-key --list-keys "$MONARCHY_OMARCHY_KEY" >/dev/null 2>&1
+}
+
+monarchy_omarchy_key_locally_signed() {
+    local short
+    short=$(printf '%s' "$MONARCHY_OMARCHY_KEY" | tail -c 16)
+    monarchy_sudo gpg --homedir /etc/pacman.d/gnupg --no-permission-warning \
+        --list-sigs --with-colons "$MONARCHY_OMARCHY_KEY" 2>/dev/null \
+        | awk -F: -v s="$short" 'BEGIN { s=toupper(s) }
+            $1=="sig" && toupper($5) != s { found=1 }
+            END { exit !found }'
+}
+
+monarchy_omarchy_key_fpr() {
+    monarchy_sudo gpg --homedir /etc/pacman.d/gnupg --no-permission-warning \
+        --list-keys --with-colons "$MONARCHY_OMARCHY_KEY" 2>/dev/null \
+        | awk -F: '$1=="fpr" { print $10; exit }'
+}
+
+monarchy_recv_omarchy_key() {
+    local ks
+    local -a servers=(
+        keys.openpgp.org
+        hkps://keys.openpgp.org
+        keyserver.ubuntu.com
+    )
+    for ks in "${servers[@]}"; do
+        monarchy_log "pacman-key --recv-keys from $ks"
+        if monarchy_sudo pacman-key --recv-keys "$MONARCHY_OMARCHY_KEY" --keyserver "$ks"; then
+            return 0
+        fi
+    done
+    monarchy_die "could not download Omarchy packaging key $MONARCHY_OMARCHY_KEY"
+}
+
+monarchy_confirm_omarchy_key() {
+    local reply
+    if [ -n "${MONARCHY_TRUST_OMARCHY_KEY:-}" ]; then
+        monarchy_log "MONARCHY_TRUST_OMARCHY_KEY set; signing without prompt"
+        return 0
+    fi
+    echo >&2
+    echo "Monarchy needs to locally sign the Omarchy packaging key:" >&2
+    echo "  fingerprint: $MONARCHY_OMARCHY_KEY" >&2
+    echo "  expected uid: $MONARCHY_OMARCHY_KEY_UID" >&2
+    echo "This is a one-time trust. Later setup-monarchy.sh runs skip the prompt." >&2
+    echo -n "Locally sign this key? [y/N] " >&2
+    if [ -r /dev/tty ]; then
+        read -r reply </dev/tty
+    elif [ -t 0 ]; then
+        read -r reply
+    else
+        monarchy_die "no TTY to confirm Omarchy key; re-run from a terminal or set MONARCHY_TRUST_OMARCHY_KEY=1"
+    fi
+    case "$reply" in
+        y|Y|yes|YES) return 0 ;;
+        *) monarchy_die "declined to trust Omarchy packaging key" ;;
+    esac
+}
+
+monarchy_trust_omarchy_key() {
+    command -v pacman-key >/dev/null 2>&1 || monarchy_die "pacman-key is missing"
+    if monarchy_omarchy_key_present && monarchy_omarchy_key_locally_signed; then
+        monarchy_log "Omarchy packaging key already locally signed"
+        return 0
+    fi
+    if ! monarchy_omarchy_key_present; then
+        monarchy_recv_omarchy_key
+    fi
+    local fpr
+    fpr=$(monarchy_omarchy_key_fpr)
+    [ "$fpr" = "$MONARCHY_OMARCHY_KEY" ] \
+        || monarchy_die "downloaded key fingerprint '$fpr' != $MONARCHY_OMARCHY_KEY"
+    monarchy_sudo pacman-key --finger "$MONARCHY_OMARCHY_KEY" || true
+    if monarchy_omarchy_key_locally_signed; then
+        monarchy_log "Omarchy packaging key already locally signed"
+        return 0
+    fi
+    monarchy_confirm_omarchy_key
+    monarchy_log "pacman-key --lsign-key $MONARCHY_OMARCHY_KEY"
+    monarchy_sudo pacman-key --lsign-key "$MONARCHY_OMARCHY_KEY" \
+        || monarchy_die "pacman-key --lsign-key failed"
+}
+
+monarchy_install_omarchy_keyring() {
+    if monarchy_pkg_installed omarchy-keyring; then
+        monarchy_log "omarchy-keyring already installed"
+    else
+        monarchy_log "pacman -Sy then install omarchy-keyring"
+        monarchy_sudo pacman -Sy --noconfirm
+        monarchy_sudo pacman -S --needed --noconfirm omarchy-keyring \
+            || monarchy_die "omarchy-keyring install failed (is [omarchy] in pacman.conf?)"
+    fi
+    if [ -f /usr/share/pacman/keyrings/omarchy.gpg ]; then
+        monarchy_sudo pacman-key --populate omarchy
+    fi
+}
+
 monarchy_add_omarchy_repo() {
     local conf=${MONARCHY_PACMAN_CONF:-/etc/pacman.conf}
     local bak=/etc/pacman.conf.monarchy.bak
@@ -48,10 +152,9 @@ monarchy_add_omarchy_repo() {
         monarchy_sudo cp -a "$conf" "$bak"
     fi
 
-    if command -v pacman >/dev/null 2>&1 && ! pacman -Q omarchy-keyring >/dev/null 2>&1; then
-        monarchy_log "install omarchy-keyring"
-        monarchy_sudo pacman -S --needed --noconfirm omarchy-keyring
-    fi
+    # Recv+lsign before the package install: SigLevel Required cannot
+    # fetch omarchy-keyring until this key is locally signed.
+    monarchy_trust_omarchy_key
 
     block=$(
         cat <<EOF
@@ -79,6 +182,7 @@ EOF
     rm -f "$tmp"
     monarchy_preserve_pacman_conf
     monarchy_log "appended [omarchy] marker block"
+    monarchy_install_omarchy_keyring
 }
 
 monarchy_nvidia_keep_chwd() {

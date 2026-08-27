@@ -61,16 +61,32 @@ EOF
 }
 
 monarchy_user_theme() {
-    local theme="$MONARCHY_SRC/install/user/theme.sh"
-    [ -f "$theme" ] || return 0
     export PATH="$MONARCHY_PATH/bin:$PATH"
     export OMARCHY_PATH
     export OMARCHY_SETUP_CONTEXT=monarchy-setup
     export OMARCHY_THEME_HEADLESS=1
-    if ! bash "$theme"; then
-        monarchy_log "warning: theme.sh failed; set a theme from the Omarchy menu after login"
+    if [ ! -s "$HOME/.local/state/omarchy/current/theme.name" ]; then
+        if ! omarchy-theme-set "Tokyo Night"; then
+            monarchy_log "warning: omarchy-theme-set Tokyo Night failed; set a theme from the Omarchy menu after login"
+            return 0
+        fi
     fi
-    return 0
+    # Pi theme is optional; tokyo-night only has pi.json after templates run.
+    omarchy-theme-set-pi --activate >/dev/null 2>&1 || true
+    monarchy_log "theme $(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null)"
+}
+
+monarchy_seed_kwallet_autostart() {
+    local dest="$HOME/.config/hypr/autostart.lua"
+    mkdir -p "$(dirname "$dest")"
+    [ -f "$dest" ] || printf -- '-- Extra autostart processes.\n' >"$dest"
+    grep -q pam_kwallet_init "$dest" 2>/dev/null && return 0
+    cat >>"$dest" <<'EOF'
+
+-- Unlock KWallet so NetworkManager can use Wi-Fi secrets saved under Plasma.
+o.launch_on_start("/usr/lib/pam_kwallet_init")
+EOF
+    monarchy_log "seeded pam_kwallet_init in $dest"
 }
 
 monarchy_user_git() {
@@ -82,6 +98,7 @@ monarchy_user_git() {
 monarchy_setup_user() {
     [ "$USER" != "root" ] || monarchy_die "user setup must not run as root"
     monarchy_seed_hyprland_config
+    monarchy_seed_kwallet_autostart
     monarchy_seed_branding
     monarchy_seed_uwsm_user_env
     monarchy_user_xcompose

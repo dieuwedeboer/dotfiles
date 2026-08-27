@@ -68,13 +68,34 @@ monarchy_refuse_daily_driver() {
     done
 }
 
+monarchy_assert_root_pre_update_snapshot() {
+    if ! zfs list -t snapshot -H -o name -d 1 "$MONARCHY_ROOT_DATASET" 2>/dev/null \
+        | grep -q '@pre-update-'; then
+        monarchy_die "no pre-update snapshot on $MONARCHY_ROOT_DATASET after running the helper"
+    fi
+}
+
+monarchy_install_snapshot_helper() {
+    local helper=/root/.local/bin/zfs-snapshot-pre-update.sh
+    local src="$MONARCHY_DOTFILES/chezmoi/dot_local/bin/executable_zfs-snapshot-pre-update"
+    [ -f "$src" ] || monarchy_die "missing $src"
+    if monarchy_sudo test -x "$helper" && monarchy_sudo grep -q ROOT_DATASET "$helper"; then
+        return 0
+    fi
+    monarchy_log "installing snapshot helper to $helper"
+    monarchy_sudo mkdir -p /root/.local/bin
+    monarchy_sudo install -m 755 "$src" "$helper"
+}
+
 monarchy_snapshot_first() {
     local helper=/root/.local/bin/zfs-snapshot-pre-update.sh
-    if [ ! -x "$helper" ]; then
-        monarchy_die "missing $helper; run scripts/setup-zfs.sh first"
+    monarchy_install_snapshot_helper
+    if ! monarchy_sudo test -x "$helper"; then
+        monarchy_die "missing $helper"
     fi
     monarchy_log "snapshot via $helper"
     monarchy_sudo "$helper"
+    monarchy_assert_root_pre_update_snapshot
 }
 
 monarchy_assert_zfs_layout() {

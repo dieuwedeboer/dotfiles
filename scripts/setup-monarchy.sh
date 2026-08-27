@@ -15,9 +15,11 @@ usage: setup-monarchy.sh [--check] [--update] [--no-packages] [--splash-only] [-
 
   --check         Snapshot-free dry-run. Safe on kingfisher.
   --update        Snapshot, fetch, check, then apply.
-  (none)          Snapshot-first apply: clone, overlay, [omarchy] repo,
-                  filtered packages, greeter session, UWSM env, user Hyprland
+  (none)          Snapshot-first apply: clone, overlay, trust Omarchy
+                  packaging key (prompts once), [omarchy] repo, filtered
+                  packages, greeter session, UWSM env, user Hyprland
                   config. Refuses kingfisher/bonw9 unless MONARCHY_ALLOW_HOST=1.
+                  MONARCHY_TRUST_OMARCHY_KEY=1 skips the key prompt.
   --no-packages   Skip pacman leaf packages (still does overlay, repo, session).
   --splash-only   Branding + Plymouth HOOKS (PR 5; not implemented yet).
 
