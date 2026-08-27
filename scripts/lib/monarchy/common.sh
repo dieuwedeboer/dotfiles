@@ -106,17 +106,6 @@ monarchy_pkg_installed() {
     pacman -Q "$1" >/dev/null 2>&1
 }
 
-monarchy_keep_plasmalogin() {
-    if monarchy_pkg_installed sddm; then
-        monarchy_die "sddm is installed; packages.deny forbids a second display manager"
-    fi
-    if command -v systemctl >/dev/null 2>&1; then
-        systemctl is-enabled plasmalogin >/dev/null 2>&1 \
-            || monarchy_die "plasmalogin is not enabled"
-    fi
-    return 0
-}
-
 monarchy_refuse_bootloader() {
     [ -d "$MONARCHY_REFIND_DIR" ] || monarchy_die "rEFInd missing at $MONARCHY_REFIND_DIR"
     [ -d "$MONARCHY_ZBM_DIR" ] || monarchy_die "ZFSBootMenu missing at $MONARCHY_ZBM_DIR"

@@ -2,7 +2,7 @@
 
 `berenddeboer/omarchy` has issues disabled. The ZFS-specific package repo does not (`berenddeboer/omarchy-zfs-pkgs`). The issue below was filed there, asking whether the fork will treat non-`zroot` pools and non-Limine boot paths as in-scope.
 
-This is not a request that they support CachyOS, plasma-login-manager, or `linux-cachyos`. Those stay in Monarchy's bridge. If they generalize discovery of the live root dataset and skip Limine when ZFSBootMenu is already the boot path, the bridge shrinks.
+This is not a request that they support CachyOS, multi-user SDDM, or `linux-cachyos`. Those stay in Monarchy's bridge. If they generalize discovery of the live root dataset and skip Limine when ZFSBootMenu is already the boot path, the bridge shrinks.
 
 Filed: https://github.com/berenddeboer/omarchy-zfs-pkgs/issues/1
 
@@ -16,7 +16,7 @@ Filed: https://github.com/berenddeboer/omarchy-zfs-pkgs/issues/1
 ## What we did not ask them to take
 
 - CachyOS repos or `linux-cachyos` / `linux-cachyos-zfs`
-- plasma-login-manager (SDDM-compatible greeter we keep on our side)
+- Multi-user SDDM greeter overlay (stock Omarchy theme is last-user only)
 - Sanoid vs Snapper
 - Not replacing `/etc/pacman.conf`
 

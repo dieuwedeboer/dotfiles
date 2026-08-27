@@ -56,7 +56,8 @@ monarchy_check() {
     monarchy_ensure_clone_for_check
     monarchy_assert_zfs_layout
     monarchy_assert_os_release
-    monarchy_keep_plasmalogin
+    monarchy_assert_sddm_assets
+    monarchy_assert_sddm_runtime
     monarchy_refuse_bootloader
     monarchy_refuse_snapper
     monarchy_refuse_kernel_swap
@@ -77,8 +78,12 @@ monarchy_check() {
         || monarchy_die "omarchy.desktop missing DesktopNames=Hyprland"
     [ -f "$MONARCHY_MISC/10-monarchy" ] || monarchy_die "missing 10-monarchy"
     [ -f "$MONARCHY_MISC/hyprland-portals.conf" ] || monarchy_die "missing hyprland-portals.conf"
-    if monarchy_filtered_packages | grep -qx sddm; then
-        monarchy_die "sddm leaked into filtered package list"
+    [ -f "$MONARCHY_MISC/sddm/Main.qml" ] || monarchy_die "missing sddm/Main.qml"
+    [ -f "$MONARCHY_MISC/sddm/99-omarchy-sddm.conf" ] || monarchy_die "missing 99-omarchy-sddm.conf"
+    monarchy_filtered_packages | grep -qx sddm \
+        || monarchy_die "sddm missing from filtered package list"
+    if monarchy_filtered_packages | grep -qx plasma-login-manager; then
+        monarchy_die "plasma-login-manager leaked into filtered package list"
     fi
     [ -f "$monarchy_lib_dir/switch-user.sh" ] || monarchy_die "missing switch-user.sh"
     monarchy_check_session_lock_overlay
@@ -105,7 +110,7 @@ monarchy_apply() {
     monarchy_snapshot_first
     monarchy_assert_zfs_layout
     monarchy_assert_os_release
-    monarchy_keep_plasmalogin
+    monarchy_assert_sddm_assets
     monarchy_refuse_bootloader
     monarchy_refuse_snapper
     monarchy_refuse_kernel_swap
@@ -122,6 +127,7 @@ monarchy_apply() {
     export OMARCHY_PATH
     monarchy_add_omarchy_repo
     monarchy_install_packages
+    monarchy_keep_sddm
     monarchy_apply_lock
     monarchy_install_omarchy_session
     monarchy_apply_logind

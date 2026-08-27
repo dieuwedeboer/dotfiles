@@ -9,6 +9,9 @@ monarchy_wrap_stub_for() {
         omarchy-plymouth-set|omarchy-plymouth-reset|omarchy-refresh-plymouth)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-plymouth.sh"
             ;;
+        omarchy-refresh-sddm)
+            printf '%s\n' "$monarchy_lib_dir/stubs/wrap-sddm.sh"
+            ;;
         omarchy-screensaver)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-screensaver.sh"
             ;;

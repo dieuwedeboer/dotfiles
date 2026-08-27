@@ -1,6 +1,10 @@
 # shellcheck shell=bash
 # Post-unlock Plymouth using the Omarchy theme. Never plymouth-zfs.
-# Never plymouth-before-zfs. Never SDDM. Never limine-mkinitcpio.
+# Never plymouth-before-zfs. Never limine-mkinitcpio.
+# SDDM greeter sync is in sddm.sh (plymouth-set writes the overlay QML).
+
+# shellcheck source=sddm.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/sddm.sh"
 
 MONARCHY_PLYMOUTH_THEME_DIR="${MONARCHY_PLYMOUTH_THEME_DIR:-/usr/share/plymouth/themes/omarchy}"
 MONARCHY_MKINITCPIO_CONF="${MONARCHY_MKINITCPIO_CONF:-/etc/mkinitcpio.conf}"
@@ -162,12 +166,19 @@ monarchy_plymouth_set() {
     monarchy_sudo cp -a --no-preserve=mode,ownership "$staging_dir/." "$dest/"
     monarchy_sudo plymouth-set-default-theme omarchy
     monarchy_splash_rebuild
-    monarchy_log "plymouth theme colors set; skipped SDDM"
+    local fail_asset
+    for fail_asset in entry lock; do
+        magick "$staging_dir/${fail_asset}.png" -channel RGB +level-colors "#f7768e","#f7768e" \
+            "$staging_dir/${fail_asset}-failed.png"
+    done
+    monarchy_sddm_sync_assets "$staging_dir" "$bg_hex" "$text_hex"
+    monarchy_log "plymouth theme colors set; SDDM greeter synced"
 }
 
 monarchy_plymouth_reset() {
     monarchy_refresh_plymouth
-    monarchy_log "plymouth reset; skipped omarchy-refresh-sddm"
+    monarchy_refresh_sddm
+    monarchy_log "plymouth reset; SDDM greeter refreshed"
 }
 
 monarchy_splash_maybe_theme() {
@@ -204,8 +215,11 @@ monarchy_splash() {
     if [ "${MONARCHY_SPLASH_REBUILD:-0}" = 1 ]; then
         monarchy_splash_rebuild
     fi
+    if [ -d "$(monarchy_sddm_clone_theme)" ]; then
+        monarchy_refresh_sddm
+    fi
     monarchy_skip_plymouth_zfs
-    monarchy_log "splash ready (plymouth after zfs, theme omarchy)"
+    monarchy_log "splash ready (plymouth after zfs, theme omarchy, sddm greeter synced)"
 }
 
 monarchy_splash_only() {

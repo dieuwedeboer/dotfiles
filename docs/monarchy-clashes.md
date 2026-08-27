@@ -2,7 +2,7 @@
 
 Living matrix. Source of truth for `packages.deny` and overlay-bin policy. See `docs/monarchy.md` for architecture.
 
-Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c01df169` (438 `bin/` names: 291 allow, 5 wrap, 142 deny).
+Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c01df169` (438 `bin/` names: 290 allow, 7 wrap, 141 deny).
 
 ## Blocker
 
@@ -16,7 +16,7 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 | Omarchy ALPM update guard | would be Omarchy | Never install `omarchy` / `omarchy-dev` | `monarchy_disable_omarchy_update_guard` |
 | `zroot/ROOT/default` vs `zpcachyos/ROOT/cos/root` | Dieuwe | Never run `zfs.sh` / zfs-check | `monarchy_refuse_dataset_rename` |
 | `omarchy-settings*` overwrites `/etc/os-release` | CachyOS | Never install those packages | `monarchy_skip_os_release_clobber` |
-| `sddm` vs plasma-login-manager | CachyOS | Deny `sddm`. Keep PLM | `monarchy_keep_plasmalogin` |
+| Two DMs: CachyOS PLM vs Omarchy `sddm` | CachyOS | Install `sddm`, remove PLM | `monarchy_keep_sddm` |
 
 ## Major
 
@@ -34,12 +34,12 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 
 ## `packages.deny`
 
-See `misc/monarchy/packages.deny`. Hard list includes `sddm`, `tldr`, `yay`, `mise-bin`, `ufw-docker`, `snapper`, `limine*`, stock `linux`/`linux-headers`, NVIDIA dkms variants, `omarchy`/`omarchy-dev`/`omarchy-settings*`, `kernel-modules-hook`, `btrfs-progs`, `zram-generator`.
+See `misc/monarchy/packages.deny`. Hard list includes `plasma-login-manager`, `tldr`, `yay`, `mise-bin`, `ufw-docker`, `snapper`, `limine*`, stock `linux`/`linux-headers`, NVIDIA dkms variants, `omarchy`/`omarchy-dev`/`omarchy-settings*`, `kernel-modules-hook`, `btrfs-progs`, `zram-generator`.
 
 ## Overlay bin
 
 - `misc/monarchy/bin.allow` — symlink to clone `bin/<name>`
-- `misc/monarchy/bin.wrap` — `omarchy-update` and `omarchy-update-system-pkgs` call `setup-monarchy.sh --update`. Plymouth write-path names (`omarchy-plymouth-set`, `omarchy-plymouth-reset`, `omarchy-refresh-plymouth`) skip SDDM and Limine.
+- `misc/monarchy/bin.wrap` — `omarchy-update` and `omarchy-update-system-pkgs` call `setup-monarchy.sh --update`. Plymouth write-path names skip Limine and restyle the SDDM greeter from Monarchy `Main.qml`. `omarchy-refresh-sddm` copies the clone theme then overlays that QML.
 - `misc/monarchy/bin.deny` — stub, exit 2. Also installed under `/usr/local/bin` on apply
 
 `omarchy` itself is allowlisted (CLI router). `omarchy-refresh-pacman` is deny, not a wrap.

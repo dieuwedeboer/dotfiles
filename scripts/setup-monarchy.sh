@@ -55,6 +55,8 @@ source "$SCRIPT_DIR/lib/monarchy/sessions.sh"
 source "$SCRIPT_DIR/lib/monarchy/portals.sh"
 # shellcheck source=lib/monarchy/user.sh
 source "$SCRIPT_DIR/lib/monarchy/user.sh"
+# shellcheck source=lib/monarchy/sddm.sh
+source "$SCRIPT_DIR/lib/monarchy/sddm.sh"
 # shellcheck source=lib/monarchy/splash.sh
 source "$SCRIPT_DIR/lib/monarchy/splash.sh"
 

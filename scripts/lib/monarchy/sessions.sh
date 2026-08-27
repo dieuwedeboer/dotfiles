@@ -28,7 +28,7 @@ monarchy_accountsservice_session() {
         printf '[User]\nSession=%s\n' "$session" | monarchy_sudo tee "$f" >/dev/null
         monarchy_sudo chmod 644 "$f"
     fi
-    monarchy_log "AccountsService Session=$session for $user (unverified PLM API)"
+    monarchy_log "AccountsService Session=$session for $user"
 }
 
 monarchy_install_omarchy_session() {

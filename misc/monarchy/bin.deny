@@ -70,7 +70,6 @@ omarchy-provision-owner
 omarchy-provision-user
 omarchy-refresh-limine
 omarchy-refresh-pacman
-omarchy-refresh-sddm
 omarchy-reinstall
 omarchy-reinstall-configs
 omarchy-reinstall-pkgs
