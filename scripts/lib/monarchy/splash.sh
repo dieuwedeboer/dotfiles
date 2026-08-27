@@ -183,23 +183,24 @@ monarchy_plymouth_reset() {
 
 monarchy_splash_maybe_theme() {
     local name_file="$HOME/.local/state/omarchy/current/theme.name"
-    local theme theme_dir
+    local theme theme_dir set_by
     [ -s "$name_file" ] || return 0
-    [ -f "$MONARCHY_PLYMOUTH_THEME_DIR/omarchy.plymouth" ] || return 0
     theme=$(cat "$name_file")
     [ -n "$theme" ] || return 0
-    theme_dir="${OMARCHY_PATH:-/usr/local/share/omarchy}/themes/$theme"
-    [ -d "$HOME/.config/omarchy/themes/$theme" ] && theme_dir="$HOME/.config/omarchy/themes/$theme"
+    theme_dir=$(monarchy_current_theme_dir "$theme")
     [ -f "$theme_dir/unlock.png" ] || return 0
-    if cmp -s "$theme_dir/unlock.png" "$MONARCHY_PLYMOUTH_THEME_DIR/logo.png" 2>/dev/null; then
-        return 0
+    if [ -f "$MONARCHY_PLYMOUTH_THEME_DIR/omarchy.plymouth" ] &&
+        ! cmp -s "$theme_dir/unlock.png" "$MONARCHY_PLYMOUTH_THEME_DIR/logo.png" 2>/dev/null; then
+        monarchy_log "apply plymouth unlock from theme $theme"
+        set_by="${MONARCHY_PATH:-/usr/local/share/omarchy}/bin/omarchy-plymouth-set-by-theme"
+        export PATH="${MONARCHY_PATH:-/usr/local/share/omarchy}/bin:$PATH"
+        if [ -x "$set_by" ]; then
+            "$set_by" "$theme"
+        fi
     fi
-    monarchy_log "apply plymouth unlock from theme $theme"
-    local set_by="${MONARCHY_PATH:-/usr/local/share/omarchy}/bin/omarchy-plymouth-set-by-theme"
-    export PATH="${MONARCHY_PATH:-/usr/local/share/omarchy}/bin:$PATH"
-    if [ -x "$set_by" ]; then
-        "$set_by" "$theme"
-    fi
+    # plymouth-set-by-theme already restyles SDDM; this still runs when
+    # plymouth already matched so a stock greeter copy is not left behind.
+    monarchy_sddm_apply_current_theme
 }
 
 monarchy_splash() {

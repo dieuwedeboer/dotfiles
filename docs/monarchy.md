@@ -460,11 +460,11 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 | `monarchy_skip_os_release_clobber` | Never install `omarchy-settings*`. If `/etc/os-release` `ID` is not `cachyos`, abort and restore from `/usr/lib/os-release` |
 | `monarchy_keep_family_mime` | Do not install Omarchy mimeapps system-wide or into `~/.config/mimeapps.list`. Hyprland keybinds launch Nautilus explicitly |
 | `monarchy_apply_lock` | Run overlay `omarchy-apply-lock` (same as `install/config/lockscreen-pam.sh`). Writes `/etc/pam.d/omarchy-lock-password`. Quickshell lock returns `missing-pam` without it. Not a plasmalogin problem; official Omarchy also keeps the greeter running |
-| `monarchy_overlay_session_lock` | Explode prefix `shell/` and `default/` into dirs of child symlinks. Copy-and-patch `plugins/lock` and `omarchy-menu.jsonc` so Super+Ctrl+U switches user. `--check` fails if the clone hunks drifted |
+| `monarchy_overlay_session_lock` | Explode prefix `shell/` and `default/` into dirs of child symlinks. Copy the `shell/plugins` tree (PluginRegistry's `find -type f` does not follow dir-symlinks) and patch `plugins/lock` plus `omarchy-menu.jsonc` so Super+Ctrl+U switches user. `--check` fails if the clone hunks drifted |
 | `monarchy_install_switch_user` | Install `/usr/local/bin/monarchy-switch-user`. Locks the Omarchy session if needed, then `Seat.SwitchToGreeter` |
 | `monarchy_rebuild_overlay` | Rebuild overlay `bin/` fail-closed |
 | `monarchy_nvidia_keep_chwd` | Never run Omarchy `nvidia.sh` |
-| `monarchy_splash` | Omarchy Plymouth theme, plymouth after zfs, `mkinitcpio -P`. Never plymouth-zfs, never Limine. SDDM greeter restyle is `monarchy_refresh_sddm` / plymouth-set |
+| `monarchy_splash` | Omarchy Plymouth theme, plymouth after zfs, `mkinitcpio -P`. Never plymouth-zfs, never Limine. SDDM greeter restyle is `monarchy_refresh_sddm` / plymouth-set. `splash_maybe_theme` restyles SDDM even when plymouth already matches |
 
 ### Dual-session design
 
@@ -472,7 +472,7 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 
 Stay on Omarchy's login stack except where the household requires a fork. ZFS stays ZBM. Multi-user family KDE is the greeter overlay, not a second display manager. plasma-login-manager cannot load Omarchy's QML theme, so keeping it meant skipping `omarchy-plymouth-set`'s greeter half forever.
 
-Stock Omarchy `Main.qml` is a last-user password box that auto-picks the first `uwsm` session. That logs Amie into Dieuwe's account. Monarchy overlays `misc/monarchy/sddm/Main.qml`: same logo/lock/entry, `#1a1b26`/`#ffffff` color tokens, plus Tab user cycle and Up/Down session cycle. amie and olivier default to Plasma; everyone else defaults to Omarchy. Do not write `/var/lib/sddm/state.conf`. Do not enable Autologin.
+Stock Omarchy `Main.qml` is a last-user password box that auto-picks the first `uwsm` session. That logs Amie into Dieuwe's account. Monarchy overlays `misc/monarchy/sddm/Main.qml`: same logo/lock/entry, `#1a1b26`/`#ffffff` color tokens, plus Tab user cycle and Up/Down session cycle. amie and olivier default to Plasma; everyone else defaults to Omarchy. Do not write `/var/lib/sddm/state.conf`. Do not enable Autologin. SDDM does not remember last session per user; the overlay's static defaults are the picker. Dieuwe still needs to decide whether to keep that or add per-user memory. See Open questions.
 
 CachyOS leftover `/usr/lib/sddm/sddm.conf.d/zz-wayland.conf` (kwin greeter) and `/etc/sddm.conf.d/kde_settings.conf` (`Current=breeze`) lose to `/etc/sddm.conf.d/99-omarchy-sddm.conf`.
 
@@ -501,10 +501,10 @@ Exact greeter files:
 | `/usr/share/wayland-sessions/omarchy.desktop` | Monarchy-authored. `TryExec=uwsm`. `DesktopNames=Hyprland`. Comment is Monarchy-branded, not the clone's. Exec is `uwsm start -g -1 -e -D Hyprland hyprland.desktop` once that file exists, otherwise `monarchy-session-probe` |
 | `/usr/share/wayland-sessions/plasma.desktop` | Untouched |
 | `/etc/sddm.conf.d/99-omarchy-sddm.conf` | `Current=omarchy`. `DisplayServer=wayland`. `CompositorCommand=start-hyprland -- --config /usr/share/sddm/hyprland.lua`. Autologin `User` empty |
-| `/usr/share/sddm/themes/omarchy/Main.qml` | Clone theme copy, then Monarchy overlay. `omarchy-refresh-sddm` is wrapped so stock last-user QML cannot land |
+| `/usr/share/sddm/themes/omarchy/Main.qml` | Clone theme copy, then Monarchy overlay. `omarchy-refresh-sddm` is wrapped so stock last-user QML cannot land. `splash_maybe_theme` then restyles from `theme.name` even when plymouth already matches |
 | `/usr/share/sddm/hyprland.lua` | Clone `default/sddm/hyprland.lua` |
-| `/var/lib/sddm/state.conf` | Do **not** write Dieuwe+omarchy. Last user is SDDM's own memory; session default is the QML overlay |
-| `/var/lib/AccountsService/users/{dieuwe,amie,olivier}` | Still written (`omarchy.desktop` / `plasma.desktop`). The QML overlay is the picker default that matters |
+| `/var/lib/sddm/state.conf` | Do **not** write Dieuwe+omarchy. Last user is SDDM's own memory; session default is the QML overlay. SDDM's `RememberLastSession` is one slot for the whole machine, not per user |
+| `/var/lib/AccountsService/users/{dieuwe,amie,olivier}` | Still written (`omarchy.desktop` / `plasma.desktop`). The QML overlay is the picker default that matters. Per-user last-session memory is deferred; see Open questions |
 | leftover `/etc/sddm.conf.d/kde_settings.conf` | Assert `[Autologin] User` empty. Do not delete. `99-omarchy-sddm.conf` wins on Theme |
 
 Family members see the Omarchy terminal-style greeter with their name and Plasma on screen. Tab if the last user was someone else. After login they still get full Plasma. `sddm-kcm` may stay; a monarchy apply puts `Current=omarchy` back.
@@ -571,12 +571,12 @@ Live config: Components enabled, EFI UKI disabled, `SplashImage` unused. Do **no
 - Copy clone `default/plymouth/` to `/usr/share/plymouth/themes/omarchy`. `plymouth-set-default-theme omarchy`.
 - Insert `plymouth` **after** `zfs` and **before** `filesystems`. `mkinitcpio -P`. Never `generate-zbm` for this (ZBM is a separate image).
 - Keep `quiet splash` on `org.zfsbootmenu:commandline`.
-- Wrap `omarchy-refresh-plymouth` / `omarchy-plymouth-set` / `omarchy-plymouth-reset` so they never call `limine-mkinitcpio`. `omarchy-plymouth-set` writes the SDDM greeter from Monarchy `Main.qml` (same `#1a1b26` / `#ffffff` tokens). `omarchy-refresh-sddm` is wrapped: copy clone theme, overlay QML. Allow list/current/preview/switcher/`set-by-theme`.
+- Wrap `omarchy-refresh-plymouth` / `omarchy-plymouth-set` / `omarchy-plymouth-reset` so they never call `limine-mkinitcpio`. `omarchy-plymouth-set` writes the SDDM greeter from Monarchy `Main.qml` (same `#1a1b26` / `#ffffff` tokens). `omarchy-refresh-sddm` is wrapped: copy clone theme, overlay QML. `splash_maybe_theme` restyles SDDM from `theme.name` even when plymouth's logo already matches. Allow list/current/preview/switcher/`set-by-theme`.
 - Do not set `ShowDelay` (packaged default is already 0).
 
 #### 4. Greeter
 
-Omarchy SDDM theme at `/usr/share/sddm/themes/omarchy`, Hyprland as the greeter compositor, Monarchy `Main.qml` overlay. `99-omarchy-sddm.conf` beats CachyOS breeze/kwin drop-ins.
+Omarchy SDDM theme at `/usr/share/sddm/themes/omarchy`, Hyprland as the greeter compositor, Monarchy `Main.qml` overlay restyled from the current Omarchy theme. `99-omarchy-sddm.conf` beats CachyOS breeze/kwin drop-ins.
 
 #### 5. Session splashes
 
@@ -953,6 +953,8 @@ Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZBM, or clone+promote
 ## Open questions
 
 1. **Will `quattro-on-zfs` generalize pool name and bootloader?** Filed as https://github.com/berenddeboer/omarchy-zfs-pkgs/issues/1. Until that lands, the bridge keeps refusing Limine, archzfs, and `zroot/ROOT/default`. If they take the change, denylist and zfs-check stubs shrink.
+
+2. **Per-user greeter session: static default vs last-used?** SDDM's `RememberLastSession` is global (`state.conf` `[Last] Session=`). The overlay therefore hardcodes amie/olivier → Plasma and everyone else → Omarchy, and ignores `sessionModel.lastIndex`. Apply still writes AccountsService `Session=`, but the greeter does not read it. Remembering last session per user would be a Monarchy hook, not an SDDM feature, and would also remember an accidental Omarchy login for family. Dieuwe to review. Leave the static overlay defaults until then.
 
 Everything else that used to live here is a Key Decision: clone path, SigLevel, overlay-bin, Plymouth after zfs, foot vs ghostty, family sees Omarchy, both CachyOS ZFS packages stay.
 

@@ -171,7 +171,7 @@ monarchy_check_session_lock_overlay() {
 
 # Copy-and-patch lock plugin + system menu. Prefix must already be linked.
 monarchy_overlay_session_lock() {
-    local py lock_src lock_dest lock_tmp menu_src menu_dest menu_tmp
+    local py lock_src plugins_tmp menu_src menu_dest menu_tmp
     py=$(monarchy_overlay_lock_py)
     lock_src="$MONARCHY_SRC/shell/plugins/lock"
     menu_src="$MONARCHY_SRC/default/omarchy/omarchy-menu.jsonc"
@@ -179,16 +179,18 @@ monarchy_overlay_session_lock() {
     [ -f "$menu_src" ] || monarchy_die "missing $menu_src"
 
     monarchy_explode_symlink_dir "$MONARCHY_PATH/shell"
-    monarchy_explode_symlink_dir "$MONARCHY_PATH/shell/plugins"
-    lock_dest="$MONARCHY_PATH/shell/plugins/lock"
-    lock_tmp=$(mktemp -d)
-    cp -a "$lock_src"/. "$lock_tmp"/
-    python3 "$py" apply lock "$lock_tmp" || {
-        rm -rf "$lock_tmp"
+    # Copy the whole plugins tree. PluginRegistry finds manifests with
+    # `find -type f` and does not follow directory symlinks, so exploding
+    # plugins/ into child-dir-symlinks hides wallpaper, menu, and the rest.
+    # Only lock/ is patched; the copy keeps the clone itself untouched.
+    plugins_tmp=$(mktemp -d)
+    cp -a "$MONARCHY_SRC/shell/plugins"/. "$plugins_tmp"/
+    python3 "$py" apply lock "$plugins_tmp/lock" || {
+        rm -rf "$plugins_tmp"
         monarchy_die "lock QML overlay failed"
     }
-    monarchy_overlay_replace_dir "$lock_dest" "$lock_tmp"
-    monarchy_log "overlaid $lock_dest"
+    monarchy_overlay_replace_dir "$MONARCHY_PATH/shell/plugins" "$plugins_tmp"
+    monarchy_log "overlaid $MONARCHY_PATH/shell/plugins/lock"
 
     monarchy_explode_symlink_dir "$MONARCHY_PATH/default"
     monarchy_explode_symlink_dir "$MONARCHY_PATH/default/omarchy"

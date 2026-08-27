@@ -160,7 +160,22 @@ if [ -f "$clone/shell/plugins/lock/LockView.qml" ]; then
     grep -q '"system.switch-user"' "$menu" || fail "menu missing system.switch-user"
     awk '/system.lock/{lock=NR} /system.switch-user/{sw=NR} END{if(!(lock&&sw&&sw==lock+1)) exit 1}' "$menu" \
         || fail "system.switch-user is not the row after system.lock"
-    [ -L "$MONARCHY_PATH/shell/plugins/menu" ] || fail "unrelated shell plugin should stay a symlink"
+    # PluginRegistry scans with `find -type f` and does not follow directory
+    # symlinks. Child-dir-symlinks hide wallpaper and the menu: black desktop.
+    menu_manifest="$MONARCHY_PATH/shell/plugins/menu/manifest.json"
+    bg_manifest="$MONARCHY_PATH/shell/plugins/background/manifest.json"
+    [ -f "$menu_manifest" ] && [ ! -L "$menu_manifest" ] \
+        || fail "menu manifest must be a real file (find -type f)"
+    [ -f "$bg_manifest" ] && [ ! -L "$bg_manifest" ] \
+        || fail "background manifest must be a real file (find -type f)"
+    overlay_scan=$(find "$MONARCHY_PATH/shell/plugins" -mindepth 2 -maxdepth 3 \
+        -type f \( -name manifest.json -o -name '*.manifest.json' \) | wc -l)
+    clone_scan=$(find "$clone/shell/plugins" -mindepth 2 -maxdepth 3 \
+        -type f \( -name manifest.json -o -name '*.manifest.json' \) | wc -l)
+    [ "$overlay_scan" -eq "$clone_scan" ] \
+        || fail "overlay plugin scan finds $overlay_scan manifests, clone has $clone_scan"
+    grep -q 'signal switchUserRequested' "$clone/shell/plugins/lock/LockView.qml" \
+        && fail "clone LockView.qml was patched"
     [ -L "$MONARCHY_PATH/logo.txt" ] || fail "prefix logo.txt should stay a symlink"
 else
     echo "test-switch-user: skip live clone overlay (no $clone/shell/plugins/lock)" >&2
