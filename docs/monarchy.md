@@ -2,7 +2,7 @@
 
 - **Author:** TBD (Dieuwe)
 - **Date:** 2026-08-26
-- **Status:** v1. Omarchy and Plasma share a greeter on zbook. Apply is open on every CachyOS+ZFS+KDE host via `scripts/setup-monarchy.sh`. Splash is not.
+- **Status:** v1. Omarchy and Plasma share a greeter on zbook. Apply is open on every CachyOS+ZFS+KDE host via `scripts/setup-monarchy.sh`. Plymouth is the Omarchy theme, after zfs, post-unlock only.
 - **Audience:** Senior engineers working in `dieuwedeboer/dotfiles`
 - **Machines in scope:** every CachyOS+ZFS+KDE box that follows `scripts/install.sh`. First bring-up was zbook. kingfisher (Gigabyte B550 / Ryzen 5 5600X) and bonw9 (System76 Bonobo WS / Haswell i7-4810MQ + GTX 970M) run the same script.
 
@@ -94,7 +94,7 @@ Trust the fork to keep Hyprland/Quickshell/omarchy scripts current. Do not adopt
 - Dieuwe's default session is Omarchy/Hyprland (AccountsService `Session=` if PR 3 proves PLM honors it; otherwise he picks Omarchy once). Family default is Plasma. Same greeter, no autologin. Family sees Omarchy in the picker and picks Plasma.
 - Consume `berenddeboer/omarchy` `quattro-on-zfs` as an `omarchy-dev-link` tree (`/etc/omarchy.conf` + working prefix). Consume official `[omarchy]` for packages that do not fight CachyOS. Hyprland and Quickshell come from CachyOS first-match.
 - Bridging layer with a denylist, an overlay `bin/`, and named functions for every blocker-class clash.
-- Monarchy-branded boot/login splashes that do not steal the ZFS passphrase from ZFSBootMenu. Plymouth is PR 5, after the session works.
+- Omarchy Plymouth theme after zfs, post-unlock only. ZFSBootMenu keeps the passphrase. rEFInd stays glow. No custom Monarchy banner yet.
 - Repeatable across current and future CachyOS+ZFS machines. Per-machine hooks stay in `setup-kingfisher.sh` / `setup-bonw9.sh`.
 - Docs under `docs/` as listed below.
 
@@ -126,7 +126,7 @@ flowchart TB
     UEFI --> rEFInd
     rEFInd -->|"glow / optional Monarchy banner"| ZBM[ZFSBootMenu]
     ZBM -->|"passphrase for zpcachyos"| Initramfs
-    Initramfs -->|"HOOKS: ... zfs filesystems [plymouth after zfs, PR 5]"| Kernel
+    Initramfs -->|"HOOKS: ... zfs plymouth filesystems"| Kernel
   end
 
   subgraph dm [Display manager: plasma-login-manager]
@@ -309,6 +309,7 @@ PR 2 generates `bin.deny` as the complement of `bin.allow` ∪ `bin.wrap` at the
 
 - `omarchy-update` -> `setup-monarchy.sh --update`
 - `omarchy-update-system-pkgs` -> `setup-monarchy.sh --update`
+- `omarchy-plymouth-set` / `omarchy-plymouth-reset` / `omarchy-refresh-plymouth` -> Monarchy splash helpers (theme + `mkinitcpio -P`, no SDDM, no Limine)
 
 `omarchy-refresh-pacman` stays in `bin.deny` (exit 2). Its contract is "replace pacman.conf"; redirecting it to `--update` would hide that.
 
@@ -336,9 +337,7 @@ Hard-deny names that must appear in `bin.deny` (never accidentally allow):
 
 - `omarchy-refresh-pacman`
 - `omarchy-refresh-limine`
-- `omarchy-refresh-plymouth`
-- `omarchy-plymouth-set`
-- `omarchy-plymouth-set-by-theme`
+- `omarchy-refresh-sddm`
 - `omarchy-upgrade-to-quattro`
 - `omarchy-upgrade-to-quattro-zfs-check`
 - `omarchy-setup-direct-boot`
@@ -353,7 +352,6 @@ Hard-deny names that must appear in `bin.deny` (never accidentally allow):
 - `omarchy-provision-first-run`
 - `omarchy-provision-user`
 - `omarchy-provision-owner`
-- `omarchy-refresh-sddm`
 
 Install-script denylist (never invoked by the bridge, even if a binary of the same name is allowlisted):
 
@@ -407,7 +405,7 @@ scripts/lib/monarchy/
   clone.sh               # monarchy_sync_omarchy_clone
   sessions.sh            # plasma-login-manager dual session
   portals.sh
-  splash.sh
+  splash.sh              # Omarchy plymouth theme, plymouth after zfs
   nvidia.sh
   update.sh
   stubs/                 # stub templates copied into overlay bin and /usr/local/bin
@@ -451,6 +449,7 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 | `monarchy_keep_family_mime` | Do not install Omarchy mimeapps system-wide or into `~/.config/mimeapps.list`. Hyprland keybinds launch Nautilus explicitly |
 | `monarchy_rebuild_overlay` | Rebuild overlay `bin/` fail-closed |
 | `monarchy_nvidia_keep_chwd` | Never run Omarchy `nvidia.sh` |
+| `monarchy_splash` | Omarchy Plymouth theme, plymouth after zfs, `mkinitcpio -P`. Never plymouth-zfs, never Limine, never SDDM |
 
 ### Dual-session design
 
@@ -519,14 +518,14 @@ Kingfisher already has `/etc/zfs/zroot.key` in host initramfs `FILES`, so the ho
 
 On a future box **without** the keyfile: the host `zfs` hook prompts on the console *before* plymouth starts (plymouth is after zfs). That can look like a "broken splash" rather than a second passphrase. Document it. Do not "fix" it with `plymouth-zfs`.
 
-Plymouth is a Key Decision: do it in PR 5 after the session works. Branding assets (`banner.png`, plymouth theme, optional greeter jpg) are created in PR 5; they do not exist yet.
+Plymouth uses the Omarchy theme from the clone (`default/plymouth`), installed at `/usr/share/plymouth/themes/omarchy`. Custom rEFInd/ZBM/greeter art is not shipped. The greeter wallpaper stays whatever CachyOS already has.
 
 ```mermaid
 sequenceDiagram
   participant FW as UEFI
   participant R as rEFInd (theme)
   participant Z as ZFSBootMenu (passphrase lives here)
-  participant P as Plymouth (post-unlock only, PR 5)
+  participant P as Plymouth (post-unlock only)
   participant G as plasma-login-manager
   participant S as Session splash
   FW->>R: firmware splash / rEFInd banner
@@ -543,18 +542,19 @@ sequenceDiagram
 
 #### 1. rEFInd (already glow)
 
-`scripts/setup-refind-theme.sh` still owns installing glow. Monarchy adds `misc/monarchy/branding/refind/banner.png` and a marker in `refind.conf` that does not fight `include themes/glow/theme.conf`.
+`scripts/setup-refind-theme.sh` still owns installing glow. No Monarchy banner yet.
 
 #### 2. ZFSBootMenu
 
-Live config: Components enabled, EFI UKI disabled, `SplashImage` unused. v1 copies `misc/monarchy/branding/zbm/splash.bmp` to `/etc/zfsbootmenu/splash.bmp` so it is ready if EFI is ever enabled. Do **not** enable `EFI.Enabled`. Passphrase stays the stock ZBM TUI.
+Live config: Components enabled, EFI UKI disabled, `SplashImage` unused. Do **not** enable `EFI.Enabled`. Passphrase stays the stock ZBM TUI.
 
-#### 3. Plymouth (post-unlock, PR 5)
+#### 3. Plymouth (post-unlock)
 
-- Theme `misc/monarchy/branding/plymouth/` -> `/usr/share/plymouth/themes/monarchy/`. `plymouth-set-default-theme monarchy`.
+- Copy clone `default/plymouth/` to `/usr/share/plymouth/themes/omarchy`. `plymouth-set-default-theme omarchy`.
 - Insert `plymouth` **after** `zfs` and **before** `filesystems`. `mkinitcpio -P`. Never `generate-zbm` for this (ZBM is a separate image).
 - Keep `quiet splash` on `org.zfsbootmenu:commandline`.
-- Overlay-stub `omarchy-refresh-plymouth` / `omarchy-plymouth-set`. Do not set `ShowDelay` (packaged default is already 0).
+- Wrap `omarchy-refresh-plymouth` / `omarchy-plymouth-set` / `omarchy-plymouth-reset` so they never call `limine-mkinitcpio` or `omarchy-refresh-sddm`. Allow list/current/preview/switcher/`set-by-theme`.
+- Do not set `ShowDelay` (packaged default is already 0).
 
 #### 4. Greeter
 
@@ -568,10 +568,8 @@ Plasma: keep chezmoi `ksplashrc`. Omarchy: Quickshell lock + branding in `~/.con
 
 | Asset | Repo path | Deploy path | Deployed by |
 | --- | --- | --- | --- |
-| rEFInd banner | `misc/monarchy/branding/refind/banner.png` | `/boot/efi/EFI/refind/themes/monarchy/banner.png` | `monarchy_splash_refind` (PR 5) |
-| ZBM BMP | `misc/monarchy/branding/zbm/splash.bmp` | `/etc/zfsbootmenu/splash.bmp` | `monarchy_splash_zbm` (PR 5) |
-| Plymouth theme | `misc/monarchy/branding/plymouth/*` | `/usr/share/plymouth/themes/monarchy/` | `monarchy_splash_plymouth` (PR 5) |
-| Greeter wallpaper | `misc/monarchy/branding/greeter/monarchy.jpg` | `/var/lib/plasmalogin/wallpapers/monarchy.jpg` | optional, not default |
+| Plymouth theme | clone `default/plymouth/` | `/usr/share/plymouth/themes/omarchy/` | `monarchy_splash` |
+| Greeter wallpaper | n/a | n/a | not installed |
 | Omarchy session desktop | `misc/monarchy/omarchy.desktop` (authored) | `/usr/share/wayland-sessions/omarchy.desktop` | `monarchy_install_omarchy_session` (PR 3) |
 | Dieuwe Omarchy branding | clone `logo.txt` / `icon.txt` | `~/.config/omarchy/branding/` | PR 4b |
 
@@ -634,7 +632,7 @@ usage: setup-monarchy.sh [--check] [--update] [--no-packages] [--splash-only] [-
 | (none) | Snapshot-first, clone pin, repo append, overlay, filtered packages (after PR 4a), session, portals |
 | `--update` | Snapshot, fetch, `--check`, then apply |
 | `--no-packages` | Config/session/overlay only |
-| `--splash-only` | PR 5 branding + Plymouth HOOKS |
+| `--splash-only` | Omarchy Plymouth theme, plymouth after zfs, `mkinitcpio -P` |
 
 ### Greeter session file (Monarchy-authored)
 
@@ -693,7 +691,7 @@ fi
 | `/usr/share/wayland-sessions/omarchy.desktop` | session |
 | `/var/lib/AccountsService/users/{dieuwe,amie,olivier}` | attempted per-user default; PR 3 must verify PLM honors `Session=` |
 | `/usr/share/xdg-desktop-portal/hyprland-portals.conf` | portal preference |
-| `/usr/share/plymouth/themes/monarchy/` | splash (PR 5) |
+| `/usr/share/plymouth/themes/omarchy/` | Omarchy Plymouth theme |
 | `misc/monarchy/omarchy.lock` | clone+hyprland+quickshell pin |
 | `misc/monarchy/packages.installed` | recorded leaf set |
 | `/root/.local/bin/zfs-snapshot-pre-update.sh` | existing helper; required |
@@ -739,7 +737,7 @@ Sources compared:
 | CachyOS shell config. #650 says remove it | Dieuwe | major | Keep the package. Do not follow #650 |
 | `omarchy-nvim` vs `chezmoi/dot_config/nvim` | Dieuwe chezmoi | major | Install `omarchy-nvim` as its own app. Do not overwrite `~/.config/nvim` |
 | `mise-bin` + `install/user/mise.sh` vs uv/pnpm/bun/pipx + curl-installed grok/opencode | Dieuwe | major | Deny `mise-bin`. Skip `mise.sh` |
-| Plymouth hook vs current mkinitcpio | Dieuwe HOOKS | major | PR 5: plymouth **after** zfs only. Never `plymouth-zfs` |
+| Plymouth hook vs current mkinitcpio | Dieuwe HOOKS | major | plymouth **after** zfs only. Never `plymouth-zfs` |
 | SDDM theme vs family greeter | CachyOS plasma-login-manager | major | Do not switch DM. Do not apply Omarchy SDDM theme |
 | `xdg-desktop-portal-hyprland` vs kde | both | major | Install both. Session-scoped `XDG_CURRENT_DESKTOP` |
 | `nautilus` vs Dolphin | Plasma mime | major | Install nautilus. Do not write user-global mimeapps. Hyprland keybinds open Nautilus |
@@ -903,8 +901,8 @@ No feature flag service. The flag is "did you run `setup-monarchy.sh`".
 2. Clone, `/etc/omarchy.conf`, overlay, `omarchy-keyring`, `[omarchy]` marker (PR 2). Landed.
 3. `uwsm` + session desktop (PR 3). Greeter lists Omarchy. AccountsService `Session=` is still an attempt. Landed.
 4. Leaf packages + overlay populated (PR 4a), then Dieuwe user config (PR 4b). Landed on zbook: Omarchy and Plasma share the greeter.
-5. Splash (PR 5) after a known-good session. Not started.
-6. README pointer and apply open on every matching host (this change). Run `setup-monarchy.sh` on kingfisher and bonw9 the same way as zbook. bonw9 still needs a Hyprland + `chwd` NVIDIA check after apply.
+5. Splash: Omarchy Plymouth theme, plymouth after zfs. Landed. rEFInd/ZBM custom art still not shipped.
+6. README pointer and apply open on every matching host. Run `setup-monarchy.sh` on kingfisher and bonw9 the same way as zbook. bonw9 still needs a Hyprland + `chwd` NVIDIA check after apply.
 
 Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZBM, or clone+promote. Pacman.conf backup at `/etc/pacman.conf.monarchy.bak`. `--uninstall` is not v1.
 
@@ -916,7 +914,7 @@ Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZBM, or clone+promote
 | --- | --- | --- |
 | Accidental `omarchy-refresh-pacman` or metapackage install | high | Overlay stubs, `/usr/local/bin` stubs, never install metapackage, `monarchy_preserve_pacman_conf`, pacman.conf bak |
 | `omarchy-settings` rewrite of `/etc/os-release` | high | Never install it. Preflight `ID=cachyos` |
-| Plymouth-before-zfs or `plymouth-zfs` | high | PR 5 only, after session; plymouth after zfs; no plymouth-zfs |
+| Plymouth-before-zfs or `plymouth-zfs` | high | plymouth after zfs; no plymouth-zfs; wrap the Omarchy plymouth write path |
 | `bin/` names new relative to the lock on `--update` | high | Fail closed; classify into allow, wrap, or deny before applying |
 | plasma-login-manager does not list `omarchy.desktop` | medium | PR 3 installs `uwsm` and uses `TryExec=uwsm`. Fallback: SDDM without autologin |
 | Hyprland + GTX 970M on bonw9 | medium | Do not run Omarchy nvidia.sh. Validate after kingfisher. Not live-verified here |
@@ -934,7 +932,7 @@ Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZBM, or clone+promote
 
 2. **Will `quattro-on-zfs` generalize pool name and bootloader?** Filed as https://github.com/berenddeboer/omarchy-zfs-pkgs/issues/1. Until that lands, the bridge keeps refusing Limine, archzfs, and `zroot/ROOT/default`. If they take the change, denylist and zfs-check stubs shrink.
 
-Everything else that used to live here is a Key Decision: clone path, SigLevel, overlay-bin, Plymouth as PR 5, foot vs ghostty, family sees Omarchy, both CachyOS ZFS packages stay.
+Everything else that used to live here is a Key Decision: clone path, SigLevel, overlay-bin, Plymouth after zfs, foot vs ghostty, family sees Omarchy, both CachyOS ZFS packages stay.
 
 ---
 
@@ -966,7 +964,7 @@ Everything else that used to live here is a Key Decision: clone path, SigLevel, 
 
 4. **Keep plasma-login-manager, not SDDM.** It is KDE's SDDM-compatible greeter (same wayland-session discovery). `sddm` is in `packages.deny` so we never run two display managers. Shared greeter lists both sessions. No autologin.
 
-5. **ZFSBootMenu keeps the passphrase. Plymouth is post-unlock only, and only in PR 5 after the session works.** No `plymouth-zfs`. No plymouth-before-zfs.
+5. **ZFSBootMenu keeps the passphrase. Plymouth is post-unlock only, Omarchy theme, after zfs.** No `plymouth-zfs`. No plymouth-before-zfs. No SDDM theme sync.
 
 6. **CachyOS updater remains the OS updater.** Omarchy's ALPM guard and `omarchy-refresh-pacman` are forbidden. Overlay **symlinks** clone `bin/omarchy` (the CLI router). Only `omarchy-update` and `omarchy-update-system-pkgs` wrap `setup-monarchy.sh --update`. `omarchy update` (two words) is the router dispatching to that wrapper. `omarchy-refresh-pacman` is a deny stub (exit 2), not a wrapper.
 
@@ -1037,10 +1035,10 @@ Each PR is independently reviewable and mergeable. Later PRs must not be require
 
 ### PR 5: Monarchy splash and branding
 
-- **Title:** Add Monarchy boot and login branding (rEFInd, ZBM BMP, post-unlock Plymouth)
-- **Files/components:** `misc/monarchy/branding/**` (assets created here), `scripts/lib/monarchy/splash.sh`
+- **Title:** Enable Omarchy Plymouth after zfs (post-unlock)
+- **Files/components:** `scripts/lib/monarchy/splash.sh`, plymouth overlay wraps, inventories
 - **Dependencies:** PR 4b (session works without splash; Plymouth HOOKS change is a reboot risk)
-- **Description:** Create banner/plymouth/BMP assets. Deploy idempotently. Insert plymouth **after** zfs. `mkinitcpio -P`. Do not enable ZBM EFI UKI. Do not install plymouth-zfs. Do not replace the kingfisher greeter photo.
+- **Description:** Install clone `default/plymouth` as the Omarchy theme. Insert plymouth **after** zfs. `mkinitcpio -P`. Wrap the plymouth write path so it cannot call Limine or SDDM. Do not enable ZBM EFI UKI. Do not install plymouth-zfs. Do not replace the greeter photo. Custom rEFInd/ZBM art is still later if wanted.
 
 ### PR 6: Per-machine validation notes and README
 

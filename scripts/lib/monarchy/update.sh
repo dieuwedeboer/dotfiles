@@ -110,6 +110,8 @@ monarchy_apply() {
     monarchy_setup_user
     monarchy_skip_autologin
     monarchy_keep_family_mime
+    monarchy_splash
+    monarchy_splash_maybe_theme
     monarchy_log "apply complete"
 }
 

@@ -21,7 +21,7 @@ usage: setup-monarchy.sh [--check] [--update] [--no-packages] [--splash-only] [-
                   config. Run on any CachyOS+ZFS+KDE host after install.sh.
                   MONARCHY_TRUST_OMARCHY_KEY=1 skips the key prompt.
   --no-packages   Skip pacman leaf packages (still does overlay, repo, session).
-  --splash-only   Branding + Plymouth HOOKS (PR 5; not implemented yet).
+  --splash-only   Omarchy Plymouth theme and plymouth hook after zfs.
 EOF
             exit 0
             ;;
@@ -55,10 +55,12 @@ source "$SCRIPT_DIR/lib/monarchy/sessions.sh"
 source "$SCRIPT_DIR/lib/monarchy/portals.sh"
 # shellcheck source=lib/monarchy/user.sh
 source "$SCRIPT_DIR/lib/monarchy/user.sh"
+# shellcheck source=lib/monarchy/splash.sh
+source "$SCRIPT_DIR/lib/monarchy/splash.sh"
 
 case "$MODE" in
     check) monarchy_check ;;
     apply) monarchy_apply ;;
     update) monarchy_update ;;
-    splash) monarchy_die "splash is PR 5; not implemented yet" ;;
+    splash) monarchy_splash_only ;;
 esac

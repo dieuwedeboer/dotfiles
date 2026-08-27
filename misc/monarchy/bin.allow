@@ -177,6 +177,11 @@ omarchy-plugin-list
 omarchy-plugin-remove
 omarchy-plugin-update
 omarchy-plugin-validate
+omarchy-plymouth-current
+omarchy-plymouth-list
+omarchy-plymouth-preview
+omarchy-plymouth-set-by-theme
+omarchy-plymouth-switcher
 omarchy-power-present
 omarchy-powerprofiles-init
 omarchy-powerprofiles-list

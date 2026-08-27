@@ -15,14 +15,14 @@ from pathlib import Path
 WRAP = {
     "omarchy-update",
     "omarchy-update-system-pkgs",
+    "omarchy-plymouth-set",
+    "omarchy-plymouth-reset",
+    "omarchy-refresh-plymouth",
 }
 
 HARD_DENY = {
     "omarchy-refresh-pacman",
     "omarchy-refresh-limine",
-    "omarchy-refresh-plymouth",
-    "omarchy-plymouth-set",
-    "omarchy-plymouth-set-by-theme",
     "omarchy-upgrade-to-quattro",
     "omarchy-upgrade-to-quattro-zfs-check",
     "omarchy-setup-direct-boot",
@@ -86,6 +86,11 @@ ALLOW_EXACT = {
     "omarchy-cmd-present",
     "omarchy-cmd-missing",
     "omarchy-state",
+    "omarchy-plymouth-current",
+    "omarchy-plymouth-list",
+    "omarchy-plymouth-preview",
+    "omarchy-plymouth-switcher",
+    "omarchy-plymouth-set-by-theme",
 }
 
 ALLOW_PREFIXES = (
@@ -149,9 +154,6 @@ ALLOW_PREFIXES = (
     "omarchy-windows-key",
     "omarchy-channel-current",
     "omarchy-hibernation-available",
-    "omarchy-plymouth-current",
-    "omarchy-plymouth-list",
-    "omarchy-plymouth-preview",
     "omarchy-migrate",
 )
 

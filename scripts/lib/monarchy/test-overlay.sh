@@ -41,6 +41,13 @@ st=$?
 set -e
 [ "$st" -eq 2 ] || { echo "deny stub exit is $st, expected 2" >&2; exit 1; }
 [ -x "$dest/omarchy-update" ] || { echo "wrap missing" >&2; exit 1; }
+grep -q 'setup-monarchy' "$dest/omarchy-update" || { echo "update wrap is not wrap-update" >&2; exit 1; }
+[ -x "$dest/omarchy-refresh-plymouth" ] || { echo "plymouth wrap missing" >&2; exit 1; }
+grep -q 'wrap-plymouth does not handle' "$dest/omarchy-refresh-plymouth" || {
+    echo "refresh-plymouth is not wrap-plymouth" >&2
+    exit 1
+}
+[ -L "$dest/omarchy-plymouth-set-by-theme" ] || { echo "set-by-theme should be allowlisted" >&2; exit 1; }
 [ -x "$dest/yay" ] || { echo "yay wrapper missing" >&2; exit 1; }
 
 allow_n=${#MONARCHY_BIN_ALLOW[@]}

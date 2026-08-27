@@ -34,8 +34,9 @@ Any machine that already ran `scripts/install.sh` (CachyOS, encrypted ZFS, KDE P
 - Register `/usr/share/wayland-sessions/omarchy.desktop` (`TryExec=uwsm`, `DesktopNames=Hyprland`). Exec is the real `uwsm start … hyprland.desktop` once that file exists, otherwise the session probe
 - Install `/usr/share/uwsm/env.d/10-monarchy` and Hyprland portal defaults if missing
 - Seed `~/.config/hypr/*` (no overwrite), branding, `TERMINAL=ghostty`, and the first-run-done marker so `omarchy-provision-first-run` no-ops
+- Install the Omarchy Plymouth theme, put `plymouth` **after** `zfs` in mkinitcpio HOOKS, `mkinitcpio -P`. Does not steal the ZFS passphrase (that stays at ZFSBootMenu). Does not touch rEFInd.
 
-It does **not** change Plymouth or rEFInd. Splash is a later PR.
+`--splash-only` is the same Plymouth step without redoing packages or user config.
 
 `--no-packages` skips the leaf set (still does overlay, repo, and session).
 
@@ -59,7 +60,7 @@ Boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZFSBootMenu, or clone+promote. 
 
 ## No-keyfile Plymouth UX
 
-If the host has no `/etc/zfs/zroot.key`, the mkinitcpio `zfs` hook prompts on the console before Plymouth (Plymouth is PR 5, after the zfs hook). That is a second passphrase look, not a stolen ZBM prompt. Do not "fix" it with `plymouth-zfs`.
+If the host has no `/etc/zfs/zroot.key`, the mkinitcpio `zfs` hook prompts on the console before Plymouth (plymouth is after the zfs hook). That is a second passphrase look, not a stolen ZBM prompt. Do not "fix" it with `plymouth-zfs`.
 
 ## Family greeter
 
