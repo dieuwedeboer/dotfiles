@@ -2,7 +2,7 @@
 
 Living matrix. Source of truth for `packages.deny` and overlay-bin policy. See `docs/monarchy.md` for architecture.
 
-Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c01df169` (438 `bin/` names: 286 allow, 2 wrap, 150 deny).
+Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c01df169` (438 `bin/` names: 291 allow, 5 wrap, 142 deny).
 
 ## Blocker
 
@@ -39,7 +39,7 @@ See `misc/monarchy/packages.deny`. Hard list includes `sddm`, `tldr`, `yay`, `mi
 ## Overlay bin
 
 - `misc/monarchy/bin.allow` — symlink to clone `bin/<name>`
-- `misc/monarchy/bin.wrap` — `omarchy-update` and `omarchy-update-system-pkgs` call `setup-monarchy.sh --update`
+- `misc/monarchy/bin.wrap` — `omarchy-update` and `omarchy-update-system-pkgs` call `setup-monarchy.sh --update`. Plymouth write-path names (`omarchy-plymouth-set`, `omarchy-plymouth-reset`, `omarchy-refresh-plymouth`) skip SDDM and Limine.
 - `misc/monarchy/bin.deny` — stub, exit 2. Also installed under `/usr/local/bin` on apply
 
 `omarchy` itself is allowlisted (CLI router). `omarchy-refresh-pacman` is deny, not a wrap.
