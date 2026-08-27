@@ -452,6 +452,7 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 | `monarchy_refuse_dataset_rename` | Never run `install/config/zfs.sh`. Never write `/etc/pam.d/zfs-key` |
 | `monarchy_disable_omarchy_update_guard` | Never install `omarchy` / `omarchy-dev`. If the hook appears, mask it |
 | `monarchy_keep_plasmalogin` | Assert `systemctl is-enabled plasmalogin`. Assert `sddm` is **not installed**. Never `systemctl enable sddm`. `sddm` is in `packages.deny` as a hard assert, not "install if a dependency requires it" |
+| `monarchy_apply_logind` | Install Omarchy's `HandlePowerKey=ignore` and `InhibitDelayMaxSec=15` under `/etc/systemd/logind.conf.d/10-monarchy-*` / `20-monarchy-*`. Reload logind, never restart it. CachyOS default `HandlePowerKey=poweroff` plus a Bluetooth AVRCP KEY_POWER is a full shutdown |
 | `monarchy_install_omarchy_session` | Install Monarchy-authored `/usr/share/wayland-sessions/omarchy.desktop` (not a blind copy of the clone) |
 | `monarchy_skip_autologin` | Assert no `[Autologin] User=` in `/etc/plasmalogin.conf`, `/etc/plasmalogin.conf.d/*`, and leftover `/etc/sddm.conf.d/*` |
 | `monarchy_skip_plymouth_zfs` | Never install AUR `plymouth-zfs`. Never put plymouth *before* the zfs hook |
@@ -704,6 +705,7 @@ fi
 | `/usr/local/share/omarchy` | working prefix: data symlinks + overlay `bin/` |
 | `/usr/local/bin/omarchy-*` | deny stubs only (sudo-safe) |
 | `/usr/local/bin/monarchy-switch-user` | lock if needed, then PLM `SwitchToGreeter` |
+| `/etc/systemd/logind.conf.d/10-monarchy-ignore-power-button.conf` | `HandlePowerKey=ignore`. Shutdown is the System menu, not the power key or a headset |
 | `/usr/share/uwsm/env.d/10-monarchy` | exact script in API section (literal env-bootstrap + uwsm/default) |
 | `/usr/share/wayland-sessions/omarchy.desktop` | session |
 | `/var/lib/AccountsService/users/{dieuwe,amie,olivier}` | attempted per-user default; PR 3 must verify PLM honors `Session=` |

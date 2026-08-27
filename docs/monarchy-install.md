@@ -36,6 +36,7 @@ Any machine that already ran `scripts/install.sh` (CachyOS, encrypted ZFS, KDE P
 - Seed `~/.config/hypr/*` (no overwrite), branding (`screensaver.txt` from clone `logo.txt`, `about.txt` from `icon.txt`), `TERMINAL=ghostty`, and the first-run-done marker so `omarchy-provision-first-run` no-ops
 - Run `omarchy-apply-lock` so `/etc/pam.d/omarchy-lock-password` exists. Super+Ctrl+L is a no-op without it (`lock-denied: missing-pam`). plasmalogin staying up after login is expected; it is not the locker
 - Install `/usr/local/bin/monarchy-switch-user`, overlay Super+Ctrl+U onto the lock screen and System menu, and seed the Hyprland bind. Family uses that chord on the lock screen to reach plasma-login-manager without the locked user's password
+- Install logind drop-ins: `HandlePowerKey=ignore` (CachyOS default is poweroff; a Bluetooth headset KEY_POWER has shut zbook down) and `InhibitDelayMaxSec=15` for lid-close lock. Reloads logind, does not restart it
 - Install the Omarchy Plymouth theme, put `plymouth` **after** `zfs` in mkinitcpio HOOKS, `mkinitcpio -P`. Does not steal the ZFS passphrase (that stays at ZFSBootMenu). Does not touch rEFInd.
 
 `--splash-only` is the same Plymouth step without redoing packages or user config.
@@ -57,6 +58,7 @@ Overlay unit test (no sudo):
 ./scripts/lib/monarchy/test-branding.sh
 ./scripts/lib/monarchy/test-lock.sh
 ./scripts/lib/monarchy/test-switch-user.sh
+./scripts/lib/monarchy/test-logind.sh
 ```
 
 ## Rollback
