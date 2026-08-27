@@ -4,9 +4,9 @@ Optional Omarchy Quattro session on top of a finished CachyOS+ZFS+KDE box. Does 
 
 ## Where to run it
 
-Build and review happen on kingfisher. First apply is an **older laptop**, not kingfisher or bonw9.
+Any machine that already ran `scripts/install.sh` (CachyOS, encrypted ZFS, KDE Plasma, rEFInd, ZFSBootMenu). First bring-up was zbook. kingfisher and bonw9 use the same script.
 
-`setup-monarchy.sh` (without `--check`) refuses those two hostnames unless `MONARCHY_ALLOW_HOST=1`. `--check` is snapshot-free and is safe on kingfisher.
+`--check` is snapshot-free and writes nothing under `/etc` or `/usr/local`.
 
 ## New machine
 
@@ -14,7 +14,7 @@ Build and review happen on kingfisher. First apply is an **older laptop**, not k
 2. ZFSBootMenu properties from the README: `bootfs=zpcachyos/ROOT/cos/root`, `rootprefix=root=ZFS=`, `commandline="rw quiet splash"`.
 3. rEFInd + `zfsbootmenu` + `generate-zbm`.
 4. Clone dotfiles and run `./scripts/install.sh`. That does not install Monarchy.
-5. On the bring-up laptop:
+5. Then:
 
 ```bash
 ./scripts/setup-monarchy.sh --check
@@ -39,7 +39,7 @@ It does **not** change Plymouth or rEFInd. Splash is a later PR.
 
 `--no-packages` skips the leaf set (still does overlay, repo, and session).
 
-## Check on kingfisher (review only)
+## Check (review only)
 
 ```bash
 ./scripts/setup-monarchy.sh --check
@@ -65,9 +65,9 @@ If the host has no `/etc/zfs/zroot.key`, the mkinitcpio `zfs` hook prompts on th
 
 Plasma Login Manager lists every file in `/usr/share/wayland-sessions/`. Omarchy is visible. Family members pick Plasma. Do not enable autologin. AccountsService `Session=` is an attempt, not a proven PLM API.
 
-## Laptop test
+## After apply
 
-After apply and reboot:
+After reboot:
 
 1. Greeter shows Plasma and Omarchy.
 2. Your user can start Omarchy. Hyprland + Quickshell come up. Ghostty is the terminal.

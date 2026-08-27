@@ -13,18 +13,15 @@ for arg in "$@"; do
             cat <<'EOF'
 usage: setup-monarchy.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
 
-  --check         Snapshot-free dry-run. Safe on kingfisher.
+  --check         Snapshot-free dry-run. Writes nothing under /etc or /usr/local.
   --update        Snapshot, fetch, check, then apply.
   (none)          Snapshot-first apply: clone, overlay, trust Omarchy
                   packaging key (prompts once), [omarchy] repo, filtered
                   packages, greeter session, UWSM env, user Hyprland
-                  config. Refuses kingfisher/bonw9 unless MONARCHY_ALLOW_HOST=1.
+                  config. Run on any CachyOS+ZFS+KDE host after install.sh.
                   MONARCHY_TRUST_OMARCHY_KEY=1 skips the key prompt.
   --no-packages   Skip pacman leaf packages (still does overlay, repo, session).
   --splash-only   Branding + Plymouth HOOKS (PR 5; not implemented yet).
-
-First apply is an older laptop, not kingfisher. Build and review may run
---check here.
 EOF
             exit 0
             ;;

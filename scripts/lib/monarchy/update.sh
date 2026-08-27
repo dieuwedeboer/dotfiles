@@ -84,7 +84,6 @@ monarchy_check() {
 }
 
 monarchy_apply() {
-    monarchy_refuse_daily_driver
     monarchy_load_lock
     monarchy_load_inventories
     monarchy_snapshot_first
@@ -115,7 +114,6 @@ monarchy_apply() {
 }
 
 monarchy_update() {
-    monarchy_refuse_daily_driver
     monarchy_load_lock
     monarchy_load_inventories
     monarchy_snapshot_first

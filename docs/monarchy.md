@@ -2,11 +2,11 @@
 
 - **Author:** TBD (Dieuwe)
 - **Date:** 2026-08-26
-- **Status:** Implementation (laptop apply path is wired: overlay, packages, greeter, user config. Splash is not.)
+- **Status:** v1. Omarchy and Plasma share a greeter on zbook. Apply is open on every CachyOS+ZFS+KDE host via `scripts/setup-monarchy.sh`. Splash is not.
 - **Audience:** Senior engineers working in `dieuwedeboer/dotfiles`
-- **Machines in scope:** bring-up on an older laptop first. kingfisher (Gigabyte B550 / Ryzen 5 5600X) is for build and review only. bonw9 (System76 Bonobo WS / Haswell i7-4810MQ + GTX 970M) after the laptop. Then any future CachyOS+ZFS+KDE box that follows `scripts/install.sh`
+- **Machines in scope:** every CachyOS+ZFS+KDE box that follows `scripts/install.sh`. First bring-up was zbook. kingfisher (Gigabyte B550 / Ryzen 5 5600X) and bonw9 (System76 Bonobo WS / Haswell i7-4810MQ + GTX 970M) run the same script.
 
-This document is the source of truth for Monarchy. Scripts live under `scripts/setup-monarchy.sh`. Apply refuses kingfisher and bonw9 unless `MONARCHY_ALLOW_HOST=1`.
+This document is the source of truth for Monarchy. Scripts live under `scripts/setup-monarchy.sh`. `scripts/install.sh` does not call it.
 
 ---
 
@@ -427,7 +427,7 @@ docs/monarchy-clashes.md
 
 There is no `packages.allow`. Filter is `omarchy-base.packages` minus `packages.deny` minus already-installed. `packages.installed` is the recorded result `--update` uses.
 
-Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. That helper hard-codes `zpcachyos/ROOT/cos` (same as `monarchy_assert_zfs_layout`'s default). If the helper is absent, abort with "run scripts/setup-zfs.sh first". Do not invoke the chezmoi source path; the installed helper is what the pacman hook uses.
+Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. That helper hard-codes `zpcachyos/ROOT/cos` (same as `monarchy_assert_zfs_layout`'s default). If the helper is absent or still has the varlog-only prune, apply installs the current copy from this repo, then asserts a `@pre-update-*` exists on `zpcachyos/ROOT/cos/root`. The pacman hook uses that installed helper.
 
 #### Named functions (blockers)
 
@@ -451,7 +451,6 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 | `monarchy_keep_family_mime` | Do not install Omarchy mimeapps system-wide or into `~/.config/mimeapps.list`. Hyprland keybinds launch Nautilus explicitly |
 | `monarchy_rebuild_overlay` | Rebuild overlay `bin/` fail-closed |
 | `monarchy_nvidia_keep_chwd` | Never run Omarchy `nvidia.sh` |
-| `monarchy_refuse_daily_driver` | Refuse apply on kingfisher/bonw9 unless `MONARCHY_ALLOW_HOST=1`. `--check` is allowed |
 
 ### Dual-session design
 
@@ -777,14 +776,14 @@ Sources compared:
 3. rEFInd + `zfsbootmenu` + `generate-zbm` as in README.
 4. Create family users. Enable CachyOS updater from the greeter if desired.
 5. `git clone git@github.com:dieuwedeboer/dotfiles.git && ./scripts/install.sh` (this does **not** install Monarchy).
-6. Optional: `./scripts/setup-monarchy.sh`
-7. Reboot. If PR 3 verified AccountsService, Dieuwe's picker default is Omarchy; otherwise he picks Omarchy once. Family picks Plasma from the dropdown every time global `[Last]` has drifted.
+6. `./scripts/setup-monarchy.sh --check` then `./scripts/setup-monarchy.sh`
+7. Reboot. If AccountsService `Session=` is honored, Dieuwe's picker default is Omarchy; otherwise he picks Omarchy once. Family picks Plasma from the dropdown every time global `[Last]` has drifted.
 
 ### Existing machines
 
-Same `setup-monarchy.sh`. Idempotent. Snapshot-first uses `/root/.local/bin/zfs-snapshot-pre-update.sh`. Per-machine scripts stay as they are.
+Same `setup-monarchy.sh`. Idempotent. Snapshot-first uses `/root/.local/bin/zfs-snapshot-pre-update.sh` (apply installs the current helper if the host copy is missing or still has the varlog-only prune). Per-machine scripts stay as they are.
 
-**First apply is an older laptop.** kingfisher and bonw9 are blocked in `monarchy_refuse_daily_driver` (override `MONARCHY_ALLOW_HOST=1`). Build and `--check` happen on kingfisher. bonw9 extra validation after the laptop is stable: confirm `chwd` NVIDIA stack still loads after Hyprland. Do not let `nvidia-580xx-dkms` from `[omarchy]`/`extra` replace CachyOS packages. Maxwell GM204 notes are from `setup-bonw9.sh` comments, not live-verified on kingfisher.
+bonw9 extra: confirm `chwd` NVIDIA stack still loads after Hyprland. Do not let `nvidia-580xx-dkms` from `[omarchy]`/`extra` replace CachyOS packages. Maxwell GM204 notes are from `setup-bonw9.sh` comments, not live-verified on zbook.
 
 ### Updates
 
@@ -805,7 +804,7 @@ Channel: `[omarchy]` **stable**. Clone follows `quattro-on-zfs`. Those two are a
 | `docs/monarchy-install.md` | Operator steps, greeter dropdown warning, no-keyfile Plymouth UX, rollback via ZBM |
 | `docs/monarchy-clashes.md` | Living clash matrix |
 | `docs/monarchy-upstream.md` | Issue filed against the ZFS fork: pool name + bootloader coexistence |
-| `README.md` | Short Monarchy pointer. Landed in PR 6, not PR 1 |
+| `README.md` | Short Monarchy pointer |
 
 ---
 
@@ -900,12 +899,12 @@ Threat model is a household workstation. The serious failure mode is "Omarchy up
 
 No feature flag service. The flag is "did you run `setup-monarchy.sh`".
 
-1. Docs (PR 1).
-2. Clone, `/etc/omarchy.conf`, overlay, `omarchy-keyring`, `[omarchy]` marker (PR 2). `--check` on kingfisher. Apply on the older laptop.
-3. `uwsm` + session desktop (PR 3) on the laptop. Prove the greeter *lists* Omarchy. Confirm or drop AccountsService as the per-user default.
-4. Leaf packages + overlay populated (PR 4a), then Dieuwe user config (PR 4b).
-5. Splash (PR 5) after a known-good session.
-6. bonw9 after the laptop is stable. Then README (PR 6).
+1. Docs (PR 1). Landed.
+2. Clone, `/etc/omarchy.conf`, overlay, `omarchy-keyring`, `[omarchy]` marker (PR 2). Landed.
+3. `uwsm` + session desktop (PR 3). Greeter lists Omarchy. AccountsService `Session=` is still an attempt. Landed.
+4. Leaf packages + overlay populated (PR 4a), then Dieuwe user config (PR 4b). Landed on zbook: Omarchy and Plasma share the greeter.
+5. Splash (PR 5) after a known-good session. Not started.
+6. README pointer and apply open on every matching host (this change). Run `setup-monarchy.sh` on kingfisher and bonw9 the same way as zbook. bonw9 still needs a Hyprland + `chwd` NVIDIA check after apply.
 
 Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZBM, or clone+promote. Pacman.conf backup at `/etc/pacman.conf.monarchy.bak`. `--uninstall` is not v1.
 
@@ -1045,7 +1044,7 @@ Each PR is independently reviewable and mergeable. Later PRs must not be require
 
 ### PR 6: Per-machine validation notes and README
 
-- **Title:** Document Monarchy bring-up on kingfisher and bonw9
-- **Files/components:** `docs/monarchy-install.md` validation checklist, `README.md` Monarchy subsection, `docs/monarchy-clashes.md` updates from what PR 4a actually installed, optional comments in `setup-bonw9.sh` / `setup-kingfisher.sh` with no behavior change
+- **Title:** Open Monarchy apply on every CachyOS+ZFS+KDE host
+- **Files/components:** `docs/monarchy-install.md`, `README.md` Monarchy subsection, drop `monarchy_refuse_daily_driver`, `scripts/install.sh` optional next-step pointer
 - **Dependencies:** PR 4b (PR 5 nice-to-have)
-- **Description:** Record NVIDIA/chwd expectations for bonw9 (not live-verified at design time), ufw-disabled for kingfisher, greeter dropdown for family, keyfile vs no-keyfile Plymouth UX, rollback via ZBM. This is the "we ran it" PR.
+- **Description:** zbook proved Omarchy and Plasma share a greeter. README points at `setup-monarchy.sh`. `install.sh` still does not run it. bonw9 NVIDIA/chwd remains a post-apply check.

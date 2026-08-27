@@ -10,6 +10,7 @@ Repeatable system setup for Arch Linux (CachyOS).
   - [Bootloader (rEFInd + ZFSBootMenu)](#bootloader-refind--zfsbootmenu)
   - [Dotfiles](#dotfiles)
   - [Agent Configuration](#agent-configuration)
+  - [Monarchy (optional Omarchy session)](#monarchy-optional-omarchy-session)
 - [Legacy Setup](#legacy-setup)
 
 ## Installation
@@ -89,6 +90,8 @@ The install script will:
 - Install packages and configure system
 - Optionally configure rEFInd with a custom theme (glow) if no custom theme is present
 
+`install.sh` does not install Monarchy. After it finishes, see [Monarchy](#monarchy-optional-omarchy-session).
+
 ### Agent Configuration
 
 `.agents/` in this repo is the single source of truth for coding-agent config, shared
@@ -125,6 +128,19 @@ sudo zfs change-key -o keylocation=file:///etc/zfs/zroot.key -o keyformat=passph
 echo 'FILES+=(/etc/zfs/zroot.key)' | sudo tee -a /etc/mkinitcpio.conf
 sudo mkinitcpio -P
 ```
+
+### Monarchy (optional Omarchy session)
+
+Omarchy Quattro as a second Wayland session on the same CachyOS+ZFS+KDE box. Plasma stays the family default. Dieuwe picks Omarchy at the greeter.
+
+After `./scripts/install.sh`:
+
+```bash
+./scripts/setup-monarchy.sh --check
+./scripts/setup-monarchy.sh
+```
+
+Then reboot. Operator notes, rollback, and the greeter dropdown warning are in `docs/monarchy-install.md`. Design and clash matrix are `docs/monarchy.md` and `docs/monarchy-clashes.md`.
 
 ---
 

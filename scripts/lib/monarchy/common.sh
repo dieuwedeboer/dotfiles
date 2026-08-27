@@ -15,7 +15,6 @@ MONARCHY_ESP="${MONARCHY_ESP:-/boot/efi}"
 MONARCHY_ZBM_DIR="${MONARCHY_ZBM_DIR:-$MONARCHY_ESP/EFI/zbm}"
 MONARCHY_REFIND_DIR="${MONARCHY_REFIND_DIR:-$MONARCHY_ESP/EFI/refind}"
 MONARCHY_CACHE="${MONARCHY_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/monarchy/omarchy}"
-MONARCHY_BLOCKED_HOSTS="${MONARCHY_BLOCKED_HOSTS:-kingfisher bonw9}"
 
 monarchy_log() {
     local line
@@ -55,17 +54,6 @@ monarchy_load_lock() {
     [ -n "$MONARCHY_LOCK_REMOTE" ] || monarchy_die "omarchy.lock missing remote"
     [ -n "$MONARCHY_LOCK_BRANCH" ] || monarchy_die "omarchy.lock missing branch"
     [ -n "$MONARCHY_LOCK_COMMIT" ] || monarchy_die "omarchy.lock missing commit"
-}
-
-monarchy_refuse_daily_driver() {
-    local host
-    host=$(hostname)
-    local blocked
-    for blocked in $MONARCHY_BLOCKED_HOSTS; do
-        if [ "$host" = "$blocked" ] && [ -z "${MONARCHY_ALLOW_HOST:-}" ]; then
-            monarchy_die "refusing to apply on $host (daily driver). First bring-up is an older laptop. Set MONARCHY_ALLOW_HOST=1 to override."
-        fi
-    done
 }
 
 monarchy_assert_root_pre_update_snapshot() {
