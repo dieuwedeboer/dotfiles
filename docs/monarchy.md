@@ -197,14 +197,18 @@ Not a git submodule. Two trees:
 
 ```text
 /usr/local/share/omarchy/
-  default     -> symlink to /usr/local/src/monarchy/omarchy/default
-  shell       -> symlink to .../shell
+  default     -> symlink, then exploded so omarchy/omarchy-menu.jsonc can be a patched copy
+  shell       -> symlink, then exploded so plugins/lock can be a patched copy
   themes      -> symlink to .../themes
   migrations  -> symlink to .../migrations
   config      -> symlink to .../config
   install     -> symlink to .../install
   applications-> symlink to .../applications
   version     -> symlink to .../version
+  logo.txt    -> symlink to .../logo.txt
+  logo.svg    -> symlink to .../logo.svg
+  icon.txt    -> symlink to .../icon.txt
+  icon.png    -> symlink to .../icon.png
   bin/        -> OVERLAY directory (not a symlink to clone/bin)
     omarchy-refresh-pacman   # stub, mode 0755
     omarchy-menu             # symlink to clone/bin/omarchy-menu
@@ -224,7 +228,7 @@ Monarchy UWSM drop-in `/usr/share/uwsm/env.d/10-monarchy` (sorts before a hypoth
 Dieuwe-only user files (PR 4b):
 
 - Copy `config/hypr/*` into `~/.config/hypr/` so `hyprland.lua` can `dofile` bootstrap from `OMARCHY_PATH`.
-- Seed `~/.config/omarchy/branding/` from clone `logo.txt` / `icon.txt`.
+- Seed `~/.config/omarchy/branding/` the way Omarchy skel does: `logo.txt` → `screensaver.txt` (and `logo.txt`), `icon.txt` → `about.txt` (and `icon.txt`), plus `icon.png`. `omarchy-screensaver` feeds `screensaver.txt` to `ttfx`. Without that file `ttfx` exits immediately and the fullscreen window crash-loops `error reading input file` so a key never dismisses it. We do not install `omarchy-settings`, so setup has to write these names.
 - Do **not** copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
 
 omarchy-settings files that must never land on disk:
@@ -310,6 +314,7 @@ PR 2 generates `bin.deny` as the complement of `bin.allow` ∪ `bin.wrap` at the
 - `omarchy-update` -> `setup-monarchy.sh --update`
 - `omarchy-update-system-pkgs` -> `setup-monarchy.sh --update`
 - `omarchy-plymouth-set` / `omarchy-plymouth-reset` / `omarchy-refresh-plymouth` -> Monarchy splash helpers (theme + `mkinitcpio -P`, no SDDM, no Limine)
+- `omarchy-screensaver` -> seed `screensaver.txt` from clone `logo.txt` if missing, then exec the clone binary. Reset copies `$OMARCHY_PATH/logo.txt`, which is why the working prefix must link that file.
 
 `omarchy-refresh-pacman` stays in `bin.deny` (exit 2). Its contract is "replace pacman.conf"; redirecting it to `--update` would hide that.
 
@@ -361,6 +366,7 @@ Install-script denylist (never invoked by the bridge, even if a binary of the sa
 - `install/config/snapper.sh`
 - `install/config/enable-services.sh`
 - `install/config/firewall.sh`
+- `install/config/increase-lockout-limit.sh` (patches `sddm-autologin`; lock PAM is `omarchy-apply-lock` instead)
 - `install/hardware/nvidia.sh`
 - `install/hardware/intel/ptl-kernel.sh`
 - `install/hardware/network.sh`
@@ -368,6 +374,8 @@ Install-script denylist (never invoked by the bridge, even if a binary of the sa
 - `install/hardware/pacman.sh`
 - `install/user/mise.sh`
 - `install/user/all.sh` (would run mise). PR 4b calls `theme.sh`, `git.sh`, `xcompose.sh` individually.
+
+`install/config/lockscreen-pam.sh` is invoked as overlay `omarchy-apply-lock` from `monarchy_apply_lock`.
 
 `omarchy-provision-first-run` is stubbed. PR 4b also seeds `~/.local/state/omarchy/first-run-user` so a leaked copy no-ops.
 
@@ -400,7 +408,9 @@ scripts/lib/monarchy/
   common.sh              # logging, snapshot-first via installed helper
   pacman.sh              # monarchy_preserve_pacman_conf, monarchy_add_omarchy_repo
   denylist.sh            # loads packages.deny, bin.allow, bin.wrap, bin.deny, migrations.deny
-  overlay.sh             # monarchy_rebuild_overlay
+  overlay.sh             # monarchy_rebuild_overlay, lock/menu explode-and-patch
+  overlay-lock.py        # Super+Ctrl+U hunks; --check fails if clone drifted
+  switch-user.sh         # installed as /usr/local/bin/monarchy-switch-user
   packages.sh            # filtered install, writes packages.installed
   clone.sh               # monarchy_sync_omarchy_clone
   sessions.sh            # plasma-login-manager dual session
@@ -447,6 +457,9 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 | `monarchy_skip_plymouth_zfs` | Never install AUR `plymouth-zfs`. Never put plymouth *before* the zfs hook |
 | `monarchy_skip_os_release_clobber` | Never install `omarchy-settings*`. If `/etc/os-release` `ID` is not `cachyos`, abort and restore from `/usr/lib/os-release` |
 | `monarchy_keep_family_mime` | Do not install Omarchy mimeapps system-wide or into `~/.config/mimeapps.list`. Hyprland keybinds launch Nautilus explicitly |
+| `monarchy_apply_lock` | Run overlay `omarchy-apply-lock` (same as `install/config/lockscreen-pam.sh`). Writes `/etc/pam.d/omarchy-lock-password`. Quickshell lock returns `missing-pam` without it. Not a plasmalogin problem; official Omarchy also keeps the greeter running |
+| `monarchy_overlay_session_lock` | Explode prefix `shell/` and `default/` into dirs of child symlinks. Copy-and-patch `plugins/lock` and `omarchy-menu.jsonc` so Super+Ctrl+U switches user. `--check` fails if the clone hunks drifted |
+| `monarchy_install_switch_user` | Install `/usr/local/bin/monarchy-switch-user`. Locks the Omarchy session if needed, then `Seat.SwitchToGreeter` |
 | `monarchy_rebuild_overlay` | Rebuild overlay `bin/` fail-closed |
 | `monarchy_nvidia_keep_chwd` | Never run Omarchy `nvidia.sh` |
 | `monarchy_splash` | Omarchy Plymouth theme, plymouth after zfs, `mkinitcpio -P`. Never plymouth-zfs, never Limine, never SDDM |
@@ -490,6 +503,8 @@ Exact greeter files:
 | leftover `/etc/sddm.conf.d/kde_settings.conf` | Assert `[Autologin] User` empty. Do not delete (inert) |
 
 Family members will see "Omarchy (Hyprland uwsm)" in the picker. That is acceptable and required. A shared greeter cannot hide a wayland-session without per-user filters PLM does not document. They pick Plasma.
+
+Switch user is Super+Ctrl+U in both places: the System menu / Hyprland bind (Dieuwe, session unlocked) and the Omarchy lock screen (family, no password). Both run `/usr/local/bin/monarchy-switch-user`, which takes `ext-session-lock` if the session is unlocked, waits until it is held, then calls plasma-login-manager `Seat.SwitchToGreeter`. PLM `SwitchToUser` and `Seat.Lock` are stubs. Do not replace `omarchy.lock` with the greeter. There is no Unlock menu row. `--check` fails if the lock QML or `system.lock` menu hunk no longer matches the clone.
 
 If PR 3 shows PLM honors AccountsService `Session=`, Dieuwe's picker default is Omarchy. If PLM ignores it, **fall back: Dieuwe picks Omarchy once** after install; global `[Last]` may drift; family uses the dropdown. Document whichever outcome in `docs/monarchy-install.md`. Do not treat AccountsService as a guaranteed API until that check lands. Do not enable Autologin to fake a default.
 
@@ -571,7 +586,7 @@ Plasma: keep chezmoi `ksplashrc`. Omarchy: Quickshell lock + branding in `~/.con
 | Plymouth theme | clone `default/plymouth/` | `/usr/share/plymouth/themes/omarchy/` | `monarchy_splash` |
 | Greeter wallpaper | n/a | n/a | not installed |
 | Omarchy session desktop | `misc/monarchy/omarchy.desktop` (authored) | `/usr/share/wayland-sessions/omarchy.desktop` | `monarchy_install_omarchy_session` (PR 3) |
-| Dieuwe Omarchy branding | clone `logo.txt` / `icon.txt` | `~/.config/omarchy/branding/` | PR 4b |
+| Dieuwe Omarchy branding | clone `logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt` | `~/.config/omarchy/branding/` | PR 4b |
 
 ### Package install filter
 
@@ -684,9 +699,11 @@ fi
 | `/etc/pacman.conf` marker block | `[omarchy]`, `SigLevel = Required DatabaseOptional` |
 | `/etc/pacman.conf.monarchy.bak` | Backup before first edit |
 | `/etc/omarchy.conf` | `OMARCHY_PATH=/usr/local/share/omarchy` |
+| `/etc/pam.d/omarchy-lock-password` | Quickshell lock PAM. Written by `omarchy-apply-lock` |
 | `/usr/local/src/monarchy/omarchy` | git clone |
 | `/usr/local/share/omarchy` | working prefix: data symlinks + overlay `bin/` |
 | `/usr/local/bin/omarchy-*` | deny stubs only (sudo-safe) |
+| `/usr/local/bin/monarchy-switch-user` | lock if needed, then PLM `SwitchToGreeter` |
 | `/usr/share/uwsm/env.d/10-monarchy` | exact script in API section (literal env-bootstrap + uwsm/default) |
 | `/usr/share/wayland-sessions/omarchy.desktop` | session |
 | `/var/lib/AccountsService/users/{dieuwe,amie,olivier}` | attempted per-user default; PR 3 must verify PLM honors `Session=` |

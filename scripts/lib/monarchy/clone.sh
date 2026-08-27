@@ -54,11 +54,31 @@ monarchy_write_omarchy_conf() {
 }
 
 monarchy_link_working_prefix() {
-    local name
-    monarchy_sudo mkdir -p "$MONARCHY_PATH"
-    for name in default shell themes migrations config install applications version; do
+    local name ln_cmd mkdir_cmd
+    local names=(
+        default shell themes migrations config install applications version
+        logo.txt logo.svg icon.txt icon.png
+    )
+    if [ -w "$MONARCHY_PATH" ] 2>/dev/null || [ -w "$(dirname "$MONARCHY_PATH")" ] 2>/dev/null; then
+        mkdir_cmd=(mkdir -p)
+        ln_cmd=(ln -sfn)
+    else
+        mkdir_cmd=(monarchy_sudo mkdir -p)
+        ln_cmd=(monarchy_sudo ln -sfn)
+    fi
+    "${mkdir_cmd[@]}" "$MONARCHY_PATH"
+    for name in "${names[@]}"; do
         if [ -e "$MONARCHY_SRC/$name" ]; then
-            monarchy_sudo ln -sfn "$MONARCHY_SRC/$name" "$MONARCHY_PATH/$name"
+            dest="$MONARCHY_PATH/$name"
+            # A previous apply may have exploded this symlink into a directory.
+            if [ -d "$dest" ] && [ ! -L "$dest" ]; then
+                if [ -w "$MONARCHY_PATH" ] 2>/dev/null; then
+                    rm -rf "$dest"
+                else
+                    monarchy_sudo rm -rf "$dest"
+                fi
+            fi
+            "${ln_cmd[@]}" "$MONARCHY_SRC/$name" "$dest"
         fi
     done
 }

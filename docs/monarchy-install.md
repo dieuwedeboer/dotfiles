@@ -33,7 +33,9 @@ Any machine that already ran `scripts/install.sh` (CachyOS, encrypted ZFS, KDE P
 - Install filtered leaf packages (`omarchy-base.packages` minus `packages.deny`). Hyprland and Quickshell come from CachyOS first-match
 - Register `/usr/share/wayland-sessions/omarchy.desktop` (`TryExec=uwsm`, `DesktopNames=Hyprland`). Exec is the real `uwsm start … hyprland.desktop` once that file exists, otherwise the session probe
 - Install `/usr/share/uwsm/env.d/10-monarchy` and Hyprland portal defaults if missing
-- Seed `~/.config/hypr/*` (no overwrite), branding, `TERMINAL=ghostty`, and the first-run-done marker so `omarchy-provision-first-run` no-ops
+- Seed `~/.config/hypr/*` (no overwrite), branding (`screensaver.txt` from clone `logo.txt`, `about.txt` from `icon.txt`), `TERMINAL=ghostty`, and the first-run-done marker so `omarchy-provision-first-run` no-ops
+- Run `omarchy-apply-lock` so `/etc/pam.d/omarchy-lock-password` exists. Super+Ctrl+L is a no-op without it (`lock-denied: missing-pam`). plasmalogin staying up after login is expected; it is not the locker
+- Install `/usr/local/bin/monarchy-switch-user`, overlay Super+Ctrl+U onto the lock screen and System menu, and seed the Hyprland bind. Family uses that chord on the lock screen to reach plasma-login-manager without the locked user's password
 - Install the Omarchy Plymouth theme, put `plymouth` **after** `zfs` in mkinitcpio HOOKS, `mkinitcpio -P`. Does not steal the ZFS passphrase (that stays at ZFSBootMenu). Does not touch rEFInd.
 
 `--splash-only` is the same Plymouth step without redoing packages or user config.
@@ -52,6 +54,9 @@ Overlay unit test (no sudo):
 
 ```bash
 ./scripts/lib/monarchy/test-overlay.sh /tmp/quattro-on-zfs
+./scripts/lib/monarchy/test-branding.sh
+./scripts/lib/monarchy/test-lock.sh
+./scripts/lib/monarchy/test-switch-user.sh
 ```
 
 ## Rollback
@@ -76,5 +81,8 @@ After reboot:
 4. `grep '^\[omarchy\]' -n /etc/pacman.conf` is after `[cachyos]`. `/etc/os-release` still `ID=cachyos`.
 5. `omarchy-refresh-pacman` prints `monarchy: blocked` and exits 2.
 6. `pacman -Q sddm` fails (not installed). `systemctl is-enabled plasmalogin` is enabled.
+7. `/etc/pam.d/omarchy-lock-password` exists. Super+Ctrl+L locks the Omarchy session.
+8. Super+Ctrl+U (System menu too) locks if needed and returns to plasma-login-manager. The same chord on the lock screen is the family breakout. It does not need the locked user's password.
+9. `~/.config/omarchy/branding/screensaver.txt` exists (Omarchy wordmark). Super+Esc → Screensaver shows it; a key dismisses it. `$OMARCHY_PATH/logo.txt` is a symlink so _Style > Screensaver > Restore Default_ works.
 
 If Hyprland fails to start, stay on Plasma, boot a `pre-update-*` snapshot from ZFSBootMenu, and keep `/var/log/monarchy-setup.log`.

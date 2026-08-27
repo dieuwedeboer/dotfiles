@@ -25,10 +25,16 @@ monarchy_seed_hyprland_config() {
 
 monarchy_seed_branding() {
     local dest="$HOME/.config/omarchy/branding"
+    [ -f "$MONARCHY_SRC/logo.txt" ] || monarchy_die "missing $MONARCHY_SRC/logo.txt"
+    [ -f "$MONARCHY_SRC/icon.txt" ] || monarchy_die "missing $MONARCHY_SRC/icon.txt"
     mkdir -p "$dest"
-    [ -f "$MONARCHY_SRC/logo.txt" ] && monarchy_copy_if_missing "$MONARCHY_SRC/logo.txt" "$dest/logo.txt"
-    [ -f "$MONARCHY_SRC/icon.txt" ] && monarchy_copy_if_missing "$MONARCHY_SRC/icon.txt" "$dest/icon.txt"
+    monarchy_copy_if_missing "$MONARCHY_SRC/logo.txt" "$dest/logo.txt"
+    monarchy_copy_if_missing "$MONARCHY_SRC/icon.txt" "$dest/icon.txt"
     [ -f "$MONARCHY_SRC/icon.png" ] && monarchy_copy_if_missing "$MONARCHY_SRC/icon.png" "$dest/icon.png"
+    # Omarchy skel names. ttfx reads screensaver.txt; missing it crash-loops the
+    # fullscreen terminal so a key cannot dismiss it.
+    monarchy_copy_if_missing "$MONARCHY_SRC/logo.txt" "$dest/screensaver.txt"
+    monarchy_copy_if_missing "$MONARCHY_SRC/icon.txt" "$dest/about.txt"
 }
 
 monarchy_seed_uwsm_user_env() {
@@ -76,6 +82,19 @@ monarchy_user_theme() {
     monarchy_log "theme $(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null)"
 }
 
+monarchy_seed_switch_user_bind() {
+    local dest="$HOME/.config/hypr/bindings.lua"
+    mkdir -p "$(dirname "$dest")"
+    [ -f "$dest" ] || printf -- '-- Keep only your personal keybinding overrides here.\n' >"$dest"
+    grep -q 'monarchy-switch-user' "$dest" 2>/dev/null && return 0
+    cat >>"$dest" <<'EOF'
+
+-- Switch user: lock, then plasma-login-manager greeter. Same chord on the lock screen.
+o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user")
+EOF
+    monarchy_log "seeded Super+Ctrl+U switch-user bind in $dest"
+}
+
 monarchy_seed_kwallet_autostart() {
     local dest="$HOME/.config/hypr/autostart.lua"
     mkdir -p "$(dirname "$dest")"
@@ -98,6 +117,7 @@ monarchy_user_git() {
 monarchy_setup_user() {
     [ "$USER" != "root" ] || monarchy_die "user setup must not run as root"
     monarchy_seed_hyprland_config
+    monarchy_seed_switch_user_bind
     monarchy_seed_kwallet_autostart
     monarchy_seed_branding
     monarchy_seed_uwsm_user_env
