@@ -74,7 +74,7 @@ If the host has no `/etc/zfs/zroot.key`, the mkinitcpio `zfs` hook prompts on th
 
 ## Family greeter
 
-SDDM runs the Omarchy theme with a Monarchy overlay. Tab cycles users. Up/Down cycles sessions. amie and olivier default to Plasma; Dieuwe defaults to Omarchy. Do not enable autologin. Do not write `/var/lib/sddm/state.conf`.
+SDDM runs the Omarchy theme with a Monarchy overlay. Tab cycles users. Up/Down cycles sessions. amie and olivier default to Plasma; Dieuwe defaults to Omarchy. Do not enable autologin. Do not write `/var/lib/sddm/state.conf`. SDDM does not remember last session per user; those static defaults are the picker until Dieuwe reviews that (see `docs/monarchy.md` Open questions).
 
 ## After apply
 
@@ -85,7 +85,7 @@ After reboot:
 3. Log out. Plasma still starts for a family account (or for you).
 4. `grep '^\[omarchy\]' -n /etc/pacman.conf` is after `[cachyos]`. `/etc/os-release` still `ID=cachyos`.
 5. `omarchy-refresh-pacman` prints `monarchy: blocked` and exits 2.
-6. `pacman -Q sddm` succeeds. `systemctl is-enabled sddm` is enabled. `pacman -Q plasma-login-manager` fails. `/etc/sddm.conf.d/99-omarchy-sddm.conf` sets `Current=omarchy`.
+6. `pacman -Q sddm` succeeds. `systemctl is-enabled sddm` is enabled. `pacman -Q plasma-login-manager` fails. `/etc/sddm.conf.d/99-omarchy-sddm.conf` sets `Current=omarchy`. Greeter `Main.qml` uses the current Omarchy theme colours and `unlock.png`, not stock `#1a1b26`.
 7. `/etc/pam.d/omarchy-lock-password` exists. Super+Ctrl+L locks the Omarchy session.
 8. Super+Ctrl+U (System menu too) locks if needed and returns to SDDM. The same chord on the lock screen is the family breakout. It does not need the locked user's password.
 9. `~/.config/omarchy/branding/screensaver.txt` exists (Omarchy wordmark). Super+Esc → Screensaver shows it; a key dismisses it. `$OMARCHY_PATH/logo.txt` is a symlink so _Style > Screensaver > Restore Default_ works.

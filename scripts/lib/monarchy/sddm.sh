@@ -127,6 +127,89 @@ monarchy_sddm_sync_assets() {
     monarchy_sddm_write_qml "$bg_hex" "$text_hex"
 }
 
+# Same TOML colour scrape as clone bin/omarchy-plymouth-set-by-theme.
+monarchy_theme_toml_color() {
+    local file=$1 key=$2 fallback=${3:-}
+    [ -f "$file" ] || return 1
+    awk -F= -v key="$key" -v fallback="$fallback" '
+        function clean(raw) {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", raw)
+            if (raw ~ /^"/) {
+                sub(/^"/, "", raw)
+                sub(/".*$/, "", raw)
+            }
+            return raw
+        }
+        {
+            field = $1
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", field)
+            if (field == key) {
+                print clean($2)
+                found = 1
+                exit
+            }
+            if (field == fallback) fallback_value = clean($2)
+        }
+        END {
+            if (!found && fallback_value != "") print fallback_value
+        }
+    ' "$file"
+}
+
+monarchy_current_theme_dir() {
+    local theme=$1
+    local theme_dir="${OMARCHY_PATH:-$MONARCHY_PATH}/themes/$theme"
+    [ -d "$HOME/.config/omarchy/themes/$theme" ] && theme_dir="$HOME/.config/omarchy/themes/$theme"
+    printf '%s\n' "$theme_dir"
+}
+
+# Restyle the greeter from ~/.local/state/omarchy/current/theme.name.
+# Does not rebuild initramfs. No-op when no theme is selected.
+monarchy_sddm_apply_current_theme() {
+    local name_file="$HOME/.local/state/omarchy/current/theme.name"
+    local theme theme_dir colors bg_hex text_hex src_ply staging_dir asset dest
+    [ -s "$name_file" ] || return 0
+    theme=$(cat "$name_file")
+    [ -n "$theme" ] || return 0
+    theme_dir=$(monarchy_current_theme_dir "$theme")
+    [ -f "$theme_dir/unlock.png" ] || return 0
+    [ ! -L "$theme_dir/unlock.png" ] || return 0
+    colors="$theme_dir/colors.toml"
+    [ -f "$colors" ] || return 0
+    bg_hex=$(monarchy_theme_toml_color "$colors" background)
+    text_hex=$(monarchy_theme_toml_color "$colors" foreground)
+    bg_hex=${bg_hex#\#}
+    text_hex=${text_hex#\#}
+    [[ $bg_hex =~ ^[0-9a-fA-F]{6}$ ]] || return 0
+    [[ $text_hex =~ ^[0-9a-fA-F]{6}$ ]] || return 0
+
+    dest=$MONARCHY_SDDM_THEME_DIR
+    if [ ! -d "$dest" ]; then
+        monarchy_refresh_sddm
+    fi
+    monarchy_sudo mkdir -p "$dest"
+
+    src_ply="${OMARCHY_PATH:-$MONARCHY_PATH}/default/plymouth"
+    [ -f "$src_ply/bullet.png" ] || src_ply="$MONARCHY_SRC/default/plymouth"
+    staging_dir=$(mktemp -d)
+    cp "$theme_dir/unlock.png" "$staging_dir/logo.png"
+    if command -v magick >/dev/null 2>&1 && [ -f "$src_ply/bullet.png" ]; then
+        for asset in bullet.png entry.png lock.png; do
+            [ -f "$src_ply/$asset" ] || continue
+            magick "$src_ply/$asset" -channel RGB +level-colors "#$text_hex","#$text_hex" \
+                "$staging_dir/$asset"
+        done
+        for asset in entry lock; do
+            [ -f "$staging_dir/${asset}.png" ] || continue
+            magick "$staging_dir/${asset}.png" -channel RGB +level-colors "#f7768e","#f7768e" \
+                "$staging_dir/${asset}-failed.png"
+        done
+    fi
+    monarchy_sddm_sync_assets "$staging_dir" "$bg_hex" "$text_hex"
+    rm -rf "$staging_dir"
+    monarchy_log "SDDM greeter synced to theme $theme"
+}
+
 monarchy_refresh_sddm() {
     local src dest
     src=$(monarchy_sddm_clone_theme)
