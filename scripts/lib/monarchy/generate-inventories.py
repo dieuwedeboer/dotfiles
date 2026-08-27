@@ -18,6 +18,7 @@ WRAP = {
     "omarchy-plymouth-set",
     "omarchy-plymouth-reset",
     "omarchy-refresh-plymouth",
+    "omarchy-refresh-sddm",
     "omarchy-screensaver",
 }
 
@@ -40,7 +41,6 @@ HARD_DENY = {
     "omarchy-provision-first-run",
     "omarchy-provision-user",
     "omarchy-provision-owner",
-    "omarchy-refresh-sddm",
     "omarchy-apply-system",
     "omarchy-apply-hardware",
     "omarchy-dev-link",
@@ -175,7 +175,6 @@ DENY_PREFIXES = (
     "omarchy-refresh-limine",
     "omarchy-refresh-pacman",
     "omarchy-refresh-plymouth",
-    "omarchy-refresh-sddm",
     "omarchy-apply-system",
     "omarchy-apply-hardware",
     "omarchy-sudo-",

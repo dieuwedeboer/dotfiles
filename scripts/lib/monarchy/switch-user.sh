@@ -34,7 +34,7 @@ lock_state() {
 can=$(busctl --system get-property "$DM" "$SEAT_PATH" "$SEAT_IFACE" CanSwitch 2>/dev/null || true)
 case "$can" in
     *true*) ;;
-    *) die "plasma-login-manager CanSwitch is not true ($can)" ;;
+    *) die "display manager CanSwitch is not true ($can)" ;;
 esac
 
 if lock_state; then

@@ -39,11 +39,13 @@ monarchy_install_packages() {
     [ "${#pkgs[@]}" -gt 0 ] || monarchy_die "filtered package list is empty"
 
     local denied
-    for denied in sddm tldr yay mise-bin snapper limine omarchy omarchy-dev omarchy-settings omarchy-settings-dev; do
+    for denied in plasma-login-manager tldr yay mise-bin snapper limine omarchy omarchy-dev omarchy-settings omarchy-settings-dev; do
         if monarchy_in_list "$denied" "${pkgs[@]}"; then
             monarchy_die "denied package $denied leaked into install set"
         fi
     done
+    monarchy_in_list sddm "${pkgs[@]}" \
+        || monarchy_die "sddm missing from filtered package list"
 
     # TLP's tlp-pd Provides/Conflicts power-profiles-daemon. Omarchy's
     # session calls powerprofilesctl; keep the real daemon, not TLP.
@@ -55,7 +57,6 @@ monarchy_install_packages() {
     monarchy_sudo pacman -Sy --noconfirm
     monarchy_sudo pacman -S --needed --noconfirm "${pkgs[@]}"
     monarchy_record_packages
-    monarchy_keep_plasmalogin
     monarchy_skip_os_release_clobber
     monarchy_log "packages installed"
     return 0

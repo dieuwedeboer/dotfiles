@@ -47,6 +47,12 @@ grep -q 'wrap-plymouth does not handle' "$dest/omarchy-refresh-plymouth" || {
     echo "refresh-plymouth is not wrap-plymouth" >&2
     exit 1
 }
+[ -x "$dest/omarchy-refresh-sddm" ] || { echo "sddm wrap missing" >&2; exit 1; }
+[ ! -L "$dest/omarchy-refresh-sddm" ] || { echo "refresh-sddm wrap is a symlink" >&2; exit 1; }
+grep -q 'monarchy_refresh_sddm' "$dest/omarchy-refresh-sddm" || {
+    echo "refresh-sddm is not wrap-sddm" >&2
+    exit 1
+}
 [ -L "$dest/omarchy-plymouth-set-by-theme" ] || { echo "set-by-theme should be allowlisted" >&2; exit 1; }
 [ -x "$dest/omarchy-screensaver" ] || { echo "screensaver wrap missing" >&2; exit 1; }
 [ ! -L "$dest/omarchy-screensaver" ] || { echo "screensaver wrap is a symlink" >&2; exit 1; }

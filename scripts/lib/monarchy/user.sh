@@ -89,7 +89,7 @@ monarchy_seed_switch_user_bind() {
     grep -q 'monarchy-switch-user' "$dest" 2>/dev/null && return 0
     cat >>"$dest" <<'EOF'
 
--- Switch user: lock, then plasma-login-manager greeter. Same chord on the lock screen.
+-- Switch user: lock, then SDDM greeter. Same chord on the lock screen.
 o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user")
 EOF
     monarchy_log "seeded Super+Ctrl+U switch-user bind in $dest"
