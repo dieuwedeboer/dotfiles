@@ -78,3 +78,33 @@ monarchy_install_omarchy_session() {
     monarchy_log "installed $dest ($exec_line)"
     return 0
 }
+
+# Omarchy-settings would have installed these. Without them, CachyOS
+# HandlePowerKey=poweroff: a short KEY_POWER (laptop button or a Bluetooth
+# AVRCP device) shuts the machine down. Reload logind, do not restart it.
+monarchy_apply_logind() {
+    local src dest name
+    local dir="$MONARCHY_MISC/logind"
+    [ -d "$dir" ] || monarchy_die "missing $dir"
+    monarchy_sudo mkdir -p /etc/systemd/logind.conf.d
+    for src in "$dir"/*.conf; do
+        [ -f "$src" ] || continue
+        name=$(basename "$src")
+        dest="/etc/systemd/logind.conf.d/${name%%-*}-monarchy-${name#*-}"
+        monarchy_sudo install -m 644 "$src" "$dest"
+        monarchy_log "installed $dest"
+    done
+    grep -q '^HandlePowerKey=ignore' /etc/systemd/logind.conf.d/10-monarchy-ignore-power-button.conf \
+        || monarchy_die "logind drop-in missing HandlePowerKey=ignore"
+    monarchy_sudo systemctl reload systemd-logind
+    monarchy_log "reloaded systemd-logind"
+}
+
+monarchy_check_logind() {
+    local src="$MONARCHY_MISC/logind/10-ignore-power-button.conf"
+    [ -f "$src" ] || monarchy_die "missing $src"
+    grep -q '^HandlePowerKey=ignore' "$src" \
+        || monarchy_die "$src must set HandlePowerKey=ignore"
+    [ -f "$MONARCHY_MISC/logind/20-inhibit-delay.conf" ] \
+        || monarchy_die "missing inhibit-delay logind drop-in"
+}

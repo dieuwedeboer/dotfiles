@@ -82,6 +82,7 @@ monarchy_check() {
     fi
     [ -f "$monarchy_lib_dir/switch-user.sh" ] || monarchy_die "missing switch-user.sh"
     monarchy_check_session_lock_overlay
+    monarchy_check_logind
     monarchy_log "check passed"
 }
 
@@ -123,6 +124,7 @@ monarchy_apply() {
     monarchy_install_packages
     monarchy_apply_lock
     monarchy_install_omarchy_session
+    monarchy_apply_logind
     monarchy_install_uwsm_env
     monarchy_install_hyprland_portals
     monarchy_setup_user
