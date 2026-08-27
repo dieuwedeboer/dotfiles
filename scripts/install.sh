@@ -182,3 +182,8 @@ ln -s "$ICOGRAPH_DIR" "$TARGET_DIR"
 echo "  icograph installed to: $TARGET_DIR"
 
 echo "=== System installation complete ==="
+echo
+echo "Optional: Omarchy Quattro on this CachyOS+KDE box:"
+echo "  ./scripts/setup-monarchy.sh --check"
+echo "  ./scripts/setup-monarchy.sh"
+echo "See docs/monarchy-install.md"

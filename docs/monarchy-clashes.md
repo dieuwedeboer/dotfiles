@@ -30,6 +30,7 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 | `ufw-docker` | Deny. Never run `firewall.sh` |
 | NVIDIA 580xx-dkms vs `chwd` | Never run Omarchy `nvidia.sh` |
 | `tuxedo-drivers-nocompatcheck-dkms` | Deny the package and the script |
+| `tlp-pd` vs `power-profiles-daemon` | Abort if TLP is installed. Omarchy calls `powerprofilesctl` |
 
 ## `packages.deny`
 
