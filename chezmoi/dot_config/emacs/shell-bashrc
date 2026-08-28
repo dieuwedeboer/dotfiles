@@ -1,0 +1,27 @@
+# Emacs shell-mode bashrc. Sourced by omarchy.el as user-emacs-directory/shell-bashrc.
+
+if [ -r /etc/omarchy.conf ]; then
+  # shellcheck disable=SC1091
+  . /etc/omarchy.conf
+fi
+: "${OMARCHY_PATH:=/usr/local/share/omarchy}"
+
+for f in shell aliases functions envs; do
+  if [ -r "$OMARCHY_PATH/default/bash/$f" ]; then
+    # shellcheck disable=SC1090
+    . "$OMARCHY_PATH/default/bash/$f"
+  fi
+done
+
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate bash)"
+fi
+
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init bash)"
+fi
+
+PS1='\w \$ '
+
+# shellcheck disable=SC1090
+[[ -f ~/.bashrc.emacs ]] && . ~/.bashrc.emacs
