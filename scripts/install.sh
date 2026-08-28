@@ -152,6 +152,13 @@ if [ -r /sys/class/dmi/id/product_name ] && [ "$(cat /sys/class/dmi/id/product_n
     "$SCRIPT_DIR/setup-bonw9.sh"
 fi
 
+# shellcheck source=lib/zbook/detect.sh
+source "$SCRIPT_DIR/lib/zbook/detect.sh"
+if zbook_detected; then
+    echo "Detected HP ZBook, running setup-zbook.sh..."
+    "$SCRIPT_DIR/setup-zbook.sh"
+fi
+
 echo "=== Configuring ZFS monitoring and snapshots ==="
 "$SCRIPT_DIR/setup-zfs.sh"
 
