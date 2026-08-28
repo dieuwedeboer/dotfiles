@@ -2,17 +2,65 @@
 # SDDM as the household greeter. Stock Omarchy theme + Unlock, Monarchy Main.qml
 # overlay for multi-user. Never autologin. Never leave plasma-login-manager
 # installed next to sddm. The session theme does not restyle the greeter.
+#
+# Drop-in name is zz- so it sorts after leftover CachyOS/KDE files
+# (kde_settings.conf Current=breeze). 99- loses that race: 'k' > '9'.
 
 MONARCHY_SDDM_THEME_DIR="${MONARCHY_SDDM_THEME_DIR:-/usr/share/sddm/themes/omarchy}"
-MONARCHY_SDDM_CONF="${MONARCHY_SDDM_CONF:-/etc/sddm.conf.d/99-omarchy-sddm.conf}"
+MONARCHY_SDDM_CONF="${MONARCHY_SDDM_CONF:-/etc/sddm.conf.d/zz-omarchy-sddm.conf}"
 MONARCHY_SDDM_HYPR="${MONARCHY_SDDM_HYPR:-/usr/share/sddm/hyprland.lua}"
+MONARCHY_SDDM_SYS_CONF_DIR="${MONARCHY_SDDM_SYS_CONF_DIR:-/usr/lib/sddm/sddm.conf.d}"
+MONARCHY_SDDM_USER_CONF_DIR="${MONARCHY_SDDM_USER_CONF_DIR:-/etc/sddm.conf.d}"
+MONARCHY_SDDM_LEGACY_CONF="${MONARCHY_SDDM_LEGACY_CONF:-/etc/sddm.conf}"
 
 monarchy_sddm_qml_src() {
     printf '%s\n' "$MONARCHY_MISC/sddm/Main.qml"
 }
 
 monarchy_sddm_conf_src() {
-    printf '%s\n' "$MONARCHY_MISC/sddm/99-omarchy-sddm.conf"
+    printf '%s\n' "$MONARCHY_MISC/sddm/zz-omarchy-sddm.conf"
+}
+
+# Last non-empty Theme.Current in SDDM merge order (sys drop-ins, then
+# /etc/sddm.conf.d, then /etc/sddm.conf). Same order as man 5 sddm.conf.
+monarchy_sddm_effective_current() {
+    local dir f got current=""
+    for dir in "$MONARCHY_SDDM_SYS_CONF_DIR" "$MONARCHY_SDDM_USER_CONF_DIR"; do
+        [ -d "$dir" ] || continue
+        while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            got=$(awk '
+                /^\[Theme\]/ { in_theme=1; next }
+                /^\[/ { in_theme=0; next }
+                in_theme && /^Current=/ {
+                    sub(/^Current=/, "")
+                    gsub(/^[ \t]+|[ \t]+$/, "")
+                    if (length) print
+                }
+            ' "$f" | tail -1)
+            [ -n "$got" ] && current=$got
+        done < <(LC_ALL=C find "$dir" -maxdepth 1 -name '*.conf' -print | LC_ALL=C sort)
+    done
+    if [ -f "$MONARCHY_SDDM_LEGACY_CONF" ]; then
+        got=$(awk '
+            /^\[Theme\]/ { in_theme=1; next }
+            /^\[/ { in_theme=0; next }
+            in_theme && /^Current=/ {
+                sub(/^Current=/, "")
+                gsub(/^[ \t]+|[ \t]+$/, "")
+                if (length) print
+            }
+        ' "$MONARCHY_SDDM_LEGACY_CONF" | tail -1)
+        [ -n "$got" ] && current=$got
+    fi
+    printf '%s\n' "$current"
+}
+
+monarchy_sddm_assert_theme_wins() {
+    local current
+    current=$(monarchy_sddm_effective_current)
+    [ "$current" = omarchy ] || monarchy_die \
+        "effective SDDM Theme.Current is '${current:-<unset>}', expected omarchy (drop-in must sort after kde_settings.conf)"
 }
 
 monarchy_sddm_clone_theme() {
@@ -38,6 +86,9 @@ monarchy_assert_sddm_assets() {
     grep -q 'cycleUser' "$qml" || monarchy_die "$qml is not the multi-user overlay"
     grep -q '^Current=omarchy$' "$conf" || monarchy_die "$conf must set Current=omarchy"
     grep -q 'start-hyprland' "$conf" || monarchy_die "$conf must use start-hyprland"
+    if ! LC_ALL=C awk -v n="$(basename "$conf")" 'BEGIN { exit !(n > "kde_settings.conf") }'; then
+        monarchy_die "$conf must sort after kde_settings.conf (use zz-, not 99-)"
+    fi
     if grep -Eq '^[[:space:]]*User=[[:space:]]*[^[:space:]]+' "$conf"; then
         monarchy_die "$conf must not set Autologin User"
     fi
@@ -87,12 +138,34 @@ monarchy_sddm_write_qml() {
     rm -f "$tmp"
 }
 
+monarchy_sddm_install_overlay_assets() {
+    local src dest f base
+    src="$MONARCHY_MISC/sddm"
+    dest=$MONARCHY_SDDM_THEME_DIR
+    [ -d "$src" ] || return 0
+    monarchy_sudo mkdir -p "$dest"
+    for f in "$src"/*; do
+        [ -f "$f" ] || continue
+        base=$(basename "$f")
+        case "$base" in
+            *.conf|Main.qml) continue ;;
+        esac
+        monarchy_sudo install -m 644 "$f" "$dest/$base"
+    done
+}
+
 monarchy_sddm_install_conf() {
-    local src
+    local src stale
     src=$(monarchy_sddm_conf_src)
     [ -f "$src" ] || monarchy_die "missing $src"
-    monarchy_sudo mkdir -p /etc/sddm.conf.d
+    monarchy_sudo mkdir -p "$MONARCHY_SDDM_USER_CONF_DIR"
     monarchy_sudo install -m 644 "$src" "$MONARCHY_SDDM_CONF"
+    stale="$MONARCHY_SDDM_USER_CONF_DIR/99-omarchy-sddm.conf"
+    if [ -e "$stale" ] && [ "$stale" != "$MONARCHY_SDDM_CONF" ]; then
+        monarchy_sudo rm -f "$stale"
+        monarchy_log "removed stale $stale"
+    fi
+    monarchy_sddm_assert_theme_wins
     monarchy_log "installed $MONARCHY_SDDM_CONF"
 }
 
@@ -126,6 +199,7 @@ monarchy_sddm_sync_assets() {
     done
     monarchy_sudo rm -f "$dest/logo.svg"
     monarchy_sddm_write_qml "$bg_hex" "$text_hex"
+    monarchy_sddm_install_overlay_assets
 }
 
 # Same TOML colour scrape as clone bin/omarchy-plymouth-set-by-theme.
@@ -254,6 +328,7 @@ monarchy_refresh_sddm() {
     monarchy_sudo cp -a "$src" "$dest"
     monarchy_sddm_install_hyprland_lua
     monarchy_sddm_write_qml
+    monarchy_sddm_install_overlay_assets
 }
 
 monarchy_keep_sddm() {

@@ -32,7 +32,7 @@ The fork's ZFS support is real, but it is Omarchy-native ZFS (`zroot/ROOT/defaul
 | Boot | ESP at `/boot/efi` (vfat). rEFInd at `EFI/refind` with glow theme. ZFSBootMenu at `EFI/zbm`. Properties `org.zfsbootmenu:bootfs`, `rootprefix=root=ZFS=`, `commandline="rw quiet splash"` |
 | Unlock | ZFSBootMenu prompts for the pool passphrase. Host mkinitcpio HOOKS are `(base udev autodetect microcode kms modconf block keyboard keymap consolefont zfs filesystems)`. No plymouth hook. `fsck` already removed by `scripts/install.sh`. Kingfisher already uses the README keyfile: `/etc/zfs/zroot.key` is listed in mkinitcpio `FILES`, so the host `zfs` hook does not prompt |
 | Snapshots | `sanoid.timer` on `zpcachyos/ROOT/cos/home`. Pacman hook `misc/zfs-snapshot.hook` recursively snapshots `zpcachyos/ROOT/cos` as `pre-update-*`, keep 3. Bootable recovery is ZBM snapshot boot + clone/promote |
-| Desktop | KDE Plasma Wayland. CachyOS ships **plasma-login-manager** (`plasmalogin.service`). Monarchy removes it and enables **SDDM** so Omarchy's greeter theme and Plymouth color sync work. Session files: `/usr/share/wayland-sessions/{plasma,omarchy,hyprland}.desktop`. Leftover `/etc/sddm.conf.d/kde_settings.conf` has empty `[Autologin] User=` and `Current=breeze`; `99-omarchy-sddm.conf` wins on theme and compositor. `monarchy_skip_autologin` still asserts Autologin User empty |
+| Desktop | KDE Plasma Wayland. CachyOS ships **plasma-login-manager** (`plasmalogin.service`). Monarchy removes it and enables **SDDM** so Omarchy's greeter theme and Plymouth color sync work. Session files: `/usr/share/wayland-sessions/{plasma,omarchy,hyprland}.desktop`. Leftover `/etc/sddm.conf.d/kde_settings.conf` has empty `[Autologin] User=` and `Current=breeze`. SDDM drop-ins are lexicographic, so a `99-` prefix loses to `kde_settings.conf` (`k` > `9`) and the Breeze greeter keeps the church wallpaper. The drop-in is `zz-omarchy-sddm.conf`. Apply asserts effective `Theme.Current` is `omarchy`. `monarchy_skip_autologin` still asserts Autologin User empty |
 | Greeter users | `dieuwe` (uid 1000, `/bin/fish`), `amie` (1001, bash), `olivier` (1002, bash) |
 | Dotfiles | chezmoi from `chezmoi/`. fish + `cachyos-fish-config`, ghostty, starship, nvim, ksplash Breeze Dark. Emacs is chezmoi `dot_config/emacs/` (`~/.config/emacs/`) plus the `omarchy-emacs` package. `cachy-update` is the OS updater; chezmoi also has an `arch-update` config file that is not a second updater |
 | AUR helper | paru |
@@ -236,7 +236,7 @@ omarchy-settings files that must never land on disk:
 - `/etc/os-release` override
 - `/usr/share/applications/mimeapps.list`
 - `/etc/mkinitcpio.conf.d/omarchy_hooks.conf`
-- Omarchy `etc/sddm.conf.d/10-*.conf` via omarchy-settings (Monarchy writes `/etc/sddm.conf.d/99-omarchy-sddm.conf` itself)
+- Omarchy `etc/sddm.conf.d/10-*.conf` via omarchy-settings (Monarchy writes `/etc/sddm.conf.d/zz-omarchy-sddm.conf` itself)
 - `/etc/skel/.bashrc` from Omarchy
 - `/usr/lib/environment.d/*` Omarchy drop-ins
 - `/etc/sudoers.d/omarchy-*`
@@ -429,7 +429,7 @@ misc/monarchy/
   packages.installed     # written on the machine, also copied back into git after PR 4a
   bin.allow              # exact names; no globs; includes omarchy router
   bin.wrap               # update, plymouth, refresh-sddm, screensaver
-  sddm/                  # Main.qml overlay, 99-omarchy-sddm.conf
+  sddm/                  # Main.qml overlay, zz-omarchy-sddm.conf
   bin.deny               # complement at the pin (implicit deny, 438 total)
   migrations.deny
   branding/
@@ -457,7 +457,7 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 | `monarchy_refuse_dataset_rename` | Never run `install/config/zfs.sh`. Never write `/etc/pam.d/zfs-key` |
 | `monarchy_disable_omarchy_update_guard` | Never install `omarchy` / `omarchy-dev`. If the hook appears, mask it |
 | `monarchy_install_settings` | Copy clone `etc/` and selected `default/` trees (user units, fontconfig, icons, environment.d) minus `settings.skip`. Write patched `/etc/profile.d/omarchy.sh`. Rewrite user-unit ExecStart to `/usr/local/bin`. Does not install the omarchy-settings package |
-| `monarchy_keep_sddm` | Install/enable `sddm`. Remove `plasma-login-manager`. Write `99-omarchy-sddm.conf` (theme omarchy, Hyprland greeter compositor, Autologin User empty). Refresh the Omarchy SDDM theme and overlay Monarchy `Main.qml`. `--check` allows pre-apply (sddm not installed yet) |
+| `monarchy_keep_sddm` | Install/enable `sddm`. Remove `plasma-login-manager`. Write `zz-omarchy-sddm.conf` (theme omarchy, Hyprland greeter compositor, Autologin User empty). Refresh the Omarchy SDDM theme and overlay Monarchy `Main.qml`. `--check` allows pre-apply (sddm not installed yet) |
 | `monarchy_apply_logind` | Install Omarchy's `HandlePowerKey=ignore` and `InhibitDelayMaxSec=15` under `/etc/systemd/logind.conf.d/10-monarchy-*` / `20-monarchy-*`. Reload logind, never restart it. CachyOS default `HandlePowerKey=poweroff` plus a Bluetooth AVRCP KEY_POWER is a full shutdown |
 | `monarchy_install_omarchy_session` | Install Monarchy-authored `/usr/share/wayland-sessions/omarchy.desktop` (not a blind copy of the clone) |
 | `monarchy_skip_autologin` | Assert no `[Autologin] User=` in `/etc/plasmalogin.conf`, `/etc/plasmalogin.conf.d/*`, and leftover `/etc/sddm.conf.d/*` |
@@ -479,7 +479,7 @@ Stay on Omarchy's login stack except where the household requires a fork. ZFS st
 
 Stock Omarchy `Main.qml` is a last-user password box that auto-picks the first `uwsm` session. That logs Amie into Dieuwe's account. Monarchy overlays `misc/monarchy/sddm/Main.qml`: same logo/lock/entry, `#1a1b26`/`#ffffff` color tokens, plus Tab user cycle and Up/Down session cycle. amie and olivier default to Plasma; everyone else defaults to Omarchy. Do not write `/var/lib/sddm/state.conf`. Do not enable Autologin. SDDM does not remember last session per user; the overlay's static defaults are the picker. Dieuwe still needs to decide whether to keep that or add per-user memory. See Open questions.
 
-CachyOS leftover `/usr/lib/sddm/sddm.conf.d/zz-wayland.conf` (kwin greeter) and `/etc/sddm.conf.d/kde_settings.conf` (`Current=breeze`) lose to `/etc/sddm.conf.d/99-omarchy-sddm.conf`.
+CachyOS leftover `/usr/lib/sddm/sddm.conf.d/zz-wayland.conf` (kwin greeter) is in the lower-priority system dir. `/etc/sddm.conf.d/kde_settings.conf` (`Current=breeze`) is in the same dir as Monarchy, so the drop-in name must sort after it. `zz-omarchy-sddm.conf` does. `99-omarchy-sddm.conf` does not.
 
 Two display managers on one seat is still a brick. `packages.deny` lists `plasma-login-manager`. Apply enables `sddm.service` with `--force` and removes the PLM package. `--check` before the first apply does not require sddm to be installed yet.
 
@@ -505,12 +505,12 @@ Exact greeter files:
 | --- | --- |
 | `/usr/share/wayland-sessions/omarchy.desktop` | Monarchy-authored. `TryExec=uwsm`. `DesktopNames=Hyprland`. Comment is Monarchy-branded, not the clone's. Exec is `uwsm start -g -1 -e -D Hyprland hyprland.desktop` once that file exists, otherwise `monarchy-session-probe` |
 | `/usr/share/wayland-sessions/plasma.desktop` | Untouched |
-| `/etc/sddm.conf.d/99-omarchy-sddm.conf` | `Current=omarchy`. `DisplayServer=wayland`. `CompositorCommand=start-hyprland -- --config /usr/share/sddm/hyprland.lua`. Autologin `User` empty |
+| `/etc/sddm.conf.d/zz-omarchy-sddm.conf` | `Current=omarchy`. `DisplayServer=wayland`. `CompositorCommand=start-hyprland -- --config /usr/share/sddm/hyprland.lua`. Autologin `User` empty |
 | `/usr/share/sddm/themes/omarchy/Main.qml` | Clone theme copy, then Monarchy overlay. `omarchy-refresh-sddm` is wrapped so stock last-user QML cannot land. Apply follows Style > Unlock (plymouth logo), not the session theme. Fresh apply is Unlock default (`#1a1b26`) |
 | `/usr/share/sddm/hyprland.lua` | Clone `default/sddm/hyprland.lua` |
 | `/var/lib/sddm/state.conf` | Do **not** write Dieuwe+omarchy. Last user is SDDM's own memory; session default is the QML overlay. SDDM's `RememberLastSession` is one slot for the whole machine, not per user |
 | `/var/lib/AccountsService/users/{dieuwe,amie,olivier}` | Still written (`omarchy.desktop` / `plasma.desktop`). The QML overlay is the picker default that matters. Per-user last-session memory is deferred; see Open questions |
-| leftover `/etc/sddm.conf.d/kde_settings.conf` | Assert `[Autologin] User` empty. Do not delete. `99-omarchy-sddm.conf` wins on Theme |
+| leftover `/etc/sddm.conf.d/kde_settings.conf` | Assert `[Autologin] User` empty. Do not delete. `zz-omarchy-sddm.conf` sorts after this file so `Current=omarchy` wins |
 
 Family members see the Omarchy terminal-style greeter with their name and Plasma on screen. Tab if the last user was someone else. After login they still get full Plasma. `sddm-kcm` may stay; a monarchy apply puts `Current=omarchy` back.
 
@@ -581,7 +581,7 @@ Live config: Components enabled, EFI UKI disabled, `SplashImage` unused. Do **no
 
 #### 4. Greeter
 
-Omarchy SDDM theme at `/usr/share/sddm/themes/omarchy`, Hyprland as the greeter compositor, Monarchy `Main.qml` overlay. Fresh apply is Unlock default. Style > Unlock restyles plymouth and the greeter together. `99-omarchy-sddm.conf` beats CachyOS breeze/kwin drop-ins.
+Omarchy SDDM theme at `/usr/share/sddm/themes/omarchy`, Hyprland as the greeter compositor, Monarchy `Main.qml` overlay. Optional `misc/monarchy/sddm/background.jpg` is copied into the theme dir for a wallpaper on top of stock Unlock. Fresh apply is Unlock default. Style > Unlock restyles plymouth and the greeter together. `zz-omarchy-sddm.conf` sorts after `kde_settings.conf` so Breeze cannot keep `Current`.
 
 #### 5. Session splashes
 
@@ -592,8 +592,8 @@ Plasma: keep chezmoi `ksplashrc`. Omarchy: Quickshell lock + branding in `~/.con
 | Asset | Repo path | Deploy path | Deployed by |
 | --- | --- | --- | --- |
 | Plymouth theme | clone `default/plymouth/` | `/usr/share/plymouth/themes/omarchy/` | `monarchy_splash` |
-| SDDM theme | clone `default/sddm/omarchy/` plus `misc/monarchy/sddm/Main.qml` | `/usr/share/sddm/themes/omarchy/` | `monarchy_refresh_sddm` |
-| SDDM conf | `misc/monarchy/sddm/99-omarchy-sddm.conf` | `/etc/sddm.conf.d/99-omarchy-sddm.conf` | `monarchy_keep_sddm` |
+| SDDM theme | clone `default/sddm/omarchy/` plus `misc/monarchy/sddm/Main.qml` and optional extra assets (`background.jpg`) | `/usr/share/sddm/themes/omarchy/` | `monarchy_refresh_sddm` |
+| SDDM conf | `misc/monarchy/sddm/zz-omarchy-sddm.conf` | `/etc/sddm.conf.d/zz-omarchy-sddm.conf` | `monarchy_keep_sddm` |
 | Omarchy session desktop | `misc/monarchy/omarchy.desktop` (authored) | `/usr/share/wayland-sessions/omarchy.desktop` | `monarchy_install_omarchy_session` |
 | Dieuwe Omarchy branding | clone `logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt` | `~/.config/omarchy/branding/` | PR 4b |
 
@@ -704,7 +704,7 @@ fi
 | `/etc/systemd/logind.conf.d/10-monarchy-ignore-power-button.conf` | `HandlePowerKey=ignore`. Shutdown is the System menu, not the power key or a headset |
 | `/usr/share/uwsm/env.d/10-monarchy` | exact script in API section (literal env-bootstrap + uwsm/default) |
 | `/usr/share/wayland-sessions/omarchy.desktop` | session |
-| `/etc/sddm.conf.d/99-omarchy-sddm.conf` | Omarchy theme, Hyprland greeter compositor, no autologin |
+| `/etc/sddm.conf.d/zz-omarchy-sddm.conf` | Omarchy theme, Hyprland greeter compositor, no autologin |
 | `/usr/share/sddm/themes/omarchy/` | Omarchy greeter plus Monarchy `Main.qml` |
 | `/var/lib/AccountsService/users/{dieuwe,amie,olivier}` | Session= written; QML overlay is the picker default that matters |
 | `/usr/share/xdg-desktop-portal/hyprland-portals.conf` | portal preference |
@@ -1033,9 +1033,9 @@ Each PR is independently reviewable and mergeable. Later PRs must not be require
 ### PR 3: Dual-session greeter (uwsm installed, session visible)
 
 - **Title:** Register an Omarchy wayland session and switch the greeter to SDDM
-- **Files/components:** `scripts/lib/monarchy/{sessions,sddm}.sh`, `misc/monarchy/omarchy.desktop`, `misc/monarchy/sddm/{Main.qml,99-omarchy-sddm.conf}`, `/usr/local/bin/monarchy-session-probe`, AccountsService user files, autologin asserts
+- **Files/components:** `scripts/lib/monarchy/{sessions,sddm}.sh`, `misc/monarchy/omarchy.desktop`, `misc/monarchy/sddm/{Main.qml,zz-omarchy-sddm.conf}`, `/usr/local/bin/monarchy-session-probe`, AccountsService user files, autologin asserts
 - **Dependencies:** PR 2
-- **Description:** Install `uwsm` so `TryExec=uwsm` makes the session visible. Ship Monarchy-authored `omarchy.desktop`. Enable SDDM, remove plasma-login-manager, write `99-omarchy-sddm.conf`, overlay `misc/monarchy/sddm/Main.qml`. Do not write global `state.conf`. Assert Autologin empty. Success criteria: (1) greeter lists Plasma and Omarchy, (2) family users default to Plasma and Dieuwe to Omarchy without autologin.
+- **Description:** Install `uwsm` so `TryExec=uwsm` makes the session visible. Ship Monarchy-authored `omarchy.desktop`. Enable SDDM, remove plasma-login-manager, write `zz-omarchy-sddm.conf`, overlay `misc/monarchy/sddm/Main.qml`. Do not write global `state.conf`. Assert Autologin empty. Success criteria: (1) greeter lists Plasma and Omarchy, (2) family users default to Plasma and Dieuwe to Omarchy without autologin.
 
 ### PR 4a: Leaf packages, recorded set, overlay populated
 
