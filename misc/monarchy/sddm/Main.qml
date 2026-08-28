@@ -16,6 +16,21 @@ Rectangle {
   property string currentUser: userNameAt(userIndex)
   property string sessionLabel: sessionLabelAt(sessionIndex)
 
+  // Optional overlay: drop background.jpg next to this QML in misc/monarchy/sddm/.
+  Image {
+    id: background
+    anchors.fill: parent
+    source: "background.jpg"
+    fillMode: Image.PreserveAspectCrop
+    visible: status === Image.Ready
+  }
+
+  Rectangle {
+    anchors.fill: parent
+    color: "#1a1b26"
+    opacity: background.visible ? 0.55 : 0
+  }
+
   function userCount() {
     if (typeof userModel.count === "number")
       return userModel.count

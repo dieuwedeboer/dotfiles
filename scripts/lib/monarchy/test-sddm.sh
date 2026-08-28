@@ -11,9 +11,11 @@ fail() {
 }
 
 qml="$MISC/sddm/Main.qml"
-conf="$MISC/sddm/99-omarchy-sddm.conf"
+conf="$MISC/sddm/zz-omarchy-sddm.conf"
 [ -f "$qml" ] || fail "missing $qml"
 [ -f "$conf" ] || fail "missing $conf"
+[ ! -f "$MISC/sddm/99-omarchy-sddm.conf" ] \
+    || fail "stale 99-omarchy-sddm.conf still in the repo; it loses to kde_settings.conf"
 
 grep -q '#1a1b26' "$qml" || fail "Main.qml missing #1a1b26 token"
 grep -q '#ffffff' "$qml" || fail "Main.qml missing #ffffff token"
@@ -24,6 +26,7 @@ grep -q 'amie' "$qml" || fail "Main.qml missing family user amie"
 grep -q 'olivier' "$qml" || fail "Main.qml missing family user olivier"
 grep -q 'Qt.Key_Tab' "$qml" || fail "Main.qml missing Tab user cycle"
 grep -q 'Qt.Key_Down' "$qml" || fail "Main.qml missing Down session cycle"
+grep -q 'background.jpg' "$qml" || fail "Main.qml missing optional background.jpg overlay"
 if grep -q 'name.indexOf("uwsm")' "$qml"; then
     fail "Main.qml still auto-picks the first uwsm session"
 fi
@@ -34,6 +37,12 @@ grep -q '^DisplayServer=wayland$' "$conf" || fail "conf missing DisplayServer=wa
 if grep -Eq '^[[:space:]]*User=[[:space:]]*[^[:space:]]+' "$conf"; then
     fail "conf sets Autologin User"
 fi
+conf_name=$(basename "$conf")
+[ "$conf_name" = "zz-omarchy-sddm.conf" ] || fail "conf must be zz-omarchy-sddm.conf, got $conf_name"
+LC_ALL=C awk -v n="$conf_name" 'BEGIN { exit !(n > "kde_settings.conf") }' \
+    || fail "$conf_name sorts before kde_settings.conf; Theme.Current=breeze would win"
+LC_ALL=C awk -v n="99-omarchy-sddm.conf" 'BEGIN { exit !(n < "kde_settings.conf") }' \
+    || fail "lexicographic fixture broken: 99-omarchy should lose to kde_settings.conf"
 
 grep -qx 'sddm' "$MISC/packages.deny" && fail "sddm is still in packages.deny"
 grep -qx 'plasma-login-manager' "$MISC/packages.deny" \
@@ -95,6 +104,58 @@ source "$SCRIPT_DIR/sddm.sh"
 source "$SCRIPT_DIR/splash.sh"
 
 monarchy_sudo() { "$@"; }
+
+merge_tmp=$(mktemp -d)
+cleanup_merge() { rm -rf "$merge_tmp"; }
+trap cleanup_merge EXIT
+mkdir -p "$merge_tmp/sys" "$merge_tmp/etc"
+printf '[Theme]\nCurrent=breeze\n' >"$merge_tmp/sys/general.conf"
+printf '[Theme]\nCurrent=breeze\n' >"$merge_tmp/etc/kde_settings.conf"
+printf '[Theme]\nCurrent=omarchy\n' >"$merge_tmp/etc/99-omarchy-sddm.conf"
+export MONARCHY_SDDM_SYS_CONF_DIR="$merge_tmp/sys"
+export MONARCHY_SDDM_USER_CONF_DIR="$merge_tmp/etc"
+export MONARCHY_SDDM_LEGACY_CONF="$merge_tmp/missing-sddm.conf"
+[ "$(monarchy_sddm_effective_current)" = breeze ] \
+    || fail "99-omarchy-sddm.conf must lose to kde_settings.conf (the live bug)"
+rm -f "$merge_tmp/etc/99-omarchy-sddm.conf"
+install -m 644 "$conf" "$merge_tmp/etc/zz-omarchy-sddm.conf"
+[ "$(monarchy_sddm_effective_current)" = omarchy ] \
+    || fail "zz-omarchy-sddm.conf did not beat kde_settings.conf"
+printf '[Theme]\nCurrent=breeze\n' >"$merge_tmp/legacy.conf"
+export MONARCHY_SDDM_LEGACY_CONF="$merge_tmp/legacy.conf"
+[ "$(monarchy_sddm_effective_current)" = breeze ] \
+    || fail "/etc/sddm.conf must still override drop-ins"
+rm -f "$merge_tmp/legacy.conf"
+export MONARCHY_SDDM_LEGACY_CONF="$merge_tmp/missing-sddm.conf"
+export MONARCHY_SDDM_CONF="$merge_tmp/etc/zz-omarchy-sddm.conf"
+printf '[Theme]\nCurrent=omarchy\n' >"$merge_tmp/etc/99-omarchy-sddm.conf"
+monarchy_sddm_install_conf
+[ ! -e "$merge_tmp/etc/99-omarchy-sddm.conf" ] \
+    || fail "install_conf left stale 99-omarchy-sddm.conf"
+[ "$(monarchy_sddm_effective_current)" = omarchy ] \
+    || fail "install_conf did not leave effective Current=omarchy"
+
+overlay_misc=$(mktemp -d)
+mkdir -p "$overlay_misc/sddm" "$merge_tmp/theme"
+printf 'asset\n' >"$overlay_misc/sddm/background.jpg"
+printf 'keep\n' >"$overlay_misc/sddm/Main.qml"
+printf '[Theme]\nCurrent=omarchy\n' >"$overlay_misc/sddm/zz-omarchy-sddm.conf"
+export MONARCHY_MISC="$overlay_misc"
+export MONARCHY_SDDM_THEME_DIR="$merge_tmp/theme"
+monarchy_sddm_install_overlay_assets
+[ -f "$merge_tmp/theme/background.jpg" ] \
+    || fail "overlay did not copy background.jpg"
+[ ! -e "$merge_tmp/theme/Main.qml" ] \
+    || fail "overlay copied Main.qml (write_qml owns that)"
+[ ! -e "$merge_tmp/theme/zz-omarchy-sddm.conf" ] \
+    || fail "overlay copied the drop-in conf into the theme dir"
+export MONARCHY_MISC="$MISC"
+rm -rf "$overlay_misc"
+unset MONARCHY_SDDM_SYS_CONF_DIR MONARCHY_SDDM_USER_CONF_DIR \
+    MONARCHY_SDDM_LEGACY_CONF MONARCHY_SDDM_CONF MONARCHY_SDDM_THEME_DIR
+trap - EXIT
+cleanup_merge
+cleanup_merge() { :; }
 
 CLONE="${MONARCHY_SRC:-/usr/local/src/monarchy/omarchy}"
 if [ -d "$CLONE/default/sddm/omarchy" ] && [ -f "$CLONE/themes/osaka-jade/unlock.png" ]; then
