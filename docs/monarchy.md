@@ -375,8 +375,7 @@ Install-script denylist (never invoked by the bridge, even if a binary of the sa
 - `install/hardware/network.sh`
 - `install/hardware/fix-tuxedo-backlight.sh`
 - `install/hardware/pacman.sh`
-- `install/user/mise.sh`
-- `install/user/all.sh` (would run mise). PR 4b calls `theme.sh`, `git.sh`, `xcompose.sh` individually.
+- `install/user/all.sh` (would also run hardware/first-run we do not want). User setup calls `omarchy-refresh-applications`, which runs `install/user/mise.sh` for agent CLI stubs.
 
 `install/config/lockscreen-pam.sh` is invoked as overlay `omarchy-apply-lock` from `monarchy_apply_lock`.
 
@@ -669,7 +668,7 @@ Exec=uwsm start -g -1 -e -D Hyprland hyprland.desktop
 
 ### `/usr/share/uwsm/env.d/10-monarchy`
 
-Shipped in PR 4a. Literal paths only: env-bootstrap reads `/etc/omarchy.conf` itself, so this file must not use `$OMARCHY_PATH` before that happens. Do not activate mise. User `TERMINAL=ghostty` comes from `~/.config/uwsm/env.d` (PR 4b), which UWSM loads after system `env.d`.
+Shipped in PR 4a. Literal paths only: env-bootstrap reads `/etc/omarchy.conf` itself, so this file must not use `$OMARCHY_PATH` before that happens. Activates mise shims. Default terminal is Omarchy's `TERMINAL=xdg-terminal-exec` from `default/uwsm/default`.
 
 ```bash
 # /usr/share/uwsm/env.d/10-monarchy
@@ -754,7 +753,7 @@ Sources compared:
 | bash vs fish + `cachyos-fish-config` | Dieuwe fish, family bash | major | Do not change login shells. Do not install Omarchy bashrc into `/etc/skel` |
 | CachyOS shell config. #650 says remove it | Dieuwe | major | Keep the package. Do not follow #650 |
 | `omarchy-nvim` vs `chezmoi/dot_config/nvim` | Dieuwe chezmoi | major | Install `omarchy-nvim` as its own app. Do not overwrite `~/.config/nvim` |
-| `mise-bin` + `install/user/mise.sh` vs uv/pnpm/bun/pipx + curl-installed grok/opencode | Dieuwe | major | Allow `mise-bin`. Menu `omarchy-mise-install` can own agent CLIs going forward |
+| `mise-bin` + `install/user/mise.sh` vs uv/pnpm/pipx + curl-installed grok/opencode | Dieuwe | major | Allow `mise-bin`. User setup runs `omarchy-refresh-applications` (mise stubs). `setup-packages.sh` uninstalls competing copies |
 | Plymouth hook vs current mkinitcpio | Dieuwe HOOKS | major | plymouth **after** zfs only. Never `plymouth-zfs` |
 | Stock Omarchy greeter is last-user + uwsm-only | Omarchy | major | Overlay `misc/monarchy/sddm/Main.qml` (Tab user, Up/Down session, family defaults Plasma) |
 | `xdg-desktop-portal-hyprland` vs kde | both | major | Install both. Session-scoped `XDG_CURRENT_DESKTOP` |
@@ -771,7 +770,7 @@ Sources compared:
 | starship, nvim, docker, docker-compose, kdenlive, obsidian, libreoffice-fresh, wl-clipboard, ufw, ghostty | both | minor | `--needed`. Keep Dieuwe's ghostty chezmoi config |
 | chromium vs `google-chrome` | both | minor | Install chromium for Omarchy keybinds. Keep google-chrome. Do not change Plasma default browser |
 | mpv vs vlc | both | minor | Install mpv. Keep vlc |
-| foot vs ghostty | Dieuwe terminals | minor | Install foot (Omarchy `xdg-terminal-exec` list). Set Dieuwe's Omarchy default terminal to **ghostty** in PR 4b via `~/.config/uwsm/env.d` `TERMINAL=ghostty`. Ghostty is his daily driver; foot remains installed so stock keybinds do not 404 |
+| foot vs ghostty | Omarchy terminal | minor | Install both. Default terminal is Omarchy's (`xdg-terminal-exec`). Do not write `~/.config/uwsm/env.d/20-monarchy-terminal` |
 | pipewire, wireplumber, power-profiles-daemon | present | minor | No-op |
 | cups / avahi | Omarchy enable-services | minor | Do not run enable-services.sh |
 | `kernel-modules-hook` | Omarchy | minor | Denied |
@@ -950,7 +949,7 @@ Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZBM, or clone+promote
 
 2. **Per-user greeter session: static default vs last-used?** SDDM's `RememberLastSession` is global (`state.conf` `[Last] Session=`). The overlay therefore hardcodes amie/olivier → Plasma and everyone else → Omarchy, and ignores `sessionModel.lastIndex`. Apply still writes AccountsService `Session=`, but the greeter does not read it. Remembering last session per user would be a Monarchy hook, not an SDDM feature, and would also remember an accidental Omarchy login for family. Dieuwe to review. Leave the static overlay defaults until then.
 
-Everything else that used to live here is a Key Decision: clone path, SigLevel, overlay-bin, Plymouth after zfs, foot vs ghostty, family sees Omarchy, both CachyOS ZFS packages stay.
+Everything else that used to live here is a Key Decision: clone path, SigLevel, overlay-bin, Plymouth after zfs, Omarchy default terminal, family sees Omarchy, both CachyOS ZFS packages stay.
 
 ---
 
@@ -1004,7 +1003,7 @@ Everything else that used to live here is a Key Decision: clone path, SigLevel, 
 
 15. **Hyprland and Quickshell come from CachyOS first-match, not from `[omarchy]`.** The lockfile records those versions next to the clone commit. `--update` fails if the fork requires a newer compositor ABI than CachyOS ships. `[omarchy]` stable leaves are not required to match quattro-on-zfs tip.
 
-16. **Dieuwe's Omarchy default terminal is ghostty.** foot is still installed for stock Omarchy `xdg-terminal-exec`. Family sees the Omarchy greeter with their name and Plasma selected; Tab/Up/Down if that is wrong.
+16. **Omarchy owns the default terminal.** `xdg-terminal-exec` / `omarchy-default-terminal`. Do not write a Monarchy `TERMINAL=` override. Ghostty stays installed. Family sees the Omarchy greeter with their name and Plasma selected; Tab/Up/Down if that is wrong.
 
 17. **CachyOS Calamares always installs both `linux-cachyos-zfs` and `zfs-dkms`.** Dotfiles assume both. Do not pick one. Do not add archzfs.
 
@@ -1047,7 +1046,7 @@ Each PR is independently reviewable and mergeable. Later PRs must not be require
 ### PR 4b: Dieuwe user config, first-run suppression
 
 - **Title:** Seed Dieuwe's Hyprland config and suppress omarchy-provision-first-run
-- **Files/components:** copy `config/hypr/*` into Dieuwe `~/.config/hypr/`, `~/.config/omarchy/branding/`, `~/.config/uwsm/env.d` (`TERMINAL=ghostty`), `~/.local/state/omarchy/first-run-user` marker, call `install/user/{theme,git,xcompose}.sh` only, `docs/monarchy-install.md` filled in
+- **Files/components:** copy `config/hypr/*` into Dieuwe `~/.config/hypr/`, `~/.config/omarchy/branding/`, no `TERMINAL=` override, `~/.local/state/omarchy/first-run-user` marker, call `install/user/{theme,git,xcompose}.sh` plus `omarchy-refresh-applications`, `docs/monarchy-install.md` filled in
 - **Dependencies:** PR 4a
 - **Description:** Makes the session a real desktop for Dieuwe. Stubs already block `omarchy-provision-first-run`; the marker is belt and braces. No mimeapps.list in `~/.config`. No family home changes.
 
