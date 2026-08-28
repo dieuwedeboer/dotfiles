@@ -34,7 +34,7 @@ Any machine that already ran `scripts/install.sh` (CachyOS, encrypted ZFS, KDE P
 - Register `/usr/share/wayland-sessions/omarchy.desktop` (`TryExec=uwsm`, `DesktopNames=Hyprland`). Exec is the real `uwsm start … hyprland.desktop` once that file exists, otherwise the session probe
 - Install `/usr/share/uwsm/env.d/10-monarchy` (stock 10-omarchy with the working-prefix bootstrap + mise) and Hyprland portal defaults if missing
 - Install omarchy-settings files (`etc/` drop-ins, user systemd units, fontconfig, icons) minus `misc/monarchy/settings.skip`. Enable cups/avahi/docker.socket/oomd when the units exist. Seed chromium native hosts, gnome-keyring, gtk theme, and user units
-- Seed `~/.config/hypr/*` (no overwrite), branding (`screensaver.txt` from clone `logo.txt`, `about.txt` from `icon.txt`), `TERMINAL=ghostty`. `omarchy-provision-user` is allowed for a later finalize
+- Seed `~/.config/hypr/*` (no overwrite), branding (`screensaver.txt` from clone `logo.txt`, `about.txt` from `icon.txt`). Do not override `TERMINAL`. Run `omarchy-refresh-applications` (mise agent stubs + webapps), `omarchy-pkg-add spotify`, and `mise use -g bun`. `omarchy-provision-user` is allowed for a later finalize
 - Run `omarchy-apply-lock` so `/etc/pam.d/omarchy-lock-password` exists. Super+Ctrl+L is a no-op without it (`lock-denied: missing-pam`). SDDM staying up after login is expected; it is not the locker
 - Enable `sddm.service`, remove `plasma-login-manager`, install `/etc/sddm.conf.d/99-omarchy-sddm.conf` and the Omarchy greeter with the multi-user `Main.qml` overlay
 - Install `/usr/local/bin/monarchy-switch-user`, overlay Super+Ctrl+U onto the lock screen and System menu, and seed the Hyprland bind. Family uses that chord on the lock screen to reach SDDM without the locked user's password
@@ -58,6 +58,7 @@ Overlay unit test (no sudo):
 ```bash
 ./scripts/lib/monarchy/test-overlay.sh /tmp/quattro-on-zfs
 ./scripts/lib/monarchy/test-branding.sh
+./scripts/lib/monarchy/test-user.sh
 ./scripts/lib/monarchy/test-lock.sh
 ./scripts/lib/monarchy/test-switch-user.sh
 ./scripts/lib/monarchy/test-logind.sh

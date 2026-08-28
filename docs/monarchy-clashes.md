@@ -25,7 +25,10 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 | `tldr` vs `tealdeer` | Deny `tldr` |
 | `yay` vs `paru` | Deny `yay`. Overlay `yay` execs `paru` |
 | bash vs fish | Do not change login shells |
-| `mise-bin` | Allow. Omarchy menu can install it; curl-bash agents can migrate onto mise |
+| `mise-bin` | Allow. User setup runs `omarchy-refresh-applications` (mise stubs for grok, opencode, gh, …). `setup-packages.sh` uninstalls curl-pipe grok/opencode, pacman `bun`/`github-cli`/`opencode`, and the Spotify/Discord flatpaks |
+| Default terminal | Omarchy `xdg-terminal-exec`. Apply removes `~/.config/uwsm/env.d/20-monarchy-terminal` |
+| Spotify | Omarchy `omarchy-pkg-add spotify` (`/usr/bin/spotify`). Not the Flathub client |
+| Discord | Omarchy webapp `.desktop`. Not the Flathub client |
 | Nautilus vs Dolphin | Install nautilus. No user-global mimeapps |
 | `ufw-docker` | Deny. Never run `firewall.sh` |
 | NVIDIA 580xx-dkms vs `chwd` | Never run Omarchy `nvidia.sh` |

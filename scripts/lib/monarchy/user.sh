@@ -37,14 +37,30 @@ monarchy_seed_branding() {
     monarchy_copy_if_missing "$MONARCHY_SRC/icon.txt" "$dest/about.txt"
 }
 
-monarchy_seed_uwsm_user_env() {
+monarchy_clear_terminal_override() {
     local dest="$HOME/.config/uwsm/env.d/20-monarchy-terminal"
-    mkdir -p "$(dirname "$dest")"
     if [ -f "$dest" ]; then
-        return 0
+        rm -f "$dest"
+        monarchy_log "removed $dest (Omarchy owns the default terminal)"
     fi
-    printf 'export TERMINAL=ghostty\n' >"$dest"
-    monarchy_log "wrote $dest"
+}
+
+# Webapp launchers, mise agent stubs, and the tools that used to be competing
+# copies in setup-packages.sh (Spotify flatpak, pacman bun, curl grok/opencode).
+monarchy_user_omarchy_defaults() {
+    export OMARCHY_PATH
+    export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
+    if [ -x "$MONARCHY_PATH/bin/omarchy-refresh-applications" ]; then
+        omarchy-refresh-applications
+    elif [ -f "$MONARCHY_SRC/install/user/mise.sh" ]; then
+        bash "$MONARCHY_SRC/install/user/mise.sh"
+    fi
+    if command -v omarchy-pkg-add >/dev/null 2>&1; then
+        omarchy-pkg-add spotify || monarchy_log "warning: omarchy-pkg-add spotify failed"
+    fi
+    if command -v mise >/dev/null 2>&1; then
+        mise use -g bun@latest || monarchy_log "warning: mise bun failed"
+    fi
 }
 
 monarchy_mark_first_run_done() {
@@ -120,7 +136,8 @@ monarchy_setup_user() {
     monarchy_seed_switch_user_bind
     monarchy_seed_kwallet_autostart
     monarchy_seed_branding
-    monarchy_seed_uwsm_user_env
+    monarchy_clear_terminal_override
+    monarchy_user_omarchy_defaults
     monarchy_user_xcompose
     monarchy_user_git
     monarchy_user_theme

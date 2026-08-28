@@ -27,18 +27,8 @@ starship init fish | source
 # direnv
 direnv hook fish | source
 
-# opencode
-fish_add_path ~/.opencode/bin
-
-# bun global packages
-fish_add_path ~/.bun/bin
-
 # composer
 fish_add_path ~/.config/composer/vendor/bin
 
 # local exports and overrides
 source ~/.config/fish/local.fish
-
-# >>> grok installer >>>
-fish_add_path $HOME/.grok/bin
-# <<< grok installer <<<
