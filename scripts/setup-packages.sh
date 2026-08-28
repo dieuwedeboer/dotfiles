@@ -9,7 +9,6 @@ PACMAN_PACKAGES=(
     discover
     flatpak
     obsidian
-    emacs
     nvim
     vlc
     qbittorrent
@@ -53,9 +52,11 @@ FLATPAK_PACKAGES=(
 )
 
 # Omarchy (via setup-monarchy.sh) owns these: mise stubs for grok/opencode/gh/bun,
-# native Spotify, Discord webapp. Do not reinstall the competing copies.
+# native Spotify, Discord webapp, omarchy-emacs (emacs-wayland). Do not reinstall
+# the competing copies.
 OMARCHY_OWNED_PACMAN=(
     bun
+    emacs
     github-cli
     opencode
 )

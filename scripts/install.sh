@@ -78,20 +78,6 @@ fi
 echo "=== Configuring rEFInd theme ==="
 "$SCRIPT_DIR/setup-refind-theme.sh"
 
-echo "=== Symlinking emacs configuration ==="
-if [ ! -L "$HOME/.emacs.d" ]; then
-    if [ -d "$HOME/.emacs.d" ]; then
-        echo "Moving existing emacs.d to ~/.emacs.d.bk..."
-        mv "$HOME/.emacs.d" "$HOME/.emacs.d.bk"
-    fi
-    echo "Linking emacs config..."
-    ln -s "$DOTFILES_DIR/emacs" "$HOME/.emacs.d"
-else
-    echo "Emacs config already linked."
-fi
-
-
-
 echo "=== Enabling services ==="
 if command -v systemctl &> /dev/null; then
     if ! systemctl is-enabled docker.socket &> /dev/null; then
