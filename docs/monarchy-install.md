@@ -32,8 +32,9 @@ Any machine that already ran `scripts/install.sh` (CachyOS, encrypted ZFS, KDE P
 - Recv and locally sign Omarchy packaging key `40DFB630FF42BCFFB047046CF0134EE680CAC571` (prompts once; later runs skip). Append `[omarchy]` after CachyOS repos (`SigLevel = Required DatabaseOptional`) and install `omarchy-keyring`
 - Install filtered leaf packages (`omarchy-base.packages` minus `packages.deny`). Hyprland and Quickshell come from CachyOS first-match
 - Register `/usr/share/wayland-sessions/omarchy.desktop` (`TryExec=uwsm`, `DesktopNames=Hyprland`). Exec is the real `uwsm start … hyprland.desktop` once that file exists, otherwise the session probe
-- Install `/usr/share/uwsm/env.d/10-monarchy` and Hyprland portal defaults if missing
-- Seed `~/.config/hypr/*` (no overwrite), branding (`screensaver.txt` from clone `logo.txt`, `about.txt` from `icon.txt`), `TERMINAL=ghostty`, and the first-run-done marker so `omarchy-provision-first-run` no-ops
+- Install `/usr/share/uwsm/env.d/10-monarchy` (stock 10-omarchy with the working-prefix bootstrap + mise) and Hyprland portal defaults if missing
+- Install omarchy-settings files (`etc/` drop-ins, user systemd units, fontconfig, icons) minus `misc/monarchy/settings.skip`. Enable cups/avahi/docker.socket/oomd when the units exist. Seed chromium native hosts, gnome-keyring, gtk theme, and user units
+- Seed `~/.config/hypr/*` (no overwrite), branding (`screensaver.txt` from clone `logo.txt`, `about.txt` from `icon.txt`), `TERMINAL=ghostty`. `omarchy-provision-user` is allowed for a later finalize
 - Run `omarchy-apply-lock` so `/etc/pam.d/omarchy-lock-password` exists. Super+Ctrl+L is a no-op without it (`lock-denied: missing-pam`). SDDM staying up after login is expected; it is not the locker
 - Enable `sddm.service`, remove `plasma-login-manager`, install `/etc/sddm.conf.d/99-omarchy-sddm.conf` and the Omarchy greeter with the multi-user `Main.qml` overlay
 - Install `/usr/local/bin/monarchy-switch-user`, overlay Super+Ctrl+U onto the lock screen and System menu, and seed the Hyprland bind. Family uses that chord on the lock screen to reach SDDM without the locked user's password
@@ -62,6 +63,7 @@ Overlay unit test (no sudo):
 ./scripts/lib/monarchy/test-logind.sh
 ./scripts/lib/monarchy/test-sddm.sh
 ./scripts/lib/monarchy/test-splash.sh
+./scripts/lib/monarchy/test-settings.sh
 ```
 
 ## Rollback
@@ -85,7 +87,7 @@ After reboot:
 3. Log out. Plasma still starts for a family account (or for you).
 4. `grep '^\[omarchy\]' -n /etc/pacman.conf` is after `[cachyos]`. `/etc/os-release` still `ID=cachyos`.
 5. `omarchy-refresh-pacman` prints `monarchy: blocked` and exits 2.
-6. `pacman -Q sddm` succeeds. `systemctl is-enabled sddm` is enabled. `pacman -Q plasma-login-manager` fails. `/etc/sddm.conf.d/99-omarchy-sddm.conf` sets `Current=omarchy`. Greeter `Main.qml` uses the current Omarchy theme colours and `unlock.png`, not stock `#1a1b26`.
+6. `pacman -Q sddm` succeeds. `systemctl is-enabled sddm` is enabled. `pacman -Q plasma-login-manager` fails. `/etc/sddm.conf.d/99-omarchy-sddm.conf` sets `Current=omarchy`. Greeter `Main.qml` is the multi-user overlay on stock Unlock (`#1a1b26`) unless Style > Unlock has already restyled plymouth.
 7. `/etc/pam.d/omarchy-lock-password` exists. Super+Ctrl+L locks the Omarchy session.
 8. Super+Ctrl+U (System menu too) locks if needed and returns to SDDM. The same chord on the lock screen is the family breakout. It does not need the locked user's password.
 9. `~/.config/omarchy/branding/screensaver.txt` exists (Omarchy wordmark). Super+Esc → Screensaver shows it; a key dismisses it. `$OMARCHY_PATH/logo.txt` is a symlink so _Style > Screensaver > Restore Default_ works.

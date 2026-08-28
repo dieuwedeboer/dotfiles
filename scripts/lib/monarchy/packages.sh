@@ -39,7 +39,7 @@ monarchy_install_packages() {
     [ "${#pkgs[@]}" -gt 0 ] || monarchy_die "filtered package list is empty"
 
     local denied
-    for denied in plasma-login-manager tldr yay mise-bin snapper limine omarchy omarchy-dev omarchy-settings omarchy-settings-dev; do
+    for denied in plasma-login-manager tldr snapper limine omarchy omarchy-dev omarchy-settings omarchy-settings-dev; do
         if monarchy_in_list "$denied" "${pkgs[@]}"; then
             monarchy_die "denied package $denied leaked into install set"
         fi

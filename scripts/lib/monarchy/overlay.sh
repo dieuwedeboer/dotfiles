@@ -76,6 +76,10 @@ monarchy_rebuild_overlay() {
             wrap_stub=$(monarchy_wrap_stub_for "$name")
             monarchy_sudo install -m 755 "$wrap_stub" "/usr/local/bin/$name"
         done
+        for name in "${MONARCHY_BIN_ALLOW[@]}"; do
+            [ -e "$src_bin/$name" ] || monarchy_die "allowlisted $name missing from clone bin/"
+            monarchy_sudo ln -sfn "$src_bin/$name" "/usr/local/bin/$name"
+        done
         monarchy_sudo ln -sfn "$MONARCHY_SETUP" /usr/local/bin/setup-monarchy
     fi
 }

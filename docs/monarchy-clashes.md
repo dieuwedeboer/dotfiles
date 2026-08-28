@@ -25,7 +25,7 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 | `tldr` vs `tealdeer` | Deny `tldr` |
 | `yay` vs `paru` | Deny `yay`. Overlay `yay` execs `paru` |
 | bash vs fish | Do not change login shells |
-| `mise-bin` | Deny. Skip `mise.sh` |
+| `mise-bin` | Allow. Omarchy menu can install it; curl-bash agents can migrate onto mise |
 | Nautilus vs Dolphin | Install nautilus. No user-global mimeapps |
 | `ufw-docker` | Deny. Never run `firewall.sh` |
 | NVIDIA 580xx-dkms vs `chwd` | Never run Omarchy `nvidia.sh` |
@@ -34,15 +34,15 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 
 ## `packages.deny`
 
-See `misc/monarchy/packages.deny`. Hard list includes `plasma-login-manager`, `tldr`, `yay`, `mise-bin`, `ufw-docker`, `snapper`, `limine*`, stock `linux`/`linux-headers`, NVIDIA dkms variants, `omarchy`/`omarchy-dev`/`omarchy-settings*`, `kernel-modules-hook`, `btrfs-progs`, `zram-generator`.
+See `misc/monarchy/packages.deny`. Curated bricks only: two DMs (`plasma-login-manager`), metapackages (`omarchy` / `omarchy-settings*`), Limine, Snapper, stock `linux`/`linux-ptl*`, plus `tldr` (tealdeer). `yay` is allowed; overlay `yay` still execs `paru` when an Omarchy script calls it from session PATH.
 
 ## Overlay bin
 
 - `misc/monarchy/bin.allow` — symlink to clone `bin/<name>`
-- `misc/monarchy/bin.wrap` — `omarchy-update` and `omarchy-update-system-pkgs` call `setup-monarchy.sh --update`. Plymouth write-path names skip Limine and restyle the SDDM greeter from Monarchy `Main.qml`. `omarchy-refresh-sddm` copies the clone theme then overlays that QML. Apply restyles the greeter from `theme.name` even when plymouth already matches.
-- `misc/monarchy/bin.deny` — stub, exit 2. Also installed under `/usr/local/bin` on apply
+- `misc/monarchy/bin.wrap` — `omarchy-update` and `omarchy-update-system-pkgs` call `setup-monarchy.sh --update`. Plymouth write-path names skip Limine and restyle the SDDM greeter from Monarchy `Main.qml`. `omarchy-refresh-sddm` copies the clone theme then overlays that QML (Unlock default). Apply then follows Style > Unlock if plymouth is already a named theme; the session theme does not restyle the greeter.
+- `misc/monarchy/bin.deny` — brick list only (pacman.conf, Limine, ISO provisioner, factory reset, dataset upgrade). Stub, exit 2. Also installed under `/usr/local/bin` on apply.
 
-`omarchy` itself is allowlisted (CLI router). `omarchy-refresh-pacman` is deny, not a wrap.
+Omarchy-first: `generate-inventories.py` allows every other `clone/bin` name, including `omarchy-install-*` and `omarchy-pkg-*`. Apply installs the omarchy-settings file tree via `settings.skip` (same idea as [omarchy-on-cachyos](https://github.com/mroboff/omarchy-on-cachyos) deleting installer steps). `omarchy` itself is the CLI router. `omarchy-refresh-pacman` stays deny, not a wrap.
 
 Regenerate after a lock bump:
 

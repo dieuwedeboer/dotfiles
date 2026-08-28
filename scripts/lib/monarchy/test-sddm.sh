@@ -66,14 +66,22 @@ grep -q 'monarchy_refresh_sddm' "$SCRIPT_DIR/splash.sh" \
     || fail "plymouth-reset / splash does not refresh SDDM"
 
 refresh_body=$(awk '/^monarchy_refresh_sddm\(\)/,/^monarchy_keep_sddm\(\)/' "$SCRIPT_DIR/sddm.sh")
-echo "$refresh_body" | grep -q 'monarchy_sddm_apply_current_theme' \
+echo "$refresh_body" | grep -q 'monarchy_sddm_follow_unlock' \
     && fail "monarchy_refresh_sddm must stay stock overlay (Unlock default)"
+echo "$refresh_body" | grep -q 'monarchy_sddm_apply_theme' \
+    && fail "monarchy_refresh_sddm must stay stock overlay (Unlock default)"
+if grep -q 'current/theme.name' "$SCRIPT_DIR/sddm.sh"; then
+    fail "sddm.sh still restyles the greeter from the session theme"
+fi
+if grep -q 'current/theme.name' "$SCRIPT_DIR/splash.sh"; then
+    fail "splash.sh still restyles Unlock from the session theme"
+fi
 
 maybe_body=$(awk '/^monarchy_splash_maybe_theme\(\)/,/^monarchy_splash\(\)/' "$SCRIPT_DIR/splash.sh")
-echo "$maybe_body" | grep -q 'monarchy_sddm_apply_current_theme' \
-    || fail "splash_maybe_theme does not restyle SDDM when plymouth already matches"
-echo "$maybe_body" | grep -q 'cmp -s' \
-    || fail "splash_maybe_theme no longer detects a matching plymouth logo"
+echo "$maybe_body" | grep -q 'monarchy_sddm_follow_unlock' \
+    || fail "splash_maybe_theme does not follow Style > Unlock"
+echo "$maybe_body" | grep -q 'plymouth-set-by-theme' \
+    && fail "splash_maybe_theme still applies desktop theme to plymouth"
 
 [ -f "$SCRIPT_DIR/stubs/wrap-sddm.sh" ] || fail "missing wrap-sddm.sh"
 grep -q 'omarchy-refresh-sddm' "$SCRIPT_DIR/overlay.sh" \
@@ -122,39 +130,51 @@ EOF
         "$CLONE/default/sddm/omarchy/logo.png" \
         || fail "refresh_sddm should keep the stock clone logo"
 
-    # Apply copies stock SDDM after plymouth is already this theme. The
-    # maybe_theme early-return used to skip the greeter in that case.
+    # Desktop theme.name is osaka-jade/jade-test, Unlock is still default.
+    # Stock Omarchy does not restyle the greeter from the session theme.
+    : >"$MONARCHY_PLYMOUTH_THEME_DIR/omarchy.plymouth"
+    cp "$CLONE/default/plymouth/logo.png" "$MONARCHY_PLYMOUTH_THEME_DIR/logo.png"
+    monarchy_splash_maybe_theme
+    grep -q '#1a1b26' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
+        || fail "maybe_theme restyled stock Unlock from desktop theme.name"
+    grep -q '#111c18' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
+        && fail "maybe_theme applied jade colours while Unlock is default"
+    cmp -s "$MONARCHY_SDDM_THEME_DIR/logo.png" \
+        "$CLONE/default/sddm/omarchy/logo.png" \
+        || fail "maybe_theme replaced the stock greeter logo while Unlock is default"
+
+    # Re-apply recopies stock SDDM after Style > Unlock already set plymouth.
     rm -rf "$MONARCHY_SDDM_THEME_DIR"
     mkdir -p "$MONARCHY_SDDM_THEME_DIR"
     cp -a "$CLONE/default/sddm/omarchy/." "$MONARCHY_SDDM_THEME_DIR/"
     install -m 644 "$MISC/sddm/Main.qml" "$MONARCHY_SDDM_THEME_DIR/Main.qml"
-    : >"$MONARCHY_PLYMOUTH_THEME_DIR/omarchy.plymouth"
     cp "$HOME/.config/omarchy/themes/jade-test/unlock.png" \
         "$MONARCHY_PLYMOUTH_THEME_DIR/logo.png"
     cmp -s "$HOME/.config/omarchy/themes/jade-test/unlock.png" \
         "$MONARCHY_PLYMOUTH_THEME_DIR/logo.png" \
-        || fail "setup: plymouth logo should already match the theme"
+        || fail "setup: plymouth logo should already match Unlock"
     grep -q '#1a1b26' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
         || fail "setup: stock overlay QML missing #1a1b26"
 
     monarchy_splash_maybe_theme
     grep -q '#111c18' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        || fail "maybe_theme skipped SDDM because plymouth already matched"
+        || fail "maybe_theme did not follow Unlock after a stock greeter copy"
     grep -q '#1a1b26' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        && fail "maybe_theme left stock #1a1b26 on a matching plymouth"
+        && fail "maybe_theme left stock #1a1b26 on a themed Unlock"
     cmp -s "$MONARCHY_SDDM_THEME_DIR/logo.png" \
         "$HOME/.config/omarchy/themes/jade-test/unlock.png" \
-        || fail "maybe_theme did not copy the theme unlock logo"
+        || fail "maybe_theme did not copy the Unlock logo"
 
     export HOME="$tmp/home-empty"
     mkdir -p "$HOME"
     rm -rf "$MONARCHY_SDDM_THEME_DIR"
+    cp "$CLONE/default/plymouth/logo.png" "$MONARCHY_PLYMOUTH_THEME_DIR/logo.png"
     monarchy_refresh_sddm
-    monarchy_sddm_apply_current_theme
+    monarchy_sddm_follow_unlock
     grep -q '#1a1b26' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        || fail "apply_current_theme without theme.name should leave stock tokens"
+        || fail "follow_unlock on default plymouth should leave stock tokens"
     grep -q '#111c18' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        && fail "apply_current_theme without theme.name restyled the greeter"
+        && fail "follow_unlock on default plymouth restyled the greeter"
 else
     echo "test-sddm: skip live theme restyle (no $CLONE/default/sddm/omarchy)" >&2
 fi

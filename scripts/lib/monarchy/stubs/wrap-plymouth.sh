@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Overlay wrapper for plymouth write-path binaries. Skips Limine.
-# SDDM greeter is restyled from the Monarchy Main.qml overlay.
+# plymouth-set restyles the Monarchy Main.qml overlay (Style > Unlock).
 set -e
 name=$(basename -- "$0")
 setup=${MONARCHY_SETUP:-/usr/local/bin/setup-monarchy}

@@ -1,0 +1,13 @@
+# Clone-relative paths that brick CachyOS+ZFS+KDE. Same idea as
+# omarchy-on-cachyos deleting installer steps. Everything else under etc/
+# and the selected default/ trees is installed.
+etc/mkinitcpio.conf.d/omarchy_hooks.conf
+etc/limine-entry-tool.d/omarchy-defaults.conf
+etc/limine-entry-tool.d/omarchy-uki.conf
+etc/sddm.conf.d/10-theme.conf
+etc/sddm.conf.d/10-wayland.conf
+etc/nsswitch.conf
+etc/profile.d/omarchy.sh
+default/applications/mimeapps.list
+default/systemd/zram-generator.conf.d/90-omarchy.conf
+default/wayland-sessions/omarchy.desktop

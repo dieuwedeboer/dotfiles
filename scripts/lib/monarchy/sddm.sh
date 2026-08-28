@@ -1,6 +1,7 @@
 # shellcheck shell=bash
-# SDDM as the household greeter. Omarchy theme, Monarchy Main.qml overlay.
-# Never autologin. Never leave plasma-login-manager installed next to sddm.
+# SDDM as the household greeter. Stock Omarchy theme + Unlock, Monarchy Main.qml
+# overlay for multi-user. Never autologin. Never leave plasma-login-manager
+# installed next to sddm. The session theme does not restyle the greeter.
 
 MONARCHY_SDDM_THEME_DIR="${MONARCHY_SDDM_THEME_DIR:-/usr/share/sddm/themes/omarchy}"
 MONARCHY_SDDM_CONF="${MONARCHY_SDDM_CONF:-/etc/sddm.conf.d/99-omarchy-sddm.conf}"
@@ -163,14 +164,38 @@ monarchy_current_theme_dir() {
     printf '%s\n' "$theme_dir"
 }
 
-# Restyle the greeter from ~/.local/state/omarchy/current/theme.name.
-# Does not rebuild initramfs. No-op when no theme is selected.
-monarchy_sddm_apply_current_theme() {
-    local name_file="$HOME/.local/state/omarchy/current/theme.name"
-    local theme theme_dir colors bg_hex text_hex src_ply staging_dir asset dest
-    [ -s "$name_file" ] || return 0
-    theme=$(cat "$name_file")
-    [ -n "$theme" ] || return 0
+# Which Style > Unlock theme is installed in plymouth, or "default".
+# Does not consult the session theme. Stock Omarchy keeps those independent.
+monarchy_unlock_theme_name() {
+    local ply_logo=$MONARCHY_PLYMOUTH_THEME_DIR/logo.png
+    local default_logo="${OMARCHY_PATH:-$MONARCHY_PATH}/default/plymouth/logo.png"
+    local dir
+    [ -f "$default_logo" ] || default_logo="$MONARCHY_SRC/default/plymouth/logo.png"
+    if [ ! -f "$ply_logo" ]; then
+        printf '%s\n' default
+        return 0
+    fi
+    if [ -f "$default_logo" ] && cmp -s "$ply_logo" "$default_logo"; then
+        printf '%s\n' default
+        return 0
+    fi
+    for dir in "$HOME/.config/omarchy/themes"/* "${OMARCHY_PATH:-$MONARCHY_PATH}/themes"/*; do
+        [ -f "$dir/unlock.png" ] || continue
+        [ ! -L "$dir/unlock.png" ] || continue
+        if cmp -s "$ply_logo" "$dir/unlock.png"; then
+            basename "$dir"
+            return 0
+        fi
+    done
+    printf '%s\n' default
+}
+
+# Restyle the greeter from a named theme's unlock.png + colors.toml.
+# Does not rebuild initramfs. No-op when the theme cannot restyle.
+monarchy_sddm_apply_theme() {
+    local theme=$1
+    local theme_dir colors bg_hex text_hex src_ply staging_dir asset dest
+    [ -n "$theme" ] && [ "$theme" != "default" ] || return 0
     theme_dir=$(monarchy_current_theme_dir "$theme")
     [ -f "$theme_dir/unlock.png" ] || return 0
     [ ! -L "$theme_dir/unlock.png" ] || return 0
@@ -207,7 +232,15 @@ monarchy_sddm_apply_current_theme() {
     fi
     monarchy_sddm_sync_assets "$staging_dir" "$bg_hex" "$text_hex"
     rm -rf "$staging_dir"
-    monarchy_log "SDDM greeter synced to theme $theme"
+    monarchy_log "SDDM greeter synced to Unlock $theme"
+}
+
+# After a stock greeter copy, match Style > Unlock. Leave default Unlock alone.
+monarchy_sddm_follow_unlock() {
+    local theme
+    theme=$(monarchy_unlock_theme_name)
+    [ "$theme" != "default" ] || return 0
+    monarchy_sddm_apply_theme "$theme"
 }
 
 monarchy_refresh_sddm() {

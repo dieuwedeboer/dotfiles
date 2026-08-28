@@ -286,7 +286,7 @@ If the fork stalls, re-pin or temporarily track `basecamp/omarchy` `quattro` for
 
 ### Overlay bin (runtime control plane)
 
-Named functions are the *setup-time* contract. The overlay is the *runtime* contract. quattro-on-zfs `bin/` has **438** executables. Session PATH must not default-allow that tree.
+Named functions are the *setup-time* contract. The overlay is the *runtime* contract. quattro-on-zfs `bin/` has **438** executables. Omarchy-first: allow every name except a short brick list (pacman.conf, Limine, ISO provisioner, factory reset). Same idea as [omarchy-on-cachyos](https://github.com/mroboff/omarchy-on-cachyos) deleting installer steps.
 
 `bin/omarchy` is the CLI router (`docs/cli-router.md`): `OMARCHY_BIN_DIR=$(dirname of this script)`, then `omarchy theme set` execs `$OMARCHY_BIN_DIR/omarchy-theme-set`. The overlay **must symlink clone `bin/omarchy`**. Wrapping `omarchy` as `--update` would break every spaced command (`omarchy menu`, `omarchy font set`, `omarchy update` dispatch). `omarchy update` (two words) is the router calling `omarchy-update`. Only that binary is wrapped.
 
@@ -296,9 +296,9 @@ Three checked-in inventories, complete at the pinned commit (`allow ∪ wrap ∪
 | --- | --- | --- |
 | `misc/monarchy/bin.allow` | Exact filenames, one per line. No globs | Symlink to clone `bin/<name>` |
 | `misc/monarchy/bin.wrap` | Exact filenames | Install a wrapper, not the clone binary |
-| `misc/monarchy/bin.deny` | Everything else (implicit deny) | Stub, exit 2, log |
+| `misc/monarchy/bin.deny` | Brick list only | Stub, exit 2, log |
 
-PR 2 generates `bin.deny` as the complement of `bin.allow` ∪ `bin.wrap` at the lock commit and checks the three files in. Prose categories below are not the source of truth; the files are.
+`generate-inventories.py` allows every clone `bin/` name that is not wrap or brick. The three files still partition the lock commit.
 
 `monarchy_rebuild_overlay`:
 
@@ -306,14 +306,14 @@ PR 2 generates `bin.deny` as the complement of `bin.allow` ∪ `bin.wrap` at the
 2. For each name in `bin.deny`, install a stub of the same filename (exit 2, log to `/var/log/monarchy-setup.log`).
 3. For each name in `bin.allow`, symlink to `/usr/local/src/monarchy/omarchy/bin/<name>`.
 4. For each name in `bin.wrap`, install the Monarchy wrapper.
-5. Install **deny stubs and wrap names also as `/usr/local/bin/<name>`** (mode 0755) so `sudo omarchy-refresh-pacman` cannot hit a clone binary. Arch `secure_path` includes `/usr/local/bin`. Do not install allowlisted binaries into `/usr/local/bin`.
+5. Install deny stubs, wrap names, **and allowlisted names** as `/usr/local/bin/<name>` so systemd user units and `sudo omarchy-pkg-add` resolve. Deny stubs still win for brick names. Arch `secure_path` includes `/usr/local/bin`.
 6. If an allowlisted script execs `yay`, a `yay` wrapper in the overlay execs `paru` with a warning. `yay` is not an Omarchy `bin/` name.
 
 `bin.wrap` (exact names):
 
 - `omarchy-update` -> `setup-monarchy.sh --update`
 - `omarchy-update-system-pkgs` -> `setup-monarchy.sh --update`
-- `omarchy-plymouth-set` / `omarchy-plymouth-reset` / `omarchy-refresh-plymouth` -> Monarchy splash helpers (theme + `mkinitcpio -P`, no SDDM, no Limine)
+- `omarchy-plymouth-set` / `omarchy-plymouth-reset` / `omarchy-refresh-plymouth` -> Monarchy splash helpers (`mkinitcpio -P`, no Limine). plymouth-set restyles the greeter overlay; refresh-sddm is a separate wrap
 - `omarchy-screensaver` -> seed `screensaver.txt` from clone `logo.txt` if missing, then exec the clone binary. Reset copies `$OMARCHY_PATH/logo.txt`, which is why the working prefix must link that file.
 
 `omarchy-refresh-pacman` stays in `bin.deny` (exit 2). Its contract is "replace pacman.conf"; redirecting it to `--update` would hide that.
@@ -336,7 +336,7 @@ Also in `bin.allow` by exact name, because the session and menu need them. This 
 
 - `omarchy-menu`, `omarchy-launch-nautilus`, `omarchy-launch-terminal`, `omarchy-launch-browser`, `omarchy-launch-editor`, `omarchy-launch-screensaver`, `omarchy-refresh-hyprland`, `omarchy-refresh-shell`, `omarchy-refresh-config`, `omarchy-refresh-applications`, `omarchy-migrate`, `omarchy-snapshot`, `omarchy-default-terminal`, `omarchy-default-browser`, `omarchy-default-editor`, `omarchy-version`, `omarchy-cmd-present`, `omarchy-cmd-missing`, `omarchy-state`
 
-Further session helpers (remaining `omarchy-menu-*`, `omarchy-launch-*` that do not shell out to a deny name, font/theme/notification/restart helpers) are added to `bin.allow` as **exact lines** when PR 2 builds the inventory. Anything not explicitly allowed is denied and stubbed.
+Further session helpers, `omarchy-install-*`, and `omarchy-pkg-*` are allowlisted by default. `generate-inventories.py` is allow-default.
 
 Hard-deny names that must appear in `bin.deny` (never accidentally allow):
 
@@ -346,16 +346,20 @@ Hard-deny names that must appear in `bin.deny` (never accidentally allow):
 - `omarchy-upgrade-to-quattro-zfs-check`
 - `omarchy-setup-direct-boot`
 - `omarchy-hibernation-setup`
+- `omarchy-hibernation-remove`
 - `omarchy-system-factory-reset`
 - `omarchy-system-factory-reset-finish`
 - `omarchy-reinstall`
 - `omarchy-reinstall-pkgs`
-- `omarchy-reinstall-configs`
 - `omarchy-channel-set`
 - `omarchy-sudo-passwordless`
-- `omarchy-provision-first-run`
-- `omarchy-provision-user`
 - `omarchy-provision-owner`
+- `omarchy-apply-system`
+- `omarchy-apply-hardware`
+- `omarchy-update-pacman-guard`
+- `omarchy-update-dev`
+- `omarchy-dev-link`
+- `omarchy-dev-unlink`
 
 Install-script denylist (never invoked by the bridge, even if a binary of the same name is allowlisted):
 
@@ -413,6 +417,7 @@ scripts/lib/monarchy/
   packages.sh            # filtered install, writes packages.installed
   clone.sh               # monarchy_sync_omarchy_clone
   sessions.sh            # wayland-session desktop + AccountsService
+  settings.sh            # omarchy-settings file tree minus settings.skip
   sddm.sh                # enable sddm, remove PLM, overlay greeter QML
   portals.sh
   splash.sh              # Omarchy plymouth theme, plymouth after zfs, SDDM color sync
@@ -452,6 +457,7 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 | `monarchy_refuse_snapper` | Refuse `snapper`. Keep sanoid + pacman hook |
 | `monarchy_refuse_dataset_rename` | Never run `install/config/zfs.sh`. Never write `/etc/pam.d/zfs-key` |
 | `monarchy_disable_omarchy_update_guard` | Never install `omarchy` / `omarchy-dev`. If the hook appears, mask it |
+| `monarchy_install_settings` | Copy clone `etc/` and selected `default/` trees (user units, fontconfig, icons, environment.d) minus `settings.skip`. Write patched `/etc/profile.d/omarchy.sh`. Rewrite user-unit ExecStart to `/usr/local/bin`. Does not install the omarchy-settings package |
 | `monarchy_keep_sddm` | Install/enable `sddm`. Remove `plasma-login-manager`. Write `99-omarchy-sddm.conf` (theme omarchy, Hyprland greeter compositor, Autologin User empty). Refresh the Omarchy SDDM theme and overlay Monarchy `Main.qml`. `--check` allows pre-apply (sddm not installed yet) |
 | `monarchy_apply_logind` | Install Omarchy's `HandlePowerKey=ignore` and `InhibitDelayMaxSec=15` under `/etc/systemd/logind.conf.d/10-monarchy-*` / `20-monarchy-*`. Reload logind, never restart it. CachyOS default `HandlePowerKey=poweroff` plus a Bluetooth AVRCP KEY_POWER is a full shutdown |
 | `monarchy_install_omarchy_session` | Install Monarchy-authored `/usr/share/wayland-sessions/omarchy.desktop` (not a blind copy of the clone) |
@@ -464,7 +470,7 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 | `monarchy_install_switch_user` | Install `/usr/local/bin/monarchy-switch-user`. Locks the Omarchy session if needed, then `Seat.SwitchToGreeter` |
 | `monarchy_rebuild_overlay` | Rebuild overlay `bin/` fail-closed |
 | `monarchy_nvidia_keep_chwd` | Never run Omarchy `nvidia.sh` |
-| `monarchy_splash` | Omarchy Plymouth theme, plymouth after zfs, `mkinitcpio -P`. Never plymouth-zfs, never Limine. SDDM greeter restyle is `monarchy_refresh_sddm` / plymouth-set. `splash_maybe_theme` restyles SDDM even when plymouth already matches |
+| `monarchy_splash` | Omarchy Plymouth theme, plymouth after zfs, `mkinitcpio -P`. Never plymouth-zfs, never Limine. SDDM greeter restyle is `monarchy_refresh_sddm` (Unlock default) / plymouth-set (Style > Unlock). `splash_maybe_theme` follows Unlock, not the session theme |
 
 ### Dual-session design
 
@@ -501,7 +507,7 @@ Exact greeter files:
 | `/usr/share/wayland-sessions/omarchy.desktop` | Monarchy-authored. `TryExec=uwsm`. `DesktopNames=Hyprland`. Comment is Monarchy-branded, not the clone's. Exec is `uwsm start -g -1 -e -D Hyprland hyprland.desktop` once that file exists, otherwise `monarchy-session-probe` |
 | `/usr/share/wayland-sessions/plasma.desktop` | Untouched |
 | `/etc/sddm.conf.d/99-omarchy-sddm.conf` | `Current=omarchy`. `DisplayServer=wayland`. `CompositorCommand=start-hyprland -- --config /usr/share/sddm/hyprland.lua`. Autologin `User` empty |
-| `/usr/share/sddm/themes/omarchy/Main.qml` | Clone theme copy, then Monarchy overlay. `omarchy-refresh-sddm` is wrapped so stock last-user QML cannot land. `splash_maybe_theme` then restyles from `theme.name` even when plymouth already matches |
+| `/usr/share/sddm/themes/omarchy/Main.qml` | Clone theme copy, then Monarchy overlay. `omarchy-refresh-sddm` is wrapped so stock last-user QML cannot land. Apply follows Style > Unlock (plymouth logo), not the session theme. Fresh apply is Unlock default (`#1a1b26`) |
 | `/usr/share/sddm/hyprland.lua` | Clone `default/sddm/hyprland.lua` |
 | `/var/lib/sddm/state.conf` | Do **not** write Dieuwe+omarchy. Last user is SDDM's own memory; session default is the QML overlay. SDDM's `RememberLastSession` is one slot for the whole machine, not per user |
 | `/var/lib/AccountsService/users/{dieuwe,amie,olivier}` | Still written (`omarchy.desktop` / `plasma.desktop`). The QML overlay is the picker default that matters. Per-user last-session memory is deferred; see Open questions |
@@ -571,12 +577,12 @@ Live config: Components enabled, EFI UKI disabled, `SplashImage` unused. Do **no
 - Copy clone `default/plymouth/` to `/usr/share/plymouth/themes/omarchy`. `plymouth-set-default-theme omarchy`.
 - Insert `plymouth` **after** `zfs` and **before** `filesystems`. `mkinitcpio -P`. Never `generate-zbm` for this (ZBM is a separate image).
 - Keep `quiet splash` on `org.zfsbootmenu:commandline`.
-- Wrap `omarchy-refresh-plymouth` / `omarchy-plymouth-set` / `omarchy-plymouth-reset` so they never call `limine-mkinitcpio`. `omarchy-plymouth-set` writes the SDDM greeter from Monarchy `Main.qml` (same `#1a1b26` / `#ffffff` tokens). `omarchy-refresh-sddm` is wrapped: copy clone theme, overlay QML. `splash_maybe_theme` restyles SDDM from `theme.name` even when plymouth's logo already matches. Allow list/current/preview/switcher/`set-by-theme`.
+- Wrap `omarchy-refresh-plymouth` / `omarchy-plymouth-set` / `omarchy-plymouth-reset` so they never call `limine-mkinitcpio`. `omarchy-plymouth-set` writes the SDDM greeter from Monarchy `Main.qml` (same `#1a1b26` / `#ffffff` tokens). `omarchy-refresh-sddm` is wrapped: copy clone theme, overlay QML (Unlock default). `splash_maybe_theme` then follows Style > Unlock so a re-apply does not wipe a chosen plymouth logo. The session theme does not restyle plymouth or SDDM. Allow list/current/preview/switcher/`set-by-theme`.
 - Do not set `ShowDelay` (packaged default is already 0).
 
 #### 4. Greeter
 
-Omarchy SDDM theme at `/usr/share/sddm/themes/omarchy`, Hyprland as the greeter compositor, Monarchy `Main.qml` overlay restyled from the current Omarchy theme. `99-omarchy-sddm.conf` beats CachyOS breeze/kwin drop-ins.
+Omarchy SDDM theme at `/usr/share/sddm/themes/omarchy`, Hyprland as the greeter compositor, Monarchy `Main.qml` overlay. Fresh apply is Unlock default. Style > Unlock restyles plymouth and the greeter together. `99-omarchy-sddm.conf` beats CachyOS breeze/kwin drop-ins.
 
 #### 5. Session splashes
 
@@ -603,9 +609,6 @@ v1 `packages.deny` (hard, checked in):
 ```text
 plasma-login-manager
 tldr
-yay
-mise-bin
-ufw-docker
 snapper
 limine
 limine-mkinitcpio-hook
@@ -614,19 +617,10 @@ linux
 linux-headers
 linux-ptl
 linux-ptl-headers
-nvidia-dkms
-nvidia-open-dkms
-nvidia-580xx-dkms
-nvidia-580xx-utils
-lib32-nvidia-580xx-utils
-tuxedo-drivers-nocompatcheck-dkms
-zram-generator
 omarchy
 omarchy-dev
 omarchy-settings
 omarchy-settings-dev
-kernel-modules-hook
-btrfs-progs
 ```
 
 `sddm` is a first-class `omarchy-base.packages` row and is installed. `plasma-login-manager` is denied so a second DM cannot come back. `monarchy_keep_sddm` enables sddm and removes PLM.
@@ -760,7 +754,7 @@ Sources compared:
 | bash vs fish + `cachyos-fish-config` | Dieuwe fish, family bash | major | Do not change login shells. Do not install Omarchy bashrc into `/etc/skel` |
 | CachyOS shell config. #650 says remove it | Dieuwe | major | Keep the package. Do not follow #650 |
 | `omarchy-nvim` vs `chezmoi/dot_config/nvim` | Dieuwe chezmoi | major | Install `omarchy-nvim` as its own app. Do not overwrite `~/.config/nvim` |
-| `mise-bin` + `install/user/mise.sh` vs uv/pnpm/bun/pipx + curl-installed grok/opencode | Dieuwe | major | Deny `mise-bin`. Skip `mise.sh` |
+| `mise-bin` + `install/user/mise.sh` vs uv/pnpm/bun/pipx + curl-installed grok/opencode | Dieuwe | major | Allow `mise-bin`. Menu `omarchy-mise-install` can own agent CLIs going forward |
 | Plymouth hook vs current mkinitcpio | Dieuwe HOOKS | major | plymouth **after** zfs only. Never `plymouth-zfs` |
 | Stock Omarchy greeter is last-user + uwsm-only | Omarchy | major | Overlay `misc/monarchy/sddm/Main.qml` (Tab user, Up/Down session, family defaults Plasma) |
 | `xdg-desktop-portal-hyprland` vs kde | both | major | Install both. Session-scoped `XDG_CURRENT_DESKTOP` |
@@ -982,7 +976,7 @@ Everything else that used to live here is a Key Decision: clone path, SigLevel, 
 
 1. **CachyOS Calamares KDE+ZFS remains the only install path.** Monarchy is an optional overlay via `setup-monarchy.sh`, not a distro. `install.sh` does not call it. Family Plasma and ZBM recovery stay first-class.
 
-2. **Consume `quattro-on-zfs` as a pinned git clone plus official `[omarchy]` leaf packages. Never install `omarchy`, `omarchy-dev`, `omarchy-settings`, or `omarchy-settings-dev`. Never add `[omarchy-zfs]` or `[archzfs]`.** The fork is trusted for script/QML currency. Its installer, pacman.conf, Limine, archzfs, and dataset names are not. `omarchy-dev` is the boot-stack+ALPM-guard package; `omarchy-settings-dev` is the os-release/mime/sddm/mkinitcpio scriptlet brick without limine depends.
+2. **Consume `quattro-on-zfs` as a pinned git clone plus official `[omarchy]` leaf packages. Never install `omarchy`, `omarchy-dev`, `omarchy-settings`, or `omarchy-settings-dev`. Never add `[omarchy-zfs]` or `[archzfs]`.** Install the omarchy-settings *file tree* ourselves (`monarchy_install_settings` + `settings.skip`), the same way omarchy-on-cachyos runs the installer after deleting Limine/pacman/plymouth steps. The metapackage still bricks os-release and Limine.
 
 3. **Do not vendor-fork Omarchy.** The durable piece is the overlay-bin policy layer in this repo.
 
@@ -1002,7 +996,7 @@ Everything else that used to live here is a Key Decision: clone path, SigLevel, 
 
 11. **Clone and `OMARCHY_PATH` are decided.** Git clone at `/usr/local/src/monarchy/omarchy`. Working prefix `OMARCHY_PATH=/usr/local/share/omarchy` via `/etc/omarchy.conf`. Data trees are symlinks into the clone. `bin/` is a Monarchy overlay, not clone `bin/`. This is the omarchy-dev-link model without the package.
 
-12. **Runtime control plane is overlay-bin, fail-closed on names new to the lock.** Do not put clone `bin/` on PATH. `envs.lua` and env-bootstrap prepend `$OMARCHY_PATH/bin`; that directory is the overlay. At the pin, `bin.allow` ∪ `bin.wrap` ∪ `bin.deny` is a complete inventory of all 438 `bin/` names (implicit deny). `--check` fails only on names **new relative to the lock**. Autostart and nvidia Lua callees are exact `bin.allow` lines, not globs. Deny stubs and wrap names are also installed under `/usr/local/bin` for sudo.
+12. **Runtime control plane is overlay-bin, allow-default.** Do not put clone `bin/` on PATH. `envs.lua` and env-bootstrap prepend `$OMARCHY_PATH/bin`; that directory is the overlay. At the pin, `bin.allow` ∪ `bin.wrap` ∪ `bin.deny` is a complete inventory of all 438 `bin/` names. Deny is the brick list. `--check` fails only on names **new relative to the lock**. Allow, wrap, and deny names are also installed under `/usr/local/bin` so systemd units and sudo resolve.
 
 13. **`[omarchy]` uses `SigLevel = Required DatabaseOptional` after installing `omarchy-keyring` in PR 2.** TrustAll is not accepted. The repo is not harmless just because CachyOS is first-match.
 

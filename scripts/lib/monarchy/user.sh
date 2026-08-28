@@ -124,6 +124,11 @@ monarchy_setup_user() {
     monarchy_user_xcompose
     monarchy_user_git
     monarchy_user_theme
+    monarchy_run_install_script "$MONARCHY_SRC/install/user/chromium.sh"
+    monarchy_run_install_script "$MONARCHY_SRC/install/user/default-keyring.sh"
+    monarchy_run_install_script "$MONARCHY_SRC/install/user/first-run/gnome-theme.sh"
+    monarchy_run_install_script "$MONARCHY_SRC/install/user/first-run/gtk-primary-paste.sh"
+    monarchy_enable_user_units
     monarchy_mark_first_run_done
     monarchy_keep_family_mime
     if [ -f "$HOME/.config/mimeapps.list" ] && grep -qi omarchy "$HOME/.config/mimeapps.list"; then
