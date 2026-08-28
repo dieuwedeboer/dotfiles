@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Build bin.allow / bin.wrap / bin.deny from a quattro-on-zfs checkout.
 
-The three files must partition every name in clone/bin at the lock commit.
+Omarchy-first: every clone bin name is allowed unless it is a wrap or a
+brick. Bricks are the commands that replace pacman.conf, Limine, the
+dataset contract, or the ISO provisioner.
+
 Re-run after bumping misc/monarchy/omarchy.lock:
 
     python3 scripts/lib/monarchy/generate-inventories.py /usr/local/src/monarchy/omarchy
@@ -22,6 +25,8 @@ WRAP = {
     "omarchy-screensaver",
 }
 
+# Same job as omarchy-on-cachyos deleting installer steps: only the commands
+# that brick CachyOS+ZFS+KDE. Everything else is a real binary.
 HARD_DENY = {
     "omarchy-refresh-pacman",
     "omarchy-refresh-limine",
@@ -32,163 +37,18 @@ HARD_DENY = {
     "omarchy-hibernation-remove",
     "omarchy-system-factory-reset",
     "omarchy-system-factory-reset-finish",
-    "omarchy-reinstall",
-    "omarchy-reinstall-pkgs",
-    "omarchy-reinstall-configs",
     "omarchy-channel-set",
     "omarchy-sudo-passwordless",
-    "omarchy-sudo-docker",
-    "omarchy-provision-first-run",
-    "omarchy-provision-user",
     "omarchy-provision-owner",
     "omarchy-apply-system",
     "omarchy-apply-hardware",
+    "omarchy-update-pacman-guard",
+    "omarchy-update-dev",
+    "omarchy-reinstall",
+    "omarchy-reinstall-pkgs",
     "omarchy-dev-link",
     "omarchy-dev-unlink",
-    "omarchy-mise-install",
-    "omarchy-update-mise",
-    "omarchy-update-pacman-guard",
-    "omarchy-update-aur-pkgs",
-    "omarchy-update-keyring",
-    "omarchy-update-dev",
-    "omarchy-setup-security-sudoless-docker",
-    "omarchy-remove-security-sudoless-docker",
-    "omarchy-hook-install",
-    "omarchy-voxtype-install",
-    "omarchy-toggle-hybrid-gpu",
 }
-
-ALLOW_EXACT = {
-    "omarchy",
-    "omarchy-launch-shell",
-    "omarchy-powerprofiles-init",
-    "omarchy-hyprland-monitor-watch",
-    "omarchy-hook",
-    "omarchy-bar",
-    "omarchy-hw-nvidia",
-    "omarchy-hw-nvidia-gsp",
-    "omarchy-hw-nvidia-without-gsp",
-    "omarchy-menu",
-    "omarchy-launch-nautilus",
-    "omarchy-launch-terminal",
-    "omarchy-launch-browser",
-    "omarchy-launch-editor",
-    "omarchy-launch-screensaver",
-    "omarchy-refresh-hyprland",
-    "omarchy-refresh-shell",
-    "omarchy-refresh-config",
-    "omarchy-refresh-applications",
-    "omarchy-migrate",
-    "omarchy-snapshot",
-    "omarchy-default-terminal",
-    "omarchy-default-browser",
-    "omarchy-default-editor",
-    "omarchy-version",
-    "omarchy-cmd-present",
-    "omarchy-cmd-missing",
-    "omarchy-state",
-    "omarchy-plymouth-current",
-    "omarchy-plymouth-list",
-    "omarchy-plymouth-preview",
-    "omarchy-plymouth-switcher",
-    "omarchy-plymouth-set-by-theme",
-}
-
-ALLOW_PREFIXES = (
-    "omarchy-launch-",
-    "omarchy-menu-",
-    "omarchy-theme-",
-    "omarchy-font-",
-    "omarchy-notification-",
-    "omarchy-hyprland-",
-    "omarchy-restart-",
-    "omarchy-toggle-",
-    "omarchy-audio-",
-    "omarchy-brightness-",
-    "omarchy-battery-",
-    "omarchy-bluetooth-",
-    "omarchy-capture-",
-    "omarchy-clipboard-",
-    "omarchy-weather-",
-    "omarchy-bar-",
-    "omarchy-branding-",
-    "omarchy-powerprofiles-",
-    "omarchy-cmd-",
-    "omarchy-version-",
-    "omarchy-default-",
-    "omarchy-hw-",
-    "omarchy-agent",
-    "omarchy-plugin-",
-    "omarchy-refresh-herdr",
-    "omarchy-refresh-hyprsunset",
-    "omarchy-refresh-tmux",
-    "omarchy-refresh-chromium",
-    "omarchy-osd",
-    "omarchy-screensaver",
-    "omarchy-reminder",
-    "omarchy-shell",
-    "omarchy-show-",
-    "omarchy-ascii",
-    "omarchy-done",
-    "omarchy-apply-lock",
-    "omarchy-system-lock",
-    "omarchy-system-logout",
-    "omarchy-system-reboot",
-    "omarchy-system-shutdown",
-    "omarchy-system-sleep",
-    "omarchy-system-wake",
-    "omarchy-system-lid",
-    "omarchy-system-stats",
-    "omarchy-power-present",
-    "omarchy-debug",
-    "omarchy-crash-watch",
-    "omarchy-monitor-state",
-    "omarchy-network-",
-    "omarchy-file-select",
-    "omarchy-drive-",
-    "omarchy-display-text-size",
-    "omarchy-dns",
-    "omarchy-voxtype-",
-    "omarchy-webapp-",
-    "omarchy-transcode",
-    "omarchy-upload-log",
-    "omarchy-windows-key",
-    "omarchy-channel-current",
-    "omarchy-hibernation-available",
-    "omarchy-migrate",
-)
-
-DENY_PREFIXES = (
-    "omarchy-pkg-",
-    "omarchy-install-",
-    "omarchy-installed-",
-    "omarchy-remove-",
-    "omarchy-update-",
-    "omarchy-reinstall",
-    "omarchy-dev-",
-    "omarchy-plymouth-",
-    "omarchy-tui-install",
-    "omarchy-tui-remove",
-    "omarchy-setup-",
-    "omarchy-provision-",
-    "omarchy-upgrade-",
-    "omarchy-refresh-limine",
-    "omarchy-refresh-pacman",
-    "omarchy-refresh-plymouth",
-    "omarchy-apply-system",
-    "omarchy-apply-hardware",
-    "omarchy-sudo-",
-    "omarchy-system-factory-",
-    "omarchy-hibernation-setup",
-    "omarchy-hibernation-remove",
-    "omarchy-channel-set",
-    "omarchy-mise-",
-    "omarchy-windows-vm",
-    "omarchy-games-",
-    "omarchy-hook-install",
-    "omarchy-voxtype-install",
-    "omarchy-toggle-hybrid-gpu",
-)
 
 
 def classify(name: str) -> str:
@@ -196,15 +56,7 @@ def classify(name: str) -> str:
         return "wrap"
     if name in HARD_DENY:
         return "deny"
-    if any(name.startswith(p) or name == p.rstrip("-") for p in DENY_PREFIXES):
-        if name in ALLOW_EXACT:
-            return "allow"
-        return "deny"
-    if name in ALLOW_EXACT:
-        return "allow"
-    if any(name.startswith(p) or name == p for p in ALLOW_PREFIXES):
-        return "allow"
-    return "deny"
+    return "allow"
 
 
 def write_list(path: Path, items: list[str]) -> None:
@@ -233,13 +85,19 @@ def main() -> int:
     if len(buckets["allow"]) + len(buckets["wrap"]) + len(buckets["deny"]) != len(names):
         print("inventory does not partition clone bin/", file=sys.stderr)
         return 1
-    missing = sorted(ALLOW_EXACT - set(names))
-    if missing:
-        print(f"required allow names missing from clone: {missing}", file=sys.stderr)
-        return 1
-    for req in sorted(HARD_DENY):
-        if req in names and classify(req) != "deny":
+    for req in sorted(WRAP | HARD_DENY):
+        if req not in names:
+            print(f"classified name missing from clone bin/: {req}", file=sys.stderr)
+            return 1
+        if req in WRAP and classify(req) != "wrap":
+            print(f"wrap not wrapped: {req}", file=sys.stderr)
+            return 1
+        if req in HARD_DENY and classify(req) != "deny":
             print(f"hard-deny not denied: {req}", file=sys.stderr)
+            return 1
+    for req in ("omarchy", "omarchy-install-app", "omarchy-pkg-add", "omarchy-provision-user"):
+        if req in names and classify(req) != "allow":
+            print(f"omarchy-first name not allowed: {req}", file=sys.stderr)
             return 1
 
     write_list(dest / "bin.allow", buckets["allow"])

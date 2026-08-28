@@ -61,6 +61,7 @@ inxi
 networkmanager
 jq
 kdenlive
+kernel-modules-hook
 lazydocker
 lazygit
 less
@@ -74,6 +75,7 @@ lua51
 luarocks
 man-db
 mariadb-libs
+mise-bin
 moonlight-qt
 mpv
 mpv-mpris
@@ -124,6 +126,7 @@ ttf-jetbrains-mono-nerd-basic
 tzupdate
 udiskie
 ufw
+ufw-docker
 unzip
 usage
 uwsm
@@ -138,6 +141,7 @@ xdg-desktop-portal-hyprland
 xdg-terminal-exec
 xournalpp
 yaru-icon-theme
+yay
 yt-dlp
 zbar
 zoxide

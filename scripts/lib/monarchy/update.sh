@@ -88,6 +88,9 @@ monarchy_check() {
     [ -f "$monarchy_lib_dir/switch-user.sh" ] || monarchy_die "missing switch-user.sh"
     monarchy_check_session_lock_overlay
     monarchy_check_logind
+    monarchy_assert_settings_assets
+    grep -q 'mise activate' "$MONARCHY_MISC/10-monarchy" \
+        || monarchy_die "10-monarchy missing mise activate"
     monarchy_log "check passed"
 }
 
@@ -127,6 +130,8 @@ monarchy_apply() {
     export OMARCHY_PATH
     monarchy_add_omarchy_repo
     monarchy_install_packages
+    monarchy_install_settings
+    monarchy_run_omarchy_config
     monarchy_keep_sddm
     monarchy_apply_lock
     monarchy_install_omarchy_session

@@ -1,14 +1,17 @@
 # /usr/share/uwsm/env.d/10-monarchy
-# Monarchy UWSM env. Do not install upstream 10-omarchy (hardcodes
-# /usr/share/omarchy/default/bash/env-bootstrap).
+# Stock 10-omarchy with the working-prefix bootstrap path.
 
 if [ -r /usr/local/share/omarchy/default/bash/env-bootstrap ]; then
   . /usr/local/share/omarchy/default/bash/env-bootstrap
 fi
 
-if [ -f /usr/local/share/omarchy/default/uwsm/default ]; then
-  . /usr/local/share/omarchy/default/uwsm/default
+if [ -f "${OMARCHY_PATH%/}/default/uwsm/default" ]; then
+  . "${OMARCHY_PATH%/}/default/uwsm/default"
 else
   export TERMINAL=xdg-terminal-exec
   export EDITOR="omarchy-launch-editor --inline"
 fi
+
+[ -f "$HOME/.config/uwsm/default" ] && . "$HOME/.config/uwsm/default"
+
+omarchy-cmd-present mise && eval "$(mise activate bash --shims)"

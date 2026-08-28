@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Post-unlock Plymouth using the Omarchy theme. Never plymouth-zfs.
 # Never plymouth-before-zfs. Never limine-mkinitcpio.
-# SDDM greeter sync is in sddm.sh (plymouth-set writes the overlay QML).
+# SDDM greeter sync is in sddm.sh (plymouth-set / follow Unlock write overlay QML).
 
 # shellcheck source=sddm.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/sddm.sh"
@@ -182,25 +182,10 @@ monarchy_plymouth_reset() {
 }
 
 monarchy_splash_maybe_theme() {
-    local name_file="$HOME/.local/state/omarchy/current/theme.name"
-    local theme theme_dir set_by
-    [ -s "$name_file" ] || return 0
-    theme=$(cat "$name_file")
-    [ -n "$theme" ] || return 0
-    theme_dir=$(monarchy_current_theme_dir "$theme")
-    [ -f "$theme_dir/unlock.png" ] || return 0
-    if [ -f "$MONARCHY_PLYMOUTH_THEME_DIR/omarchy.plymouth" ] &&
-        ! cmp -s "$theme_dir/unlock.png" "$MONARCHY_PLYMOUTH_THEME_DIR/logo.png" 2>/dev/null; then
-        monarchy_log "apply plymouth unlock from theme $theme"
-        set_by="${MONARCHY_PATH:-/usr/local/share/omarchy}/bin/omarchy-plymouth-set-by-theme"
-        export PATH="${MONARCHY_PATH:-/usr/local/share/omarchy}/bin:$PATH"
-        if [ -x "$set_by" ]; then
-            "$set_by" "$theme"
-        fi
-    fi
-    # plymouth-set-by-theme already restyles SDDM; this still runs when
-    # plymouth already matched so a stock greeter copy is not left behind.
-    monarchy_sddm_apply_current_theme
+    # Stock Omarchy: Unlock (plymouth + SDDM) is Style > Unlock, not the
+    # session theme. Apply installs Unlock default. Re-apply recopies the
+    # stock greeter, then this restores a previously chosen Unlock.
+    monarchy_sddm_follow_unlock
 }
 
 monarchy_splash() {
