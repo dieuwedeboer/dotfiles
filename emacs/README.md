@@ -1,20 +1,7 @@
-# Dieuwe's `.emacs.d`
+# Archive
 
-Uses some stuff has been taken from [Prelude](https://github.com/bbatsov/prelude) and from [Ben's Dotfiles](https://github.com/ben-denham/dotfiles/tree/master/emacs)
+Live Emacs config is chezmoi `dot_config/emacs/` → `~/.config/emacs/`, plus
+the `omarchy-emacs` package (shim `omarchy.el`, theme file, hooks).
 
-Most attention has been given to:
-
-* PHP/Drupal
-* Web (HTML/CSS/Javascript)
-
-## Installation
-
-See: `../scripts/install.sh`
-
-# Updating Packages
-
-1. `M-x straight-thaw-versions`
-2. `M-x straight-pull-recipe-repositories`
-3. `M-x straight-pull-all`
-4. `M-x straight-freeze-versions`
-5. Commit the updated `straight/versions/default.el`
+This tree is the old `~/.emacs.d`. Do not symlink it; it shadows XDG and
+blocks Omarchy's layout.

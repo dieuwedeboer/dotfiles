@@ -85,7 +85,6 @@ cd dotfiles
 The install script will:
 - Install chezmoi if not present
 - Link dotfiles via chezmoi
-- Link emacs config
 - Link agent instructions and skills (see [Agent Configuration](#agent-configuration))
 - Install packages and configure system
 - Optionally configure rEFInd with a custom theme (glow) if no custom theme is present

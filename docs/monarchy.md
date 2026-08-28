@@ -34,12 +34,12 @@ The fork's ZFS support is real, but it is Omarchy-native ZFS (`zroot/ROOT/defaul
 | Snapshots | `sanoid.timer` on `zpcachyos/ROOT/cos/home`. Pacman hook `misc/zfs-snapshot.hook` recursively snapshots `zpcachyos/ROOT/cos` as `pre-update-*`, keep 3. Bootable recovery is ZBM snapshot boot + clone/promote |
 | Desktop | KDE Plasma Wayland. CachyOS ships **plasma-login-manager** (`plasmalogin.service`). Monarchy removes it and enables **SDDM** so Omarchy's greeter theme and Plymouth color sync work. Session files: `/usr/share/wayland-sessions/{plasma,omarchy,hyprland}.desktop`. Leftover `/etc/sddm.conf.d/kde_settings.conf` has empty `[Autologin] User=` and `Current=breeze`; `99-omarchy-sddm.conf` wins on theme and compositor. `monarchy_skip_autologin` still asserts Autologin User empty |
 | Greeter users | `dieuwe` (uid 1000, `/bin/fish`), `amie` (1001, bash), `olivier` (1002, bash) |
-| Dotfiles | chezmoi from `chezmoi/`. emacs, fish + `cachyos-fish-config`, ghostty, starship, nvim, ksplash Breeze Dark. `cachy-update` is the OS updater; chezmoi also has an `arch-update` config file that is not a second updater |
+| Dotfiles | chezmoi from `chezmoi/`. fish + `cachyos-fish-config`, ghostty, starship, nvim, ksplash Breeze Dark. Emacs is chezmoi `dot_config/emacs/` (`~/.config/emacs/`) plus the `omarchy-emacs` package. `cachy-update` is the OS updater; chezmoi also has an `arch-update` config file that is not a second updater |
 | AUR helper | paru |
 | Overlap already installed | docker, nvim, starship, kdenlive, obsidian, libreoffice-fresh, wl-clipboard, ufw, ghostty |
 | Plymouth | Package installed, default theme `cachyos-bootanimation`. Not in the initramfs, so it does not run at boot today. Packaged `ShowDelay` default is already 0 |
 
-`scripts/install.sh` is the idempotent post-Calamares entrypoint. It calls `setup-packages.sh`, chezmoi, rEFInd glow, emacs, services, per-machine hooks (`setup-kingfisher.sh` / `setup-bonw9.sh`), and `setup-zfs.sh`. Monarchy is **not** called from `install.sh`. Operators run `scripts/setup-monarchy.sh` afterwards. README points at it.
+`scripts/install.sh` is the idempotent post-Calamares entrypoint. It calls `setup-packages.sh`, chezmoi, rEFInd glow, services, per-machine hooks (`setup-kingfisher.sh` / `setup-bonw9.sh`), and `setup-zfs.sh`. Monarchy is **not** called from `install.sh`. Operators run `scripts/setup-monarchy.sh` afterwards. README points at it.
 
 ### Pain points this solves
 
@@ -753,6 +753,7 @@ Sources compared:
 | bash vs fish + `cachyos-fish-config` | Dieuwe fish, family bash | major | Do not change login shells. Do not install Omarchy bashrc into `/etc/skel` |
 | CachyOS shell config. #650 says remove it | Dieuwe | major | Keep the package. Do not follow #650 |
 | `omarchy-nvim` vs `chezmoi/dot_config/nvim` | Dieuwe chezmoi | major | Install `omarchy-nvim` as its own app. Do not overwrite `~/.config/nvim` |
+| `omarchy-emacs` vs stock `emacs` | Omarchy | major | Install `omarchy-emacs` (`emacs-wayland`). Uninstall stock `emacs`. Chezmoi owns `~/.config/emacs/init.el`; move `~/.emacs.d` aside |
 | `mise-bin` + `install/user/mise.sh` vs uv/pnpm/pipx + curl-installed grok/opencode | Dieuwe | major | Allow `mise-bin`. User setup runs `omarchy-refresh-applications` (mise stubs). `setup-packages.sh` uninstalls competing copies |
 | Plymouth hook vs current mkinitcpio | Dieuwe HOOKS | major | plymouth **after** zfs only. Never `plymouth-zfs` |
 | Stock Omarchy greeter is last-user + uwsm-only | Omarchy | major | Overlay `misc/monarchy/sddm/Main.qml` (Tab user, Up/Down session, family defaults Plasma) |

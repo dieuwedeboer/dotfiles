@@ -23,12 +23,22 @@ grep -q 'omarchy-pkg-add spotify' "$SCRIPT_DIR/user.sh" \
     || fail "user.sh does not install Omarchy Spotify"
 grep -q 'mise use -g bun' "$SCRIPT_DIR/user.sh" \
     || fail "user.sh does not install bun via mise"
+grep -q 'omarchy-pkg-add omarchy-emacs' "$SCRIPT_DIR/user.sh" \
+    || fail "user.sh does not install omarchy-emacs"
+grep -q 'monarchy_prefer_xdg_emacs' "$SCRIPT_DIR/user.sh" \
+    || fail "user.sh missing monarchy_prefer_xdg_emacs"
+grep -q 'monarchy_ensure_emacs_dotfiles' "$SCRIPT_DIR/user.sh" \
+    && fail "user.sh should not restore ~/.emacs.d"
+grep -q 'omarchy-emacs-setup' "$SCRIPT_DIR/user.sh" \
+    && fail "user.sh must not call the interactive emacs setup"
 
 setup_body=$(awk '/^monarchy_setup_user\(\)/,/^}$/' "$SCRIPT_DIR/user.sh")
 echo "$setup_body" | grep -q 'monarchy_clear_terminal_override' \
     || fail "monarchy_setup_user does not clear the terminal override"
 echo "$setup_body" | grep -q 'monarchy_user_omarchy_defaults' \
     || fail "monarchy_setup_user does not install Omarchy user defaults"
+grep -q 'monarchy_user_emacs' "$SCRIPT_DIR/user.sh" \
+    || fail "user.sh missing monarchy_user_emacs"
 echo "$setup_body" | grep -q 'monarchy_seed_uwsm_user_env' \
     && fail "monarchy_setup_user still seeds a UWSM terminal override"
 
@@ -40,8 +50,15 @@ grep -q 'opencode.ai/install' "$packages" \
 install_pacman=$(awk '/^PACMAN_PACKAGES=/,/^)/' "$packages")
 echo "$install_pacman" | grep -qx '    bun' \
     && fail "setup-packages.sh still installs pacman bun"
+echo "$install_pacman" | grep -qx '    emacs' \
+    && fail "setup-packages.sh still installs stock emacs"
 echo "$install_pacman" | grep -qx '    github-cli' \
     && fail "setup-packages.sh still installs github-cli"
+grep -qx '    emacs' <<<"$(awk '/^OMARCHY_OWNED_PACMAN=/,/^)/' "$packages")" \
+    || fail "setup-packages.sh should uninstall stock emacs so emacs-wayland can replace it"
+install_sh="$SCRIPT_DIR/../../install.sh"
+grep -q 'ln -s "$DOTFILES_DIR/emacs"' "$install_sh" \
+    && fail "install.sh still links ~/.emacs.d (chezmoi owns ~/.config/emacs)"
 install_flatpak=$(awk '/^FLATPAK_PACKAGES=/,/^)/' "$packages")
 echo "$install_flatpak" | grep -q 'com.spotify.Client' \
     && fail "setup-packages.sh still installs Spotify as a flatpak"
@@ -62,5 +79,14 @@ monarchy_clear_terminal_override
 [ ! -f "$HOME/.config/uwsm/env.d/20-monarchy-terminal" ] \
     || fail "did not remove 20-monarchy-terminal"
 monarchy_clear_terminal_override
+
+mkdir -p "$HOME"
+ln -s /tmp/old-emacs "$HOME/.emacs.d"
+monarchy_prefer_xdg_emacs
+[ ! -e "$HOME/.emacs.d" ] && [ ! -L "$HOME/.emacs.d" ] \
+    || fail "did not move ~/.emacs.d aside"
+[ -L "$HOME/.emacs.d.bak" ] || fail "did not keep ~/.emacs.d.bak"
+monarchy_prefer_xdg_emacs
+[ -L "$HOME/.emacs.d.bak" ] || fail "idempotent prefer_xdg clobbered the backup"
 
 echo "user tests passed"

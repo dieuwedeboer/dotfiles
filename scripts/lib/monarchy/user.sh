@@ -45,6 +45,62 @@ monarchy_clear_terminal_override() {
     fi
 }
 
+# ~/.emacs.d shadows ~/.config/emacs. Chezmoi owns init.el under XDG;
+# move a leftover ~/.emacs.d aside so Emacs reads the Omarchy layout.
+monarchy_prefer_xdg_emacs() {
+    local src="$HOME/.emacs.d"
+    local dest
+    [ -e "$src" ] || [ -L "$src" ] || return 0
+    dest="${src}.bak"
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+        dest="${src}.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+    mv "$src" "$dest"
+    monarchy_log "moved $src -> $dest (Emacs uses ~/.config/emacs)"
+}
+
+monarchy_sync_omarchy_emacs_files() {
+    local share=/usr/share/omarchy-emacs
+    [ -d "$share" ] || return 0
+    mkdir -p "$HOME/.config/emacs/themes" "$HOME/.config/omarchy/themed"
+    cat >"$HOME/.config/emacs/omarchy.el" <<'EOF'
+;;; omarchy.el --- Omarchy Emacs integration shim -*- lexical-binding: t -*-
+;;; Managed by omarchy-emacs. Not chezmoi. Put personal Lisp in init.el.
+
+(let ((omarchy--system-file "/usr/share/omarchy-emacs/config/omarchy.el"))
+  (when (file-exists-p omarchy--system-file)
+    (load omarchy--system-file)))
+
+;;; omarchy.el ends here
+EOF
+    if [ -f "$share/config/themes/omarchy-theme.el" ]; then
+        cp "$share/config/themes/omarchy-theme.el" "$HOME/.config/emacs/themes/"
+    fi
+    if [ -f "$share/omarchy-colors.el.tpl" ]; then
+        cp "$share/omarchy-colors.el.tpl" "$HOME/.config/omarchy/themed/"
+    fi
+    if command -v omarchy-emacs-sync-hooks >/dev/null 2>&1; then
+        omarchy-emacs-sync-hooks || monarchy_log "warning: omarchy-emacs-sync-hooks failed"
+    fi
+}
+
+monarchy_user_emacs() {
+    export OMARCHY_PATH
+    export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
+    if pacman -Q emacs >/dev/null 2>&1 && ! pacman -Q emacs-wayland >/dev/null 2>&1; then
+        monarchy_sudo pacman -R --noconfirm emacs \
+            || monarchy_log "warning: could not remove emacs (conflicts with emacs-wayland)"
+    fi
+    if command -v omarchy-pkg-add >/dev/null 2>&1; then
+        omarchy-pkg-add omarchy-emacs || monarchy_log "warning: omarchy-pkg-add omarchy-emacs failed"
+    fi
+    monarchy_prefer_xdg_emacs
+    # Skip the packaged interactive setup (it offers to move ~/.emacs.d).
+    monarchy_sync_omarchy_emacs_files
+    systemctl --user enable --now emacs.service 2>/dev/null \
+        || monarchy_log "warning: could not enable emacs.service"
+}
+
 # Webapp launchers, mise agent stubs, and the tools that used to be competing
 # copies in setup-packages.sh (Spotify flatpak, pacman bun, curl grok/opencode).
 monarchy_user_omarchy_defaults() {
@@ -61,6 +117,7 @@ monarchy_user_omarchy_defaults() {
     if command -v mise >/dev/null 2>&1; then
         mise use -g bun@latest || monarchy_log "warning: mise bun failed"
     fi
+    monarchy_user_emacs
 }
 
 monarchy_mark_first_run_done() {

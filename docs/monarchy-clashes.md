@@ -29,6 +29,7 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 | Default terminal | Omarchy `xdg-terminal-exec`. Apply removes `~/.config/uwsm/env.d/20-monarchy-terminal` |
 | Spotify | Omarchy `omarchy-pkg-add spotify` (`/usr/bin/spotify`). Not the Flathub client |
 | Discord | Omarchy webapp `.desktop`. Not the Flathub client |
+| Emacs | `emacs-wayland` + `omarchy-emacs`. Live config is chezmoi `~/.config/emacs/` (`init.el` loads the omarchy shim). `~/.emacs.d` is moved aside. Stock `emacs` is uninstalled |
 | Nautilus vs Dolphin | Install nautilus. No user-global mimeapps |
 | `ufw-docker` | Deny. Never run `firewall.sh` |
 | NVIDIA 580xx-dkms vs `chwd` | Never run Omarchy `nvidia.sh` |
