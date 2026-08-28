@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+"""Publish a synthetic BAT0/power_now for HP ZBooks whose ACPI rate is unknown.
+
+The 14u G6 (and likely other HP EC firmware) fills _BST Battery Present Rate
+with 0xFFFFFFFF. The kernel still creates current_now because the battery
+reports mA units, but reads return ENODEV. omarchy-battery-status treats the
+file as usable, overwrites UPower's energy-rate, and the power panel shows 0W.
+
+This process writes a private power_supply tree. On ZBook, UWSM points
+OMARCHY_POWER_SUPPLY_PATH at that tree so the stock Omarchy script sees a
+real power_now. The kernel's BAT0 is left alone, so UPower keeps estimating
+from charge_now and does not enter a feedback loop.
+
+If current_now actually works (later firmware, different ZBook), the tree is
+just a symlink to sysfs and this is a no-op.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+import time
+from pathlib import Path
+
+WINDOW_S = 60.0
+MIN_DT_S = 8.0
+INTERVAL_S = 2.0
+
+
+def env_path(name: str, default: str) -> Path:
+    return Path(os.environ.get(name, default))
+
+
+def read_int(path: Path) -> int | None:
+    try:
+        return int(path.read_text().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def read_text(path: Path) -> str:
+    try:
+        return path.read_text().strip()
+    except OSError:
+        return ""
+
+
+def current_now_works(bat: Path) -> bool:
+    try:
+        text = (bat / "current_now").read_text().strip()
+    except OSError:
+        return False
+    return text != ""
+
+
+def power_uw_from_samples(samples: list[tuple[float, int, int]]) -> int | None:
+    """Watts in microwatts from (t, charge_uAh, voltage_uV) samples.
+
+    Uses the first and last sample. charge_now on this EC moves in a few-mAh
+    steps every ~15s, so a short window is a 0W/25W square wave. 60s covers
+    a few steps and lands near UPower's energy-rate.
+    """
+    if len(samples) < 2:
+        return None
+    t0, c0, v0 = samples[0]
+    t1, c1, v1 = samples[-1]
+    dt = t1 - t0
+    if dt < MIN_DT_S:
+        return None
+    d_uah = abs(c1 - c0)
+    if d_uah == 0:
+        return None
+    voltage_uv = (v0 + v1) / 2.0
+    current_ua = d_uah * 3600.0 / dt
+    return int(current_ua * voltage_uv / 1_000_000.0)
+
+
+def prune(samples: list[tuple[float, int, int]], now: float) -> list[tuple[float, int, int]]:
+    cutoff = now - WINDOW_S
+    return [s for s in samples if s[0] >= cutoff]
+
+
+def compute_from_stdin() -> int:
+    samples: list[tuple[float, int, int]] = []
+    for line in sys.stdin:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        samples.append((float(parts[0]), int(parts[1]), int(parts[2])))
+    power = power_uw_from_samples(samples)
+    if power is None:
+        return 1
+    print(power)
+    return 0
+
+
+def ensure_tree(runtime: Path, sys_bat: Path, sys_ac: Path) -> Path:
+    tree = runtime / "power_supply"
+    bat = tree / "BAT0"
+    if bat.is_symlink():
+        bat.unlink()
+    bat.mkdir(parents=True, exist_ok=True)
+    ac_link = tree / "AC"
+    if sys_ac.exists():
+        if ac_link.is_symlink() or ac_link.exists():
+            ac_link.unlink()
+        ac_link.symlink_to(sys_ac)
+    cycle = sys_bat / "cycle_count"
+    cycle_link = bat / "cycle_count"
+    if cycle.exists():
+        if cycle_link.is_symlink() or cycle_link.exists():
+            cycle_link.unlink()
+        cycle_link.symlink_to(cycle)
+    return bat
+
+
+def link_native(runtime: Path, sys_bat: Path, sys_ac: Path) -> None:
+    tree = runtime / "power_supply"
+    tree.mkdir(parents=True, exist_ok=True)
+    for name, target in (("BAT0", sys_bat), ("AC", sys_ac)):
+        dest = tree / name
+        if dest.is_symlink() or dest.exists():
+            if dest.is_dir() and not dest.is_symlink():
+                for child in dest.iterdir():
+                    child.unlink()
+                dest.rmdir()
+            else:
+                dest.unlink()
+        if target.exists():
+            dest.symlink_to(target)
+    (runtime / "mode").write_text("native\n")
+
+
+def write_power(bat: Path, runtime: Path, power_uw: int) -> None:
+    tmp = bat / "power_now.tmp"
+    tmp.write_text(f"{power_uw}\n")
+    tmp.replace(bat / "power_now")
+    watts = power_uw / 1_000_000.0
+    (runtime / "watts").write_text(f"{watts:.1f}\n")
+    (runtime / "mode").write_text("synthetic\n")
+
+
+def loop() -> int:
+    sys_bat = env_path("ZBOOK_SYS_BAT", "/sys/class/power_supply/BAT0")
+    sys_ac = env_path("ZBOOK_SYS_AC", "/sys/class/power_supply/AC")
+    runtime = env_path("ZBOOK_RUNTIME", "/run/zbook-battery")
+    runtime.mkdir(parents=True, exist_ok=True)
+
+    if current_now_works(sys_bat):
+        link_native(runtime, sys_bat, sys_ac)
+        while True:
+            if not current_now_works(sys_bat):
+                break
+            time.sleep(30)
+
+    bat = ensure_tree(runtime, sys_bat, sys_ac)
+    samples: list[tuple[float, int, int]] = []
+    last_power: int | None = None
+
+    while True:
+        if current_now_works(sys_bat):
+            link_native(runtime, sys_bat, sys_ac)
+            time.sleep(30)
+            continue
+
+        if not (bat / "cycle_count").exists():
+            bat = ensure_tree(runtime, sys_bat, sys_ac)
+
+        now = time.time()
+        charge = read_int(sys_bat / "charge_now")
+        volt = read_int(sys_bat / "voltage_now")
+        status = read_text(sys_bat / "status")
+
+        if charge is not None and volt is not None:
+            samples.append((now, charge, volt))
+            samples = prune(samples, now)
+
+        if status in ("Full", "Not charging"):
+            write_power(bat, runtime, 0)
+            last_power = 0
+        else:
+            power = power_uw_from_samples(samples)
+            if power is not None:
+                write_power(bat, runtime, power)
+                last_power = power
+            elif last_power is not None and not (bat / "power_now").exists():
+                write_power(bat, runtime, last_power)
+
+        time.sleep(INTERVAL_S)
+
+
+def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] in ("--compute", "-c"):
+        return compute_from_stdin()
+    if len(sys.argv) > 1:
+        print("usage: battery-rate [--compute]", file=sys.stderr)
+        return 2
+    try:
+        return loop()
+    except KeyboardInterrupt:
+        return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

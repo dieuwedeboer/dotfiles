@@ -1,0 +1,17 @@
+[Unit]
+Description=HP ZBook synthetic battery power_now
+Documentation=file:///usr/local/lib/zbook/battery-rate
+After=sysinit.target
+ConditionPathExists=/sys/class/power_supply/BAT0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/zbook/battery-rate
+Restart=always
+RestartSec=2
+RuntimeDirectory=zbook-battery
+RuntimeDirectoryMode=0755
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
