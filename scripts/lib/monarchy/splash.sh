@@ -1,44 +1,49 @@
 # shellcheck shell=bash
-# Post-unlock Plymouth using the Omarchy theme. Never plymouth-zfs.
-# Never plymouth-before-zfs. Never limine-mkinitcpio.
+# Omarchy Plymouth theme. Never plymouth-zfs. Never limine-mkinitcpio.
+# plymouth sits before zfs when the host keyfile is in FILES, otherwise after.
 # SDDM greeter sync is in sddm.sh (plymouth-set / follow Unlock write overlay QML).
 
 # shellcheck source=sddm.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/sddm.sh"
 
 MONARCHY_PLYMOUTH_THEME_DIR="${MONARCHY_PLYMOUTH_THEME_DIR:-/usr/share/plymouth/themes/omarchy}"
-MONARCHY_MKINITCPIO_CONF="${MONARCHY_MKINITCPIO_CONF:-/etc/mkinitcpio.conf}"
+MONARCHY_PLYMOUTH_RETAIN="${MONARCHY_PLYMOUTH_RETAIN:-/etc/systemd/system/plymouth-quit.service.d/20-monarchy-retain.conf}"
 
+# $1 is before or after (relative to zfs). Remaining args are HOOKS.
 monarchy_hooks_insert_plymouth() {
+    local side=$1
+    shift
     local -a hooks=("$@")
-    local i zfs_i=-1 plymouth_i=-1
+    local h has_zfs=0
+    local -a new=()
+    [ "$side" = before ] || [ "$side" = after ] || return 1
     [ "${#hooks[@]}" -gt 0 ] || return 1
-    for i in "${!hooks[@]}"; do
-        case "${hooks[$i]}" in
-            zfs) zfs_i=$i ;;
-            plymouth) plymouth_i=$i ;;
-        esac
+    for h in "${hooks[@]}"; do
+        [ "$h" = zfs ] && has_zfs=1
     done
-    if [ "$zfs_i" -lt 0 ]; then
+    if [ "$has_zfs" -ne 1 ]; then
         echo "zfs hook missing" >&2
         return 1
     fi
-    if [ "$plymouth_i" -ge 0 ]; then
-        if [ "$plymouth_i" -le "$zfs_i" ]; then
-            echo "plymouth appears before zfs" >&2
-            return 1
-        fi
-        printf '%s\n' "${hooks[*]}"
-        return 0
-    fi
-    local -a new=()
-    for i in "${!hooks[@]}"; do
-        new+=("${hooks[$i]}")
-        if [ "$i" -eq "$zfs_i" ]; then
-            new+=(plymouth)
+    for h in "${hooks[@]}"; do
+        [ "$h" = plymouth ] && continue
+        if [ "$h" = zfs ] && [ "$side" = before ]; then
+            new+=(plymouth zfs)
+        elif [ "$h" = zfs ] && [ "$side" = after ]; then
+            new+=(zfs plymouth)
+        else
+            new+=("$h")
         fi
     done
     printf '%s\n' "${new[*]}"
+}
+
+monarchy_plymouth_side() {
+    if monarchy_zfs_keyfile_in_initramfs; then
+        printf '%s\n' before
+    else
+        printf '%s\n' after
+    fi
 }
 
 monarchy_splash_refuse_omarchy_hooks_dropin() {
@@ -59,14 +64,16 @@ monarchy_splash_hooks() {
     local -a hooks
     # shellcheck disable=SC2206
     hooks=($inner)
-    rebuilt=$(monarchy_hooks_insert_plymouth "${hooks[@]}") \
-        || monarchy_die "cannot place plymouth after zfs in HOOKS"
+    local side
+    side=$(monarchy_plymouth_side)
+    rebuilt=$(monarchy_hooks_insert_plymouth "$side" "${hooks[@]}") \
+        || monarchy_die "cannot place plymouth $side zfs in HOOKS"
     newline="HOOKS=($rebuilt)"
     if [ "$newline" = "$line" ]; then
-        monarchy_log "plymouth already after zfs in $conf"
+        monarchy_log "plymouth already $side zfs in $conf"
         return 0
     fi
-    monarchy_log "insert plymouth after zfs in $conf"
+    monarchy_log "place plymouth $side zfs in $conf"
     if [ ! -f "${conf}.monarchy.bak" ]; then
         monarchy_sudo cp -a "$conf" "${conf}.monarchy.bak"
     fi
@@ -76,6 +83,21 @@ monarchy_splash_hooks() {
     monarchy_sudo cp "$tmp" "$conf"
     rm -f "$tmp"
     MONARCHY_SPLASH_REBUILD=1
+}
+
+monarchy_splash_retain() {
+    local src="$MONARCHY_MISC/plymouth-quit-retain.conf"
+    local dest=$MONARCHY_PLYMOUTH_RETAIN
+    [ -f "$src" ] || monarchy_die "missing $src"
+    if [ -f "$dest" ] && cmp -s "$src" "$dest"; then
+        return 0
+    fi
+    monarchy_log "install $dest (plymouth quit --retain-splash)"
+    monarchy_sudo mkdir -p "$(dirname "$dest")"
+    monarchy_sudo install -m 644 "$src" "$dest"
+    if command -v systemctl >/dev/null 2>&1; then
+        monarchy_sudo systemctl daemon-reload
+    fi
 }
 
 monarchy_splash_install_theme() {
@@ -198,6 +220,7 @@ monarchy_splash() {
     MONARCHY_SPLASH_REBUILD=0
     monarchy_splash_install_theme
     monarchy_splash_hooks
+    monarchy_splash_retain
     if [ "${MONARCHY_SPLASH_REBUILD:-0}" = 1 ]; then
         monarchy_splash_rebuild
     fi
@@ -205,7 +228,7 @@ monarchy_splash() {
         monarchy_refresh_sddm
     fi
     monarchy_skip_plymouth_zfs
-    monarchy_log "splash ready (plymouth after zfs, theme omarchy, sddm greeter synced)"
+    monarchy_log "splash ready (plymouth $(monarchy_plymouth_side) zfs, theme omarchy, retain-splash, sddm greeter synced)"
 }
 
 monarchy_splash_only() {

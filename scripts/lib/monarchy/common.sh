@@ -16,6 +16,8 @@ MONARCHY_ESP="${MONARCHY_ESP:-/boot/efi}"
 MONARCHY_ZBM_DIR="${MONARCHY_ZBM_DIR:-$MONARCHY_ESP/EFI/zbm}"
 MONARCHY_REFIND_DIR="${MONARCHY_REFIND_DIR:-$MONARCHY_ESP/EFI/refind}"
 MONARCHY_CACHE="${MONARCHY_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/monarchy/omarchy}"
+MONARCHY_ZFS_KEYFILE="${MONARCHY_ZFS_KEYFILE:-/etc/zfs/zroot.key}"
+MONARCHY_MKINITCPIO_CONF="${MONARCHY_MKINITCPIO_CONF:-/etc/mkinitcpio.conf}"
 
 monarchy_log() {
     local line
@@ -163,11 +165,22 @@ monarchy_skip_autologin() {
     return 0
 }
 
+# Keyfile is on disk and listed in mkinitcpio FILES, so the host zfs hook
+# will not prompt. Plymouth may sit in front of zfs in that case only.
+monarchy_zfs_keyfile_in_initramfs() {
+    local conf=${1:-$MONARCHY_MKINITCPIO_CONF}
+    local key=${2:-$MONARCHY_ZFS_KEYFILE}
+    [ -f "$key" ] || return 1
+    [ -f "$conf" ] || return 1
+    grep -E '^FILES=' "$conf" | grep -Fq "$key"
+}
+
 monarchy_skip_plymouth_zfs() {
     monarchy_pkg_installed plymouth-zfs && monarchy_die "plymouth-zfs is installed"
-    if [ -f /etc/mkinitcpio.conf ]; then
-        if grep -E '^HOOKS=' /etc/mkinitcpio.conf | grep -q 'plymouth.*zfs'; then
-            monarchy_die "plymouth appears before zfs in mkinitcpio HOOKS"
+    if [ -f "$MONARCHY_MKINITCPIO_CONF" ]; then
+        if grep -E '^HOOKS=' "$MONARCHY_MKINITCPIO_CONF" | grep -q 'plymouth.*zfs'; then
+            monarchy_zfs_keyfile_in_initramfs \
+                || monarchy_die "plymouth appears before zfs without $MONARCHY_ZFS_KEYFILE in FILES"
         fi
     fi
     return 0

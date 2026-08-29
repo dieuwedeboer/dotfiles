@@ -21,7 +21,7 @@ usage: setup-monarchy.sh [--check] [--update] [--no-packages] [--splash-only] [-
                   config. Run on any CachyOS+ZFS+KDE host after install.sh.
                   MONARCHY_TRUST_OMARCHY_KEY=1 skips the key prompt.
   --no-packages   Skip pacman leaf packages (still does overlay, repo, session).
-  --splash-only   Omarchy Plymouth theme and plymouth hook after zfs.
+  --splash-only   Omarchy Plymouth theme, plymouth around zfs, retain-splash.
 EOF
             exit 0
             ;;

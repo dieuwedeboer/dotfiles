@@ -8,6 +8,7 @@ Repeatable system setup for Arch Linux (CachyOS).
   - [Initial Setup](#initial-setup)
   - [ZFS with Native Encryption](#zfs-with-native-encryption)
   - [Bootloader (rEFInd + ZFSBootMenu)](#bootloader-refind--zfsbootmenu)
+  - [Boot flow](#boot-flow)
   - [Dotfiles](#dotfiles)
   - [Agent Configuration](#agent-configuration)
   - [Monarchy (optional Omarchy session)](#monarchy-optional-omarchy-session)
@@ -32,7 +33,7 @@ After initial install, configure ZFSBootMenu properties:
 sudo zfs get encryption
 sudo zfs set org.zfsbootmenu:bootfs="zpcachyos/ROOT/cos/root" zpcachyos
 sudo zfs set org.zfsbootmenu:rootprefix="root=ZFS=" zpcachyos
-sudo zfs set org.zfsbootmenu:commandline="rw quiet splash" zpcachyos
+sudo zfs set org.zfsbootmenu:commandline="rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0" zpcachyos
 
 sudo zfs get mountpoint
 sudo zfs mount zpcachyos/ROOT/cos/root
@@ -53,6 +54,19 @@ reboot
 ```
 
 In ZFSBootMenu, press `Ctrl+D` to set pool as default.
+
+The first `generate-zbm` in that chroot writes a stock image. After `./scripts/install.sh`, `setup-zfs.sh` merges the quiet tokens into the pool property and `/etc/zfsbootmenu/config.yaml`, then regenerates the image if the yaml changed. See [Boot flow](#boot-flow).
+
+### Boot flow
+
+Passphrase is ZFSBootMenu. Plymouth (Monarchy) covers the host initramfs after unlock. The 1-2s of console between rEFInd, ZBM, Plymouth, and Hyprland is documented and partly automated in `docs/boot-flow.md`.
+
+`setup-zfs.sh` (from `install.sh`) keeps:
+
+- `org.zfsbootmenu:commandline` on the pool: `rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0`
+- ZBM `Kernel.CommandLine`: `ro quiet loglevel=0 vt.global_cursor_default=0 fbcon=logo-count:0 rd.udev.log_level=0`
+
+Themed ZBM passphrase, HiDPI fonts, and a static ZBM splash are still planned in that doc. They are not in the image yet.
 
 ### ZFS Maintenance
 
@@ -88,6 +102,7 @@ The install script will:
 - Link agent instructions and skills (see [Agent Configuration](#agent-configuration))
 - Install packages and configure system
 - Optionally configure rEFInd with a custom theme (glow) if no custom theme is present
+- Quiet the ZFSBootMenu and host kernel command lines (`docs/boot-flow.md`)
 
 `install.sh` does not install Monarchy. After it finishes, see [Monarchy](#monarchy-optional-omarchy-session).
 

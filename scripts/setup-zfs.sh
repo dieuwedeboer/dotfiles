@@ -3,6 +3,8 @@ set -e
 [ "${VERBOSE:-0}" = 1 ] && set -x
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/zbm/boot.sh
+source "$SCRIPT_DIR/lib/zbm/boot.sh"
 
 echo "=== ZFS Setup Script ==="
 
@@ -33,5 +35,7 @@ sudo install -m 755 "$SCRIPT_DIR/../chezmoi/dot_local/bin/executable_zfs-snapsho
 
 echo "=== Enabling Sanoid timer ==="
 sudo systemctl enable --now sanoid.timer
+
+zbm_apply_quiet_boot
 
 echo "=== ZFS setup complete ==="
