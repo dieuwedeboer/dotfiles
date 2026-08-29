@@ -390,9 +390,6 @@ omarchy-update-system-pkgs-when-conflicted
 omarchy-update-time
 omarchy-update-user-notify
 omarchy-upload-log
-omarchy-version
-omarchy-version-branch
-omarchy-version-channel
 omarchy-version-pkgs
 omarchy-voxtype-config
 omarchy-voxtype-install

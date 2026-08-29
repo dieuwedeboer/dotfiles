@@ -57,6 +57,7 @@ Overlay unit test (no sudo):
 
 ```bash
 ./scripts/lib/monarchy/test-overlay.sh /tmp/quattro-on-zfs
+./scripts/lib/monarchy/test-version.sh
 ./scripts/lib/monarchy/test-branding.sh
 ./scripts/lib/monarchy/test-user.sh
 ./scripts/lib/monarchy/test-lock.sh

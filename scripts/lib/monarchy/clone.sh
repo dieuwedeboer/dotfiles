@@ -44,13 +44,28 @@ monarchy_sync_omarchy_clone() {
     monarchy_clone_git "$MONARCHY_SRC" 1
 }
 
+monarchy_install_file() {
+    local src=$1 dest=$2
+    local dir
+    dir=$(dirname "$dest")
+    if [ -w "$dir" ] 2>/dev/null; then
+        mkdir -p "$dir"
+        install -m 644 "$src" "$dest"
+    else
+        monarchy_sudo mkdir -p "$dir"
+        monarchy_sudo install -m 644 "$src" "$dest"
+    fi
+}
+
 monarchy_write_omarchy_conf() {
-    local tmp
+    local tmp src
     tmp=$(mktemp)
     printf 'OMARCHY_PATH=%s\n' "$MONARCHY_PATH" >"$tmp"
-    monarchy_sudo mkdir -p "$(dirname "$MONARCHY_CONF")"
-    monarchy_sudo install -m 644 "$tmp" "$MONARCHY_CONF"
+    monarchy_install_file "$tmp" "$MONARCHY_CONF"
     rm -f "$tmp"
+    src="$MONARCHY_MISC/omarchy.lock"
+    [ -f "$src" ] || monarchy_die "missing $src"
+    monarchy_install_file "$src" "$MONARCHY_PIN"
 }
 
 monarchy_link_working_prefix() {

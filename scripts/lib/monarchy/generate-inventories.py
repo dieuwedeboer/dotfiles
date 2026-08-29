@@ -23,6 +23,9 @@ WRAP = {
     "omarchy-refresh-plymouth",
     "omarchy-refresh-sddm",
     "omarchy-screensaver",
+    "omarchy-version",
+    "omarchy-version-branch",
+    "omarchy-version-channel",
 }
 
 # Same job as omarchy-on-cachyos deleting installer steps: only the commands
