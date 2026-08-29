@@ -21,6 +21,11 @@ grep -q '#1a1b26' "$qml" || fail "Main.qml missing #1a1b26 token"
 grep -q '#ffffff' "$qml" || fail "Main.qml missing #ffffff token"
 grep -q 'cycleUser' "$qml" || fail "Main.qml missing cycleUser"
 grep -q 'cycleSession' "$qml" || fail "Main.qml missing cycleSession"
+grep -q 'isStockHyprlandSession' "$qml" || fail "Main.qml missing isStockHyprlandSession"
+grep -q 'hyprland-uwsm.desktop' "$qml" || fail "Main.qml does not skip hyprland-uwsm.desktop"
+if grep -q 'blob.indexOf("hyprland")' "$qml"; then
+    fail "Main.qml must not hide Omarchy by matching the word hyprland"
+fi
 grep -q 'prefersPlasma' "$qml" || fail "Main.qml missing prefersPlasma"
 grep -q 'amie' "$qml" || fail "Main.qml missing family user amie"
 grep -q 'olivier' "$qml" || fail "Main.qml missing family user olivier"
@@ -59,6 +64,16 @@ fi
 apply_body=$(awk '/^monarchy_apply\(\)/,/^monarchy_update\(\)/' "$SCRIPT_DIR/update.sh")
 echo "$apply_body" | grep -q 'monarchy_keep_sddm' \
     || fail "monarchy_apply does not call monarchy_keep_sddm"
+install_body=$(awk '/^monarchy_install_omarchy_session\(\)/,/^}$/' "$SCRIPT_DIR/sessions.sh")
+echo "$install_body" | grep -q 'monarchy_hide_stock_hyprland_sessions' \
+    || fail "omarchy session install does not hide stock Hyprland sessions"
+grep -q 'print "NoDisplay=true"' "$SCRIPT_DIR/sessions.sh" \
+    || fail "hide stock Hyprland sessions must write NoDisplay=true"
+if grep -q 'print "Hidden=true"' "$SCRIPT_DIR/sessions.sh"; then
+    fail "must not set Hidden=true; uwsm start … hyprland.desktop would refuse it"
+fi
+grep -q 'is Hidden=true' "$SCRIPT_DIR/sessions.sh" \
+    || fail "hide must refuse a Hidden=true hyprland.desktop"
 echo "$apply_body" | grep -q 'monarchy_splash_maybe_theme' \
     || fail "monarchy_apply does not call monarchy_splash_maybe_theme"
 echo "$apply_body" | grep -q 'monarchy_keep_plasmalogin' \
@@ -67,6 +82,8 @@ echo "$apply_body" | grep -q 'monarchy_keep_plasmalogin' \
 check_body=$(awk '/^monarchy_check\(\)/,/^monarchy_apply_lock\(\)/' "$SCRIPT_DIR/update.sh")
 echo "$check_body" | grep -q 'monarchy_assert_sddm_runtime' \
     || fail "monarchy_check does not call monarchy_assert_sddm_runtime"
+echo "$check_body" | grep -q 'monarchy_check_hidden_hyprland_sessions' \
+    || fail "monarchy_check does not assert stock Hyprland sessions are hidden"
 echo "$check_body" | grep -q 'monarchy_keep_plasmalogin' \
     && fail "monarchy_check still calls monarchy_keep_plasmalogin"
 
@@ -101,6 +118,8 @@ grep -q 'omarchy-refresh-sddm' "$SCRIPT_DIR/overlay.sh" \
 
 # shellcheck source=common.sh
 source "$SCRIPT_DIR/common.sh"
+# shellcheck source=sessions.sh
+source "$SCRIPT_DIR/sessions.sh"
 # shellcheck source=sddm.sh
 source "$SCRIPT_DIR/sddm.sh"
 # shellcheck source=splash.sh
@@ -162,6 +181,62 @@ unset MONARCHY_SDDM_SYS_CONF_DIR MONARCHY_SDDM_USER_CONF_DIR \
 trap - EXIT
 cleanup_merge
 cleanup_merge() { :; }
+
+sess=$merge_tmp/wayland-sessions
+mkdir -p "$sess"
+cat >"$sess/hyprland.desktop" <<'EOF'
+[Desktop Entry]
+Name=Hyprland
+Exec=/usr/bin/start-hyprland
+DesktopNames=Hyprland
+EOF
+cat >"$sess/hyprland-uwsm.desktop" <<'EOF'
+[Desktop Entry]
+Name=Hyprland (uwsm-managed)
+Exec=uwsm start -e -D Hyprland hyprland.desktop
+TryExec=uwsm
+DesktopNames=Hyprland
+EOF
+cat >"$sess/omarchy.desktop" <<'EOF'
+[Desktop Entry]
+Name=Omarchy (Hyprland uwsm)
+Exec=uwsm start -g -1 -e -D Hyprland hyprland.desktop
+TryExec=uwsm
+DesktopNames=Hyprland
+EOF
+cat >"$sess/plasma.desktop" <<'EOF'
+[Desktop Entry]
+Name=Plasma (Wayland)
+Exec=/usr/bin/startplasma-wayland
+DesktopNames=KDE
+EOF
+export MONARCHY_WAYLAND_SESSIONS_DIR=$sess
+export MONARCHY_LOG=$merge_tmp/log
+monarchy_hide_stock_hyprland_sessions
+grep -q '^NoDisplay=true' "$sess/hyprland.desktop" \
+    || fail "did not set NoDisplay on hyprland.desktop"
+grep -q '^NoDisplay=true' "$sess/hyprland-uwsm.desktop" \
+    || fail "did not set NoDisplay on hyprland-uwsm.desktop"
+if grep -q '^Hidden=' "$sess/hyprland.desktop"; then
+    fail "set Hidden on hyprland.desktop (uwsm would refuse it)"
+fi
+if grep -q '^NoDisplay=' "$sess/omarchy.desktop"; then
+    fail "hid omarchy.desktop"
+fi
+if grep -q '^NoDisplay=' "$sess/plasma.desktop"; then
+    fail "hid plasma.desktop"
+fi
+monarchy_hide_stock_hyprland_sessions
+n=$(grep -c '^NoDisplay=true' "$sess/hyprland.desktop")
+[ "$n" -eq 1 ] || fail "NoDisplay seed is not idempotent ($n)"
+monarchy_check_hidden_hyprland_sessions
+
+printf '\nHidden=true\n' >>"$sess/hyprland.desktop"
+if ( monarchy_hide_stock_hyprland_sessions ) 2>/dev/null; then
+    fail "hide did not refuse Hidden=true on hyprland.desktop"
+fi
+unset MONARCHY_WAYLAND_SESSIONS_DIR
+rm -rf "$merge_tmp"
 
 CLONE="${MONARCHY_SRC:-/usr/local/src/monarchy/omarchy}"
 if [ -d "$CLONE/default/sddm/omarchy" ] && [ -f "$CLONE/themes/osaka-jade/unlock.png" ]; then
