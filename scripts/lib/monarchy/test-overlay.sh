@@ -63,6 +63,14 @@ grep -q 'monarchy_seed_branding' "$dest/omarchy-screensaver" || {
     echo "screensaver wrap does not seed branding" >&2
     exit 1
 }
+[ -x "$dest/omarchy-version" ] || { echo "version wrap missing" >&2; exit 1; }
+[ ! -L "$dest/omarchy-version" ] || { echo "omarchy-version wrap is a symlink" >&2; exit 1; }
+[ ! -L "$dest/omarchy-version-branch" ] || { echo "omarchy-version-branch wrap is a symlink" >&2; exit 1; }
+[ ! -L "$dest/omarchy-version-channel" ] || { echo "omarchy-version-channel wrap is a symlink" >&2; exit 1; }
+grep -q 'wrap-version does not handle' "$dest/omarchy-version" || {
+    echo "omarchy-version is not wrap-version" >&2
+    exit 1
+}
 [ -x "$dest/yay" ] || { echo "yay wrapper missing" >&2; exit 1; }
 
 allow_n=${#MONARCHY_BIN_ALLOW[@]}

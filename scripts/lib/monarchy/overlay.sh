@@ -15,6 +15,9 @@ monarchy_wrap_stub_for() {
         omarchy-screensaver)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-screensaver.sh"
             ;;
+        omarchy-version|omarchy-version-branch|omarchy-version-channel)
+            printf '%s\n' "$monarchy_lib_dir/stubs/wrap-version.sh"
+            ;;
         *)
             monarchy_die "no wrap stub for $name"
             ;;

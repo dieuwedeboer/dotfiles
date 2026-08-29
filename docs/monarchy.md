@@ -315,6 +315,7 @@ Three checked-in inventories, complete at the pinned commit (`allow ∪ wrap ∪
 - `omarchy-update-system-pkgs` -> `setup-monarchy.sh --update`
 - `omarchy-plymouth-set` / `omarchy-plymouth-reset` / `omarchy-refresh-plymouth` -> Monarchy splash helpers (`mkinitcpio -P`, no Limine). plymouth-set restyles the greeter overlay; refresh-sddm is a separate wrap
 - `omarchy-screensaver` -> seed `screensaver.txt` from clone `logo.txt` if missing, then exec the clone binary. Reset copies `$OMARCHY_PATH/logo.txt`, which is why the working prefix must link that file.
+- `omarchy-version` / `omarchy-version-branch` / `omarchy-version-channel` -> Fastfetch About. Version is `$OMARCHY_PATH/version` plus `-git`. Branch is the apply pin (`quattro-on-zfs @ <short sha>`). Channel is the `[omarchy]` pkg repo only (`stable` / `edge` / `unknown`). The clone is detached and root-owned, so these do not run `git`.
 
 `omarchy-refresh-pacman` stays in `bin.deny` (exit 2). Its contract is "replace pacman.conf"; redirecting it to `--update` would hide that.
 
@@ -334,7 +335,7 @@ Three checked-in inventories, complete at the pinned commit (`allow ∪ wrap ∪
 
 Also in `bin.allow` by exact name, because the session and menu need them. This is the rest of the v1 allow seed; PR 2 writes each as its own line:
 
-- `omarchy-menu`, `omarchy-launch-nautilus`, `omarchy-launch-terminal`, `omarchy-launch-browser`, `omarchy-launch-editor`, `omarchy-launch-screensaver`, `omarchy-refresh-hyprland`, `omarchy-refresh-shell`, `omarchy-refresh-config`, `omarchy-refresh-applications`, `omarchy-migrate`, `omarchy-snapshot`, `omarchy-default-terminal`, `omarchy-default-browser`, `omarchy-default-editor`, `omarchy-version`, `omarchy-cmd-present`, `omarchy-cmd-missing`, `omarchy-state`
+- `omarchy-menu`, `omarchy-launch-nautilus`, `omarchy-launch-terminal`, `omarchy-launch-browser`, `omarchy-launch-editor`, `omarchy-launch-screensaver`, `omarchy-refresh-hyprland`, `omarchy-refresh-shell`, `omarchy-refresh-config`, `omarchy-refresh-applications`, `omarchy-migrate`, `omarchy-snapshot`, `omarchy-default-terminal`, `omarchy-default-browser`, `omarchy-default-editor`, `omarchy-cmd-present`, `omarchy-cmd-missing`, `omarchy-state`
 
 Further session helpers, `omarchy-install-*`, and `omarchy-pkg-*` are allowlisted by default. `generate-inventories.py` is allow-default.
 
@@ -428,7 +429,7 @@ misc/monarchy/
   packages.deny
   packages.installed     # written on the machine, also copied back into git after PR 4a
   bin.allow              # exact names; no globs; includes omarchy router
-  bin.wrap               # update, plymouth, refresh-sddm, screensaver
+  bin.wrap               # update, plymouth, refresh-sddm, screensaver, version
   sddm/                  # Main.qml overlay, zz-omarchy-sddm.conf
   bin.deny               # complement at the pin (implicit deny, 438 total)
   migrations.deny
@@ -696,6 +697,7 @@ fi
 | `/etc/pacman.conf` marker block | `[omarchy]`, `SigLevel = Required DatabaseOptional` |
 | `/etc/pacman.conf.monarchy.bak` | Backup before first edit |
 | `/etc/omarchy.conf` | `OMARCHY_PATH=/usr/local/share/omarchy` |
+| `/etc/omarchy.lock` | Copy of `misc/monarchy/omarchy.lock` written at apply. `omarchy-version-branch` reads it |
 | `/etc/pam.d/omarchy-lock-password` | Quickshell lock PAM. Written by `omarchy-apply-lock` |
 | `/usr/local/src/monarchy/omarchy` | git clone |
 | `/usr/local/share/omarchy` | working prefix: data symlinks + overlay `bin/` |
