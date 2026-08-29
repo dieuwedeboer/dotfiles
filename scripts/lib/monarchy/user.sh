@@ -197,6 +197,34 @@ EOF
     monarchy_log "seeded pam_kwallet_init in $dest"
 }
 
+# Omarchy's default input.lua sets compose:caps (Caps Lock becomes Compose).
+# User kb_options replaces that. caps:capslock is the stock Caps Lock behavior.
+monarchy_seed_capslock() {
+    local dest="$HOME/.config/hypr/input.lua"
+    mkdir -p "$(dirname "$dest")"
+    [ -f "$dest" ] || printf -- '-- Keep only your personal input overrides here.\n' >"$dest"
+
+    if grep -Eq '^[[:space:]]*kb_options' "$dest"; then
+        if grep -Eq '^[[:space:]]*kb_options[[:space:]]*=[[:space:]]*"caps:capslock"' "$dest"; then
+            return 0
+        fi
+        if ! grep -Eq '^[[:space:]]*kb_options.*compose:caps' "$dest"; then
+            return 0
+        fi
+    fi
+
+    cat >>"$dest" <<'EOF'
+
+-- Caps Lock is Caps Lock. Omarchy's default (compose:caps) remaps it to Compose.
+hl.config({
+  input = {
+    kb_options = "caps:capslock",
+  },
+})
+EOF
+    monarchy_log "restored Caps Lock in $dest"
+}
+
 monarchy_user_git() {
     local gitsh="$MONARCHY_SRC/install/user/git.sh"
     [ -f "$gitsh" ] || return 0
@@ -208,6 +236,7 @@ monarchy_setup_user() {
     monarchy_seed_hyprland_config
     monarchy_seed_switch_user_bind
     monarchy_seed_kwallet_autostart
+    monarchy_seed_capslock
     monarchy_seed_branding
     monarchy_clear_terminal_override
     monarchy_user_omarchy_defaults
