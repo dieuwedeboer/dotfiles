@@ -8,6 +8,10 @@ SEAT_PATH=/org/freedesktop/DisplayManager/Seat0
 SEAT_IFACE=org.freedesktop.DisplayManager.Seat
 LOCK_TRIES=${MONARCHY_SWITCH_USER_LOCK_TRIES:-50}
 LOCK_SLEEP=${MONARCHY_SWITCH_USER_LOCK_SLEEP:-0.1}
+ALREADY_LOCKED=0
+if [ "${1:-}" = "--already-locked" ]; then
+    ALREADY_LOCKED=1
+fi
 
 die() {
     echo "monarchy-switch-user: $*" >&2
@@ -37,7 +41,7 @@ case "$can" in
     *) die "display manager CanSwitch is not true ($can)" ;;
 esac
 
-if lock_state; then
+if [ "$ALREADY_LOCKED" = 1 ] || lock_state; then
     busctl --system call "$DM" "$SEAT_PATH" "$SEAT_IFACE" SwitchToGreeter
     exit 0
 fi

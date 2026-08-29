@@ -157,13 +157,29 @@ monarchy_user_theme() {
 
 monarchy_seed_switch_user_bind() {
     local dest="$HOME/.config/hypr/bindings.lua"
+    local bind='o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user", { locked = true })'
     mkdir -p "$(dirname "$dest")"
     [ -f "$dest" ] || printf -- '-- Keep only your personal keybinding overrides here.\n' >"$dest"
-    grep -q 'monarchy-switch-user' "$dest" 2>/dev/null && return 0
-    cat >>"$dest" <<'EOF'
+    if grep -Fq "$bind" "$dest" 2>/dev/null; then
+        return 0
+    fi
+    if grep -q 'monarchy-switch-user' "$dest" 2>/dev/null; then
+        # Prior seed omitted locked=true. Hyprland drops unlocked binds while
+        # ext-session-lock is held, so Super+Ctrl+U on the lock screen did nothing.
+        local tmp
+        tmp=$(mktemp)
+        awk -v bind="$bind" '
+            /monarchy-switch-user/ && /o\.bind\(/ { print bind; next }
+            { print }
+        ' "$dest" >"$tmp"
+        mv "$tmp" "$dest"
+        monarchy_log "upgraded Super+Ctrl+U switch-user bind to locked in $dest"
+        return 0
+    fi
+    cat >>"$dest" <<EOF
 
--- Switch user: lock, then SDDM greeter. Same chord on the lock screen.
-o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user")
+-- Switch user: lock, then SDDM greeter. locked=true so the chord works on the lock screen.
+$bind
 EOF
     monarchy_log "seeded Super+Ctrl+U switch-user bind in $dest"
 }

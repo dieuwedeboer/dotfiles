@@ -13,8 +13,52 @@ Rectangle {
   property int userIndex: 0
   property int sessionIndex: 0
   property bool loginFailed: false
+  property bool resumePending: false
+  property string pendingPassword: ""
+  property int pendingSession: 0
   property string currentUser: userNameAt(userIndex)
   property string sessionLabel: sessionLabelAt(sessionIndex)
+
+  // Greeter Image GET: 200 png means the user already has a Wayland session
+  // and we switched to it. 404/error falls through to sddm.login().
+  Image {
+    id: resumeImg
+    visible: false
+    cache: false
+    asynchronous: true
+    onStatusChanged: {
+      if (!root.resumePending)
+        return
+      if (status === Image.Loading)
+        return
+      resumeTimer.stop()
+      root.resumePending = false
+      if (status === Image.Ready)
+        return
+      sddm.login(root.currentUser, root.pendingPassword, root.pendingSession)
+    }
+  }
+
+  Timer {
+    id: resumeTimer
+    interval: 800
+    repeat: false
+    onTriggered: {
+      if (!root.resumePending)
+        return
+      root.resumePending = false
+      sddm.login(root.currentUser, root.pendingPassword, root.pendingSession)
+    }
+  }
+
+  function attemptEnter() {
+    root.pendingPassword = password.text
+    root.pendingSession = root.sessionIndex
+    root.resumePending = true
+    resumeTimer.restart()
+    resumeImg.source = ""
+    resumeImg.source = "http://127.0.0.1:17621/resume?user=" + encodeURIComponent(root.currentUser) + "&t=" + Date.now()
+  }
 
   // Optional overlay: drop background.jpg next to this QML in misc/monarchy/sddm/.
   Image {
@@ -225,7 +269,7 @@ Rectangle {
               root.cycleSession(1)
               event.accepted = true
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-              sddm.login(root.currentUser, password.text, root.sessionIndex)
+              root.attemptEnter()
               event.accepted = true
             }
           }
@@ -234,7 +278,7 @@ Rectangle {
     }
 
     Text {
-      text: "Tab user  ·  Up/Down session"
+      text: "Tab user  ·  Up/Down session  ·  Enter resumes an open session"
       color: "#ffffff"
       opacity: 0.45
       font.family: "JetBrainsMono Nerd Font"

@@ -1,0 +1,11 @@
+[Unit]
+Description=Monarchy SDDM resume helper
+After=sddm.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/monarchy-sddm-resume --httpd
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

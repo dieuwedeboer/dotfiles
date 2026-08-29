@@ -130,7 +130,7 @@ SWITCH_PROC = """  Process {
 
   Process {
     id: switchUserProc
-    command: ["/usr/local/bin/monarchy-switch-user"]
+    command: ["/usr/local/bin/monarchy-switch-user", "--already-locked"]
   }
 """
 

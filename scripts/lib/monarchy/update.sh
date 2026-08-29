@@ -86,6 +86,7 @@ monarchy_check() {
         monarchy_die "plasma-login-manager leaked into filtered package list"
     fi
     [ -f "$monarchy_lib_dir/switch-user.sh" ] || monarchy_die "missing switch-user.sh"
+    [ -f "$monarchy_lib_dir/sddm-resume.sh" ] || monarchy_die "missing sddm-resume.sh"
     monarchy_check_session_lock_overlay
     monarchy_check_logind
     monarchy_assert_settings_assets

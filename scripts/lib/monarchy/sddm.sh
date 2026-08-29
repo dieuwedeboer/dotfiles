@@ -86,6 +86,13 @@ monarchy_assert_sddm_assets() {
     grep -q 'cycleUser' "$qml" || monarchy_die "$qml is not the multi-user overlay"
     grep -q '^Current=omarchy$' "$conf" || monarchy_die "$conf must set Current=omarchy"
     grep -q 'start-hyprland' "$conf" || monarchy_die "$conf must use start-hyprland"
+    if grep -q '^SessionCommand=' "$conf"; then
+        monarchy_die "$conf must not set SessionCommand (re-login starts a second compositor)"
+    fi
+    [ -f "$monarchy_lib_dir/sddm-resume.sh" ] || monarchy_die "missing sddm-resume.sh"
+    [ -f "$MONARCHY_MISC/sddm/monarchy-sddm-resume.service" ] \
+        || monarchy_die "missing monarchy-sddm-resume.service"
+    grep -q '127.0.0.1:17621/resume' "$qml" || monarchy_die "$qml missing resume URL"
     if ! LC_ALL=C awk -v n="$(basename "$conf")" 'BEGIN { exit !(n > "kde_settings.conf") }'; then
         monarchy_die "$conf must sort after kde_settings.conf (use zz-, not 99-)"
     fi
@@ -148,7 +155,7 @@ monarchy_sddm_install_overlay_assets() {
         [ -f "$f" ] || continue
         base=$(basename "$f")
         case "$base" in
-            *.conf|Main.qml) continue ;;
+            *.conf|*.service|Main.qml) continue ;;
         esac
         monarchy_sudo install -m 644 "$f" "$dest/$base"
     done
@@ -331,8 +338,23 @@ monarchy_refresh_sddm() {
     monarchy_sddm_install_overlay_assets
 }
 
+monarchy_install_sddm_resume() {
+    local src="$monarchy_lib_dir/sddm-resume.sh"
+    local unit="$MONARCHY_MISC/sddm/monarchy-sddm-resume.service"
+    [ -f "$src" ] || monarchy_die "missing $src"
+    [ -f "$unit" ] || monarchy_die "missing $unit"
+    monarchy_sudo install -m 755 "$src" /usr/local/bin/monarchy-sddm-resume
+    monarchy_sudo rm -f /usr/local/bin/monarchy-wayland-session
+    monarchy_sudo install -m 644 "$unit" /etc/systemd/system/monarchy-sddm-resume.service
+    if command -v systemctl >/dev/null 2>&1; then
+        monarchy_sudo systemctl enable --now monarchy-sddm-resume.service
+    fi
+    monarchy_log "installed monarchy-sddm-resume"
+}
+
 monarchy_keep_sddm() {
     monarchy_assert_sddm_assets
+    monarchy_install_sddm_resume
     if ! monarchy_pkg_installed sddm; then
         if [ "${MONARCHY_NO_PACKAGES:-0}" = 1 ]; then
             monarchy_die "sddm is not installed; run without --no-packages"
