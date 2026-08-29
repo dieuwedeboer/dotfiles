@@ -23,6 +23,7 @@ py="$SCRIPT_DIR/overlay-lock.py"
 [ -x "$cmd" ] || fail "switch-user.sh is not executable"
 [ -f "$py" ] || fail "missing overlay-lock.py"
 grep -q 'SUPER + CTRL + U' "$SCRIPT_DIR/user.sh" || fail "user.sh does not seed Super+Ctrl+U"
+grep -q '{ locked = true }' "$SCRIPT_DIR/user.sh" || fail "user.sh switch-user bind is not locked=true"
 grep -q 'monarchy_overlay_session_lock' "$SCRIPT_DIR/update.sh" || fail "apply does not overlay lock"
 grep -q 'monarchy_install_switch_user' "$SCRIPT_DIR/update.sh" || fail "apply does not install monarchy-switch-user"
 grep -q 'monarchy_check_session_lock_overlay' "$SCRIPT_DIR/update.sh" || fail "check does not verify lock overlay"
@@ -58,8 +59,19 @@ cat >"$stub/omarchy-shell" <<'SH'
 #!/bin/bash
 state_dir="${MONARCHY_TEST_STATE:?}"
 printf '%s\n' "$*" >>"$state_dir/lock.log"
+locked=$(cat "$state_dir/locked")
+# Production always answers `lock status` with compact JSON. isLocked is only
+# a fallback when status is empty; tests must exercise the JSON path.
+if [[ $1 == lock && $2 == status ]]; then
+    if [[ $locked == true ]]; then
+        echo '{"locked":true,"requested":true,"pending":false,"sessionLocked":true,"secure":true,"realScreens":1,"passwordPam":true,"fingerprint":false,"authenticating":false,"lastEvent":"secure=true","lastEventAt":"t"}'
+    else
+        echo '{"locked":false,"requested":false,"pending":false,"sessionLocked":false,"secure":false,"realScreens":1,"passwordPam":true,"fingerprint":false,"authenticating":false,"lastEvent":"unlocked","lastEventAt":"t"}'
+    fi
+    exit 0
+fi
 if [[ $1 == lock && $2 == isLocked ]]; then
-    cat "$state_dir/locked"
+    if [[ $locked == true ]]; then echo true; else echo false; fi
     exit 0
 fi
 if [[ $1 == lock && $2 == lock ]]; then
@@ -98,6 +110,15 @@ printf 'false\n' >"$state/locked"
 "$cmd" || fail "unlocked switch-user failed"
 grep -q SwitchToGreeter "$state/busctl.log" || fail "unlocked did not call SwitchToGreeter"
 grep -q 'lock lock' "$state/lock.log" || fail "unlocked did not take the session lock"
+
+printf 'false\n' >"$state/locked"
+: >"$state/busctl.log"
+: >"$state/lock.log"
+"$cmd" --already-locked || fail "--already-locked switch-user failed"
+grep -q SwitchToGreeter "$state/busctl.log" || fail "--already-locked did not call SwitchToGreeter"
+if grep -q 'lock lock' "$state/lock.log"; then
+    fail "--already-locked still tried to take the session lock"
+fi
 
 printf 'false\n' >"$state/canswitch"
 printf 'true\n' >"$state/locked"
@@ -157,6 +178,7 @@ if [ -f "$clone/shell/plugins/lock/LockView.qml" ]; then
     grep -q 'ctrl && !meta && event.key === Qt.Key_U' "$view" || fail "LockView Ctrl+U clear no longer ignores Super"
     grep -q 'function runSwitchUser' "$service" || fail "Service.qml missing runSwitchUser"
     grep -q '/usr/local/bin/monarchy-switch-user' "$service" || fail "Service.qml does not call monarchy-switch-user"
+    grep -q -- '--already-locked' "$service" || fail "Service.qml lock-screen path must pass --already-locked"
     grep -q '"system.switch-user"' "$menu" || fail "menu missing system.switch-user"
     awk '/system.lock/{lock=NR} /system.switch-user/{sw=NR} END{if(!(lock&&sw&&sw==lock+1)) exit 1}' "$menu" \
         || fail "system.switch-user is not the row after system.lock"
@@ -188,8 +210,15 @@ printf -- '-- Keep only your personal keybinding overrides here.\n' >"$bind"
 monarchy_seed_switch_user_bind
 grep -q 'SUPER + CTRL + U' "$bind" || fail "bind seed missing Super+Ctrl+U"
 grep -q 'monarchy-switch-user' "$bind" || fail "bind seed missing monarchy-switch-user"
+grep -q '{ locked = true }' "$bind" || fail "bind seed missing locked=true"
 monarchy_seed_switch_user_bind
 n=$(grep -c 'monarchy-switch-user' "$bind")
 [ "$n" -eq 1 ] || fail "bind seed is not idempotent ($n)"
+
+printf -- '-- Keep only your personal keybinding overrides here.\n\no.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user")\n' >"$bind"
+monarchy_seed_switch_user_bind
+grep -q '{ locked = true }' "$bind" || fail "seed did not upgrade an unlocked switch-user bind"
+n=$(grep -c 'monarchy-switch-user' "$bind")
+[ "$n" -eq 1 ] || fail "bind upgrade is not idempotent ($n)"
 
 echo "switch-user tests passed"

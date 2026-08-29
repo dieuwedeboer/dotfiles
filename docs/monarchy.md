@@ -514,7 +514,7 @@ Exact greeter files:
 
 Family members see the Omarchy terminal-style greeter with their name and Plasma on screen. Tab if the last user was someone else. After login they still get full Plasma. `sddm-kcm` may stay; a monarchy apply puts `Current=omarchy` back.
 
-Switch user is Super+Ctrl+U in both places: the System menu / Hyprland bind (Dieuwe, session unlocked) and the Omarchy lock screen (family, no password). Both run `/usr/local/bin/monarchy-switch-user`, which takes `ext-session-lock` if the session is unlocked, waits until it is held, then calls SDDM `Seat.SwitchToGreeter`. Do not replace `omarchy.lock` with the greeter. There is no Unlock menu row. `--check` fails if the lock QML or `system.lock` menu hunk no longer matches the clone.
+Switch user is Super+Ctrl+U in both places: the System menu / Hyprland bind (Dieuwe, session unlocked) and the Omarchy lock screen (family, no password). Both run `/usr/local/bin/monarchy-switch-user`, which takes `ext-session-lock` if the session is unlocked, waits until it is held, then calls SDDM `Seat.SwitchToGreeter`. Do not `sddm.login()` for a user who already has a Wayland session: that starts a second compositor and has hard-crashed this machine. The greeter asks `monarchy-sddm-resume` first (localhost Image GET); a hit `loginctl activate`s the existing session and leaves the greeter up. Miss falls through to `sddm.login()` for a fresh user. Do not replace `omarchy.lock` with the greeter. There is no Unlock menu row. `--check` fails if the lock QML or `system.lock` menu hunk no longer matches the clone.
 
 No `[Autologin]`. ZFS passphrase is at ZBM. User password is at the greeter.
 

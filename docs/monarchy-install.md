@@ -63,6 +63,7 @@ Overlay unit test (no sudo):
 ./scripts/lib/monarchy/test-switch-user.sh
 ./scripts/lib/monarchy/test-logind.sh
 ./scripts/lib/monarchy/test-sddm.sh
+./scripts/lib/monarchy/test-sddm-resume.sh
 ./scripts/lib/monarchy/test-splash.sh
 ./scripts/lib/monarchy/test-settings.sh
 ```
@@ -90,7 +91,7 @@ After reboot:
 5. `omarchy-refresh-pacman` prints `monarchy: blocked` and exits 2.
 6. `pacman -Q sddm` succeeds. `systemctl is-enabled sddm` is enabled. `pacman -Q plasma-login-manager` fails. `/etc/sddm.conf.d/zz-omarchy-sddm.conf` sorts after leftover `kde_settings.conf` and sets `Current=omarchy`. Greeter `Main.qml` is the multi-user overlay on stock Unlock (`#1a1b26`) unless Style > Unlock has already restyled plymouth. Drop `background.jpg` in `misc/monarchy/sddm/` to layer a wallpaper on that greeter.
 7. `/etc/pam.d/omarchy-lock-password` exists. Super+Ctrl+L locks the Omarchy session.
-8. Super+Ctrl+U (System menu too) locks if needed and returns to SDDM. The same chord on the lock screen is the family breakout. It does not need the locked user's password.
+8. Super+Ctrl+U (System menu too) locks if needed and returns to SDDM. The same chord on the lock screen is the family breakout. It does not need the locked user's password. Logging back into an open session from the greeter switches to that session's lock screen. It must not start a second compositor.
 9. `~/.config/omarchy/branding/screensaver.txt` exists (Omarchy wordmark). Super+Esc → Screensaver shows it; a key dismisses it. `$OMARCHY_PATH/logo.txt` is a symlink so _Style > Screensaver > Restore Default_ works.
 
 If Hyprland fails to start, stay on Plasma, boot a `pre-update-*` snapshot from ZFSBootMenu, and keep `/var/log/monarchy-setup.log`.

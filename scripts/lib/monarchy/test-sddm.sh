@@ -33,6 +33,9 @@ fi
 
 grep -q '^Current=omarchy$' "$conf" || fail "conf Current is not omarchy"
 grep -q 'start-hyprland' "$conf" || fail "conf missing start-hyprland"
+if grep -q '^SessionCommand=' "$conf"; then
+    fail "conf must not set SessionCommand"
+fi
 grep -q '^DisplayServer=wayland$' "$conf" || fail "conf missing DisplayServer=wayland"
 if grep -Eq '^[[:space:]]*User=[[:space:]]*[^[:space:]]+' "$conf"; then
     fail "conf sets Autologin User"
@@ -140,6 +143,7 @@ mkdir -p "$overlay_misc/sddm" "$merge_tmp/theme"
 printf 'asset\n' >"$overlay_misc/sddm/background.jpg"
 printf 'keep\n' >"$overlay_misc/sddm/Main.qml"
 printf '[Theme]\nCurrent=omarchy\n' >"$overlay_misc/sddm/zz-omarchy-sddm.conf"
+printf '[Unit]\nDescription=x\n' >"$overlay_misc/sddm/monarchy-sddm-resume.service"
 export MONARCHY_MISC="$overlay_misc"
 export MONARCHY_SDDM_THEME_DIR="$merge_tmp/theme"
 monarchy_sddm_install_overlay_assets
@@ -149,6 +153,8 @@ monarchy_sddm_install_overlay_assets
     || fail "overlay copied Main.qml (write_qml owns that)"
 [ ! -e "$merge_tmp/theme/zz-omarchy-sddm.conf" ] \
     || fail "overlay copied the drop-in conf into the theme dir"
+[ ! -e "$merge_tmp/theme/monarchy-sddm-resume.service" ] \
+    || fail "overlay copied the resume unit into the theme dir"
 export MONARCHY_MISC="$MISC"
 rm -rf "$overlay_misc"
 unset MONARCHY_SDDM_SYS_CONF_DIR MONARCHY_SDDM_USER_CONF_DIR \
