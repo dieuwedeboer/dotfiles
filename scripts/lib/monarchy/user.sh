@@ -20,7 +20,24 @@ monarchy_seed_hyprland_config() {
         [ -e "$f" ] || continue
         monarchy_copy_if_missing "$f" "$dest/$(basename "$f")"
     done
+    monarchy_seed_hypr_boot_color
     monarchy_log "seeded $dest (existing files left in place)"
+}
+
+# First Hyprland frame matches Unlock #1a1b26 instead of the default grey.
+monarchy_seed_hypr_boot_color() {
+    local src="$MONARCHY_MISC/hypr/boot-color.lua"
+    local dest="$HOME/.config/hypr/boot-color.lua"
+    local hypr="$HOME/.config/hypr/hyprland.lua"
+    [ -f "$src" ] || monarchy_die "missing $src"
+    mkdir -p "$(dirname "$dest")"
+    cp -a "$src" "$dest"
+    [ -f "$hypr" ] || return 0
+    if grep -q 'hypr.boot-color' "$hypr"; then
+        return 0
+    fi
+    printf '\nrequire("hypr.boot-color")\n' >>"$hypr"
+    monarchy_log "required hypr.boot-color from $hypr"
 }
 
 monarchy_seed_branding() {

@@ -21,6 +21,15 @@ monarchy_sddm_conf_src() {
     printf '%s\n' "$MONARCHY_MISC/sddm/zz-omarchy-sddm.conf"
 }
 
+monarchy_sddm_hypr_src() {
+    local overlay="$MONARCHY_MISC/sddm/hyprland.lua"
+    if [ -f "$overlay" ]; then
+        printf '%s\n' "$overlay"
+        return 0
+    fi
+    monarchy_sddm_clone_hypr
+}
+
 # Last non-empty Theme.Current in SDDM merge order (sys drop-ins, then
 # /etc/sddm.conf.d, then /etc/sddm.conf). Same order as man 5 sddm.conf.
 monarchy_sddm_effective_current() {
@@ -86,6 +95,11 @@ monarchy_assert_sddm_assets() {
     grep -q 'cycleUser' "$qml" || monarchy_die "$qml is not the multi-user overlay"
     grep -q '^Current=omarchy$' "$conf" || monarchy_die "$conf must set Current=omarchy"
     grep -q 'start-hyprland' "$conf" || monarchy_die "$conf must use start-hyprland"
+    [ -f "$MONARCHY_MISC/sddm/hyprland.lua" ] || monarchy_die "missing greeter hyprland.lua overlay"
+    grep -q 'background_color' "$MONARCHY_MISC/sddm/hyprland.lua" \
+        || monarchy_die "greeter hyprland.lua missing background_color"
+    grep -q 'rgb(26, 27, 38)' "$MONARCHY_MISC/sddm/hyprland.lua" \
+        || monarchy_die "greeter hyprland.lua missing Unlock background_color"
     if grep -q '^SessionCommand=' "$conf"; then
         monarchy_die "$conf must not set SessionCommand (re-login starts a second compositor)"
     fi
@@ -155,7 +169,7 @@ monarchy_sddm_install_overlay_assets() {
         [ -f "$f" ] || continue
         base=$(basename "$f")
         case "$base" in
-            *.conf|*.service|Main.qml) continue ;;
+            *.conf|*.service|Main.qml|hyprland.lua) continue ;;
         esac
         monarchy_sudo install -m 644 "$f" "$dest/$base"
     done
@@ -178,8 +192,9 @@ monarchy_sddm_install_conf() {
 
 monarchy_sddm_install_hyprland_lua() {
     local src
-    src=$(monarchy_sddm_clone_hypr)
+    src=$(monarchy_sddm_hypr_src)
     [ -f "$src" ] || monarchy_die "missing greeter hyprland.lua at $src"
+    grep -q 'background_color' "$src" || monarchy_die "$src missing background_color"
     monarchy_sudo mkdir -p /usr/share/sddm
     monarchy_sudo install -m 644 "$src" "$MONARCHY_SDDM_HYPR"
 }

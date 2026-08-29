@@ -11,7 +11,7 @@ Any machine that already ran `scripts/install.sh` (CachyOS, encrypted ZFS, KDE P
 ## New machine
 
 1. CachyOS ISO, UEFI, Calamares: FAT32 ESP 1024MB at `/boot/efi`, encrypted ZFS, KDE Plasma. Do not pick "No Desktop". Do not pick CachyOS Hyprland.
-2. ZFSBootMenu properties from the README: `bootfs=zpcachyos/ROOT/cos/root`, `rootprefix=root=ZFS=`, `commandline="rw quiet splash"`.
+2. ZFSBootMenu properties from the README: `bootfs=zpcachyos/ROOT/cos/root`, `rootprefix=root=ZFS=`. `install.sh` / `setup-zfs.sh` merge the quiet cmdline tokens (`docs/boot-flow.md`).
 3. rEFInd + `zfsbootmenu` + `generate-zbm`.
 4. Clone dotfiles and run `./scripts/install.sh`. That does not install Monarchy.
 5. Then:
@@ -39,7 +39,7 @@ Any machine that already ran `scripts/install.sh` (CachyOS, encrypted ZFS, KDE P
 - Enable `sddm.service`, remove `plasma-login-manager`, install `/etc/sddm.conf.d/zz-omarchy-sddm.conf` and the Omarchy greeter with the multi-user `Main.qml` overlay
 - Install `/usr/local/bin/monarchy-switch-user`, overlay Super+Ctrl+U onto the lock screen and System menu, and seed the Hyprland bind. Family uses that chord on the lock screen to reach SDDM without the locked user's password
 - Install logind drop-ins: `HandlePowerKey=ignore` (CachyOS default is poweroff; a Bluetooth headset KEY_POWER has shut zbook down) and `InhibitDelayMaxSec=15` for lid-close lock. Reloads logind, does not restart it
-- Install the Omarchy Plymouth theme, put `plymouth` **after** `zfs` in mkinitcpio HOOKS, `mkinitcpio -P`. Does not steal the ZFS passphrase (that stays at ZFSBootMenu). Does not touch rEFInd.
+- Install the Omarchy Plymouth theme. Put `plymouth` **before** `zfs` when `/etc/zfs/zroot.key` is in FILES, otherwise **after**. Install `plymouth quit --retain-splash`. `mkinitcpio -P`. Does not steal the ZFS passphrase (that stays at ZFSBootMenu). Does not touch rEFInd.
 
 `--splash-only` is the same Plymouth step without redoing packages or user config.
 
@@ -66,6 +66,7 @@ Overlay unit test (no sudo):
 ./scripts/lib/monarchy/test-sddm.sh
 ./scripts/lib/monarchy/test-sddm-resume.sh
 ./scripts/lib/monarchy/test-splash.sh
+./scripts/lib/zbm/test-boot.sh
 ./scripts/lib/monarchy/test-settings.sh
 ```
 
@@ -75,7 +76,7 @@ Boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZFSBootMenu, or clone+promote. 
 
 ## No-keyfile Plymouth UX
 
-If the host has no `/etc/zfs/zroot.key`, the mkinitcpio `zfs` hook prompts on the console before Plymouth (plymouth is after the zfs hook). That is a second passphrase look, not a stolen ZBM prompt. Do not "fix" it with `plymouth-zfs`.
+If the host has no `/etc/zfs/zroot.key`, plymouth stays after zfs and the mkinitcpio `zfs` hook prompts on the console. That is a second passphrase look, not a stolen ZBM prompt. Do not "fix" it with `plymouth-zfs`. With the keyfile in FILES, plymouth sits in front of zfs so import is under the splash (`docs/boot-flow.md`).
 
 ## Family greeter
 

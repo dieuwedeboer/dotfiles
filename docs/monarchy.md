@@ -2,7 +2,7 @@
 
 - **Author:** TBD (Dieuwe)
 - **Date:** 2026-08-26
-- **Status:** v1. Omarchy and Plasma share a greeter on zbook. Apply is open on every CachyOS+ZFS+KDE host via `scripts/setup-monarchy.sh`. Plymouth is the Omarchy theme, after zfs, post-unlock only.
+- **Status:** v1. Omarchy and Plasma share a greeter on zbook. Apply is open on every CachyOS+ZFS+KDE host via `scripts/setup-monarchy.sh`. Plymouth is the Omarchy theme. It sits before zfs when `/etc/zfs/zroot.key` is in FILES, otherwise after. See `docs/boot-flow.md`.
 - **Audience:** Senior engineers working in `dieuwedeboer/dotfiles`
 - **Machines in scope:** every CachyOS+ZFS+KDE box that follows `scripts/install.sh`. First bring-up was zbook. kingfisher (Gigabyte B550 / Ryzen 5 5600X) and bonw9 (System76 Bonobo WS / Haswell i7-4810MQ + GTX 970M) run the same script.
 
@@ -29,8 +29,8 @@ The fork's ZFS support is real, but it is Omarchy-native ZFS (`zroot/ROOT/defaul
 | Distro | CachyOS rolling, repos `[cachyos-v3]`, `[cachyos-core-v3]`, `[cachyos-extra-v3]`, `[cachyos]`, `[core]`, `[extra]`, `[multilib]`. No pacman Include drop-ins |
 | Kernel | CachyOS Calamares always ships both `linux-cachyos-zfs` (prebuilt kmod, loaded from `extramodules/zfs.ko.zst`) and `zfs-dkms` plus `zfs-utils` (CachyOS packager, not archzfs). kingfisher 2026-08-26: `linux-cachyos 7.1.4-1` + `linux-cachyos-zfs 7.1.4-1`. The dkms tree has `it87`, not zfs. Both packages are a base-install invariant. Do not remove either. Do not add archzfs |
 | Root | Encrypted ZFS. Pool `zpcachyos`. Bootfs `zpcachyos/ROOT/cos/root`. Home `zpcachyos/ROOT/cos/home`. Also `varcache`, `varlog` |
-| Boot | ESP at `/boot/efi` (vfat). rEFInd at `EFI/refind` with glow theme. ZFSBootMenu at `EFI/zbm`. Properties `org.zfsbootmenu:bootfs`, `rootprefix=root=ZFS=`, `commandline="rw quiet splash"` |
-| Unlock | ZFSBootMenu prompts for the pool passphrase. Host mkinitcpio HOOKS are `(base udev autodetect microcode kms modconf block keyboard keymap consolefont zfs filesystems)`. No plymouth hook. `fsck` already removed by `scripts/install.sh`. Kingfisher already uses the README keyfile: `/etc/zfs/zroot.key` is listed in mkinitcpio `FILES`, so the host `zfs` hook does not prompt |
+| Boot | ESP at `/boot/efi` (vfat). rEFInd at `EFI/refind` with glow theme. ZFSBootMenu at `EFI/zbm`. Properties `org.zfsbootmenu:bootfs`, `rootprefix=root=ZFS=`. Quiet cmdline tokens are merged by `setup-zfs.sh` (`docs/boot-flow.md`) |
+| Unlock | ZFSBootMenu prompts for the pool passphrase. Kingfisher has `/etc/zfs/zroot.key` in mkinitcpio `FILES`, so the host `zfs` hook does not prompt. With that keyfile, Monarchy places plymouth **before** zfs so pool import is under the splash. Without a keyfile, plymouth stays **after** zfs. Never `plymouth-zfs`. `fsck` already removed by `scripts/install.sh`. See `docs/boot-flow.md` |
 | Snapshots | `sanoid.timer` on `zpcachyos/ROOT/cos/home`. Pacman hook `misc/zfs-snapshot.hook` recursively snapshots `zpcachyos/ROOT/cos` as `pre-update-*`, keep 3. Bootable recovery is ZBM snapshot boot + clone/promote |
 | Desktop | KDE Plasma Wayland. CachyOS ships **plasma-login-manager** (`plasmalogin.service`). Monarchy removes it and enables **SDDM** so Omarchy's greeter theme and Plymouth color sync work. Session files: `/usr/share/wayland-sessions/{plasma,omarchy,hyprland}.desktop`. Leftover `/etc/sddm.conf.d/kde_settings.conf` has empty `[Autologin] User=` and `Current=breeze`. SDDM drop-ins are lexicographic, so a `99-` prefix loses to `kde_settings.conf` (`k` > `9`) and the Breeze greeter keeps the church wallpaper. The drop-in is `zz-omarchy-sddm.conf`. Apply asserts effective `Theme.Current` is `omarchy`. `monarchy_skip_autologin` still asserts Autologin User empty |
 | Greeter users | `dieuwe` (uid 1000, `/bin/fish`), `amie` (1001, bash), `olivier` (1002, bash) |
@@ -94,7 +94,7 @@ Trust the fork to keep Hyprland/Quickshell/omarchy scripts current. Do not adopt
 - Dieuwe's default session is Omarchy/Hyprland. Family default is Plasma. Same SDDM greeter, no autologin. The greeter overlay shows the user and session; Tab cycles users, Up/Down cycles sessions. amie and olivier default to Plasma, everyone else to Omarchy.
 - Consume `berenddeboer/omarchy` `quattro-on-zfs` as an `omarchy-dev-link` tree (`/etc/omarchy.conf` + working prefix). Consume official `[omarchy]` for packages that do not fight CachyOS. Hyprland and Quickshell come from CachyOS first-match.
 - Bridging layer with a denylist, an overlay `bin/`, and named functions for every blocker-class clash.
-- Omarchy Plymouth theme after zfs, post-unlock only. ZFSBootMenu keeps the passphrase. rEFInd stays glow. No custom Monarchy banner yet.
+- Omarchy Plymouth theme. Before zfs if the host keyfile is in FILES, otherwise after. ZFSBootMenu keeps the passphrase. rEFInd stays glow. ZBM theming is `docs/boot-flow.md`.
 - Repeatable across current and future CachyOS+ZFS machines. Per-machine hooks stay in `setup-kingfisher.sh` / `setup-bonw9.sh`.
 - Docs under `docs/` as listed below.
 
@@ -126,7 +126,7 @@ flowchart TB
     UEFI --> rEFInd
     rEFInd -->|"glow / optional Monarchy banner"| ZBM[ZFSBootMenu]
     ZBM -->|"passphrase for zpcachyos"| Initramfs
-    Initramfs -->|"HOOKS: ... zfs plymouth filesystems"| Kernel
+    Initramfs -->|"HOOKS: plymouth around zfs (keyfile-gated)"| Kernel
   end
 
   subgraph dm [Display manager: SDDM]
@@ -420,7 +420,7 @@ scripts/lib/monarchy/
   settings.sh            # omarchy-settings file tree minus settings.skip
   sddm.sh                # enable sddm, remove PLM, overlay greeter QML
   portals.sh
-  splash.sh              # Omarchy plymouth theme, plymouth after zfs, SDDM color sync
+  splash.sh              # Omarchy plymouth theme, plymouth around zfs, retain-splash, SDDM color sync
   nvidia.sh
   update.sh
   stubs/                 # stub templates copied into overlay bin and /usr/local/bin
@@ -462,7 +462,7 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 | `monarchy_apply_logind` | Install Omarchy's `HandlePowerKey=ignore` and `InhibitDelayMaxSec=15` under `/etc/systemd/logind.conf.d/10-monarchy-*` / `20-monarchy-*`. Reload logind, never restart it. CachyOS default `HandlePowerKey=poweroff` plus a Bluetooth AVRCP KEY_POWER is a full shutdown |
 | `monarchy_install_omarchy_session` | Install Monarchy-authored `/usr/share/wayland-sessions/omarchy.desktop` (not a blind copy of the clone) |
 | `monarchy_skip_autologin` | Assert no `[Autologin] User=` in `/etc/plasmalogin.conf`, `/etc/plasmalogin.conf.d/*`, and leftover `/etc/sddm.conf.d/*` |
-| `monarchy_skip_plymouth_zfs` | Never install AUR `plymouth-zfs`. Never put plymouth *before* the zfs hook |
+| `monarchy_skip_plymouth_zfs` | Never install AUR `plymouth-zfs`. plymouth-before-zfs is allowed only when `/etc/zfs/zroot.key` is in mkinitcpio FILES |
 | `monarchy_skip_os_release_clobber` | Never install `omarchy-settings*`. If `/etc/os-release` `ID` is not `cachyos`, abort and restore from `/usr/lib/os-release` |
 | `monarchy_keep_family_mime` | Do not install Omarchy mimeapps system-wide or into `~/.config/mimeapps.list`. Hyprland keybinds launch Nautilus explicitly |
 | `monarchy_apply_lock` | Run overlay `omarchy-apply-lock` (same as `install/config/lockscreen-pam.sh`). Writes `/etc/pam.d/omarchy-lock-password`. Quickshell lock returns `missing-pam` without it. Not a plasmalogin problem; official Omarchy also keeps the greeter running |
@@ -470,7 +470,7 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 | `monarchy_install_switch_user` | Install `/usr/local/bin/monarchy-switch-user`. Locks the Omarchy session if needed, then `Seat.SwitchToGreeter` |
 | `monarchy_rebuild_overlay` | Rebuild overlay `bin/` fail-closed |
 | `monarchy_nvidia_keep_chwd` | Never run Omarchy `nvidia.sh` |
-| `monarchy_splash` | Omarchy Plymouth theme, plymouth after zfs, `mkinitcpio -P`. Never plymouth-zfs, never Limine. SDDM greeter restyle is `monarchy_refresh_sddm` (Unlock default) / plymouth-set (Style > Unlock). `splash_maybe_theme` follows Unlock, not the session theme |
+| `monarchy_splash` | Omarchy Plymouth theme, plymouth before zfs when the keyfile is in FILES else after, retain-splash drop-in, `mkinitcpio -P`. Never plymouth-zfs, never Limine. SDDM greeter restyle is `monarchy_refresh_sddm` (Unlock default) / plymouth-set (Style > Unlock). `splash_maybe_theme` follows Unlock, not the session theme. Greeter `hyprland.lua` sets `background_color` to `#1a1b26` |
 
 ### Dual-session design
 
@@ -508,7 +508,7 @@ Exact greeter files:
 | `/usr/share/wayland-sessions/plasma.desktop` | Untouched |
 | `/etc/sddm.conf.d/zz-omarchy-sddm.conf` | `Current=omarchy`. `DisplayServer=wayland`. `CompositorCommand=start-hyprland -- --config /usr/share/sddm/hyprland.lua`. Autologin `User` empty |
 | `/usr/share/sddm/themes/omarchy/Main.qml` | Clone theme copy, then Monarchy overlay. `omarchy-refresh-sddm` is wrapped so stock last-user QML cannot land. Apply follows Style > Unlock (plymouth logo), not the session theme. Fresh apply is Unlock default (`#1a1b26`) |
-| `/usr/share/sddm/hyprland.lua` | Clone `default/sddm/hyprland.lua` |
+| `/usr/share/sddm/hyprland.lua` | Overlay `misc/monarchy/sddm/hyprland.lua` (clone defaults plus `background_color` `#1a1b26`) |
 | `/var/lib/sddm/state.conf` | Do **not** write Dieuwe+omarchy. Last user is SDDM's own memory; session default is the QML overlay. SDDM's `RememberLastSession` is one slot for the whole machine, not per user |
 | `/var/lib/AccountsService/users/{dieuwe,amie,olivier}` | Still written (`omarchy.desktop` / `plasma.desktop`). The QML overlay is the picker default that matters. Per-user last-session memory is deferred; see Open questions |
 | leftover `/etc/sddm.conf.d/kde_settings.conf` | Assert `[Autologin] User` empty. Do not delete. `zz-omarchy-sddm.conf` sorts after this file so `Current=omarchy` wins |
@@ -538,9 +538,9 @@ Do not set those env vars in a systemd user environment that would leak into Pla
 
 Unlock ownership is the constraint. ZFSBootMenu is a **separate** image (`Components` in `/boot/efi/EFI/zbm`, `EFI.Enabled: false`). Plymouth would join the *host* initramfs. AUR `plymouth-zfs` exists to steal the prompt (`HOOKS=(... plymouth plymouth-zfs filesystems)`). We will not install it.
 
-Kingfisher already has `/etc/zfs/zroot.key` in host initramfs `FILES`, so the host `zfs` hook does not prompt. ZBM remains the passphrase UI.
+Kingfisher already has `/etc/zfs/zroot.key` in host initramfs `FILES`, so the host `zfs` hook does not prompt. ZBM remains the passphrase UI. On that layout, plymouth sits **before** zfs so pool import is under the splash. See `docs/boot-flow.md`.
 
-On a future box **without** the keyfile: the host `zfs` hook prompts on the console *before* plymouth starts (plymouth is after zfs). That can look like a "broken splash" rather than a second passphrase. Document it. Do not "fix" it with `plymouth-zfs`.
+On a box **without** the keyfile: plymouth stays **after** zfs. The host `zfs` hook then prompts on the console before Plymouth. That can look like a "broken splash" rather than a second passphrase. Document it. Do not "fix" it with `plymouth-zfs`.
 
 Plymouth uses the Omarchy theme from the clone (`default/plymouth`), installed at `/usr/share/plymouth/themes/omarchy`. `omarchy-plymouth-set` restyles the SDDM greeter from the same colors and logo.
 
@@ -549,7 +549,7 @@ sequenceDiagram
   participant FW as UEFI
   participant R as rEFInd (theme)
   participant Z as ZFSBootMenu (passphrase lives here)
-  participant P as Plymouth (post-unlock only)
+  participant P as Plymouth (host initramfs)
   participant G as sddm (Omarchy theme)
   participant S as Session splash
   FW->>R: firmware splash / rEFInd banner
@@ -570,13 +570,14 @@ sequenceDiagram
 
 #### 2. ZFSBootMenu
 
-Live config: Components enabled, EFI UKI disabled, `SplashImage` unused. Do **not** enable `EFI.Enabled`. Passphrase stays the stock ZBM TUI.
+Live config: Components enabled, EFI UKI disabled, `SplashImage` unused. Do **not** enable `EFI.Enabled`. Passphrase stays in ZBM. Quiet cmdline and later theming: `docs/boot-flow.md`.
 
-#### 3. Plymouth (post-unlock)
+#### 3. Plymouth (host initramfs)
 
 - Copy clone `default/plymouth/` to `/usr/share/plymouth/themes/omarchy`. `plymouth-set-default-theme omarchy`.
-- Insert `plymouth` **after** `zfs` and **before** `filesystems`. `mkinitcpio -P`. Never `generate-zbm` for this (ZBM is a separate image).
-- Keep `quiet splash` on `org.zfsbootmenu:commandline`.
+- Insert `plymouth` **before** `zfs` when the keyfile is in FILES, otherwise **after** `zfs` and before `filesystems`. `mkinitcpio -P`. Never `generate-zbm` for this (ZBM is a separate image).
+- `plymouth quit --retain-splash` so SDDM paints over the last frame.
+- Quiet cmdline tokens come from `setup-zfs.sh`, not from a hand-edited `zfs set`.
 - Wrap `omarchy-refresh-plymouth` / `omarchy-plymouth-set` / `omarchy-plymouth-reset` so they never call `limine-mkinitcpio`. `omarchy-plymouth-set` writes the SDDM greeter from Monarchy `Main.qml` (same `#1a1b26` / `#ffffff` tokens). `omarchy-refresh-sddm` is wrapped: copy clone theme, overlay QML (Unlock default). `splash_maybe_theme` then follows Style > Unlock so a re-apply does not wipe a chosen plymouth logo. The session theme does not restyle plymouth or SDDM. Allow list/current/preview/switcher/`set-by-theme`.
 - Do not set `ShowDelay` (packaged default is already 0).
 
@@ -645,7 +646,7 @@ usage: setup-monarchy.sh [--check] [--update] [--no-packages] [--splash-only] [-
 | (none) | Snapshot-first, clone pin, repo append, overlay, filtered packages (after PR 4a), session, portals |
 | `--update` | Snapshot, fetch, `--check`, then apply |
 | `--no-packages` | Config/session/overlay only |
-| `--splash-only` | Omarchy Plymouth theme, plymouth after zfs, `mkinitcpio -P` |
+| `--splash-only` | Omarchy Plymouth theme, plymouth around zfs, retain-splash, `mkinitcpio -P` |
 
 ### Greeter session file (Monarchy-authored)
 
@@ -757,7 +758,7 @@ Sources compared:
 | `omarchy-nvim` vs `chezmoi/dot_config/nvim` | Dieuwe chezmoi | major | Install `omarchy-nvim` as its own app. Do not overwrite `~/.config/nvim` |
 | `omarchy-emacs` vs stock `emacs` | Omarchy | major | Install `omarchy-emacs` (`emacs-wayland`). Uninstall stock `emacs`. Chezmoi owns `~/.config/emacs/init.el`; move `~/.emacs.d` aside |
 | `mise-bin` + `install/user/mise.sh` vs uv/pnpm/pipx + curl-installed grok/opencode | Dieuwe | major | Allow `mise-bin`. User setup runs `omarchy-refresh-applications` (mise stubs). `setup-packages.sh` uninstalls competing copies |
-| Plymouth hook vs current mkinitcpio | Dieuwe HOOKS | major | plymouth **after** zfs only. Never `plymouth-zfs` |
+| Plymouth hook vs current mkinitcpio | Dieuwe HOOKS | major | plymouth before zfs iff keyfile in FILES. Never `plymouth-zfs` |
 | Stock Omarchy greeter is last-user + uwsm-only | Omarchy | major | Overlay `misc/monarchy/sddm/Main.qml` (Tab user, Up/Down session, family defaults Plasma) |
 | `xdg-desktop-portal-hyprland` vs kde | both | major | Install both. Session-scoped `XDG_CURRENT_DESKTOP` |
 | `nautilus` vs Dolphin | Plasma mime | major | Install nautilus. Do not write user-global mimeapps. Hyprland keybinds open Nautilus |
@@ -921,7 +922,7 @@ No feature flag service. The flag is "did you run `setup-monarchy.sh`".
 2. Clone, `/etc/omarchy.conf`, overlay, `omarchy-keyring`, `[omarchy]` marker (PR 2). Landed.
 3. `uwsm` + session desktop (PR 3). Greeter lists Omarchy. AccountsService `Session=` is still an attempt. Landed.
 4. Leaf packages + overlay populated (PR 4a), then Dieuwe user config (PR 4b). Landed on zbook: Omarchy and Plasma share the greeter.
-5. Splash: Omarchy Plymouth theme, plymouth after zfs. Landed. rEFInd/ZBM custom art still not shipped.
+5. Splash: Omarchy Plymouth theme, plymouth around zfs, retain-splash. Landed. ZBM theming still `docs/boot-flow.md`.
 6. README pointer and apply open on every matching host. Run `setup-monarchy.sh` on kingfisher and bonw9 the same way as zbook. bonw9 still needs a Hyprland + `chwd` NVIDIA check after apply.
 
 Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZBM, or clone+promote. Pacman.conf backup at `/etc/pacman.conf.monarchy.bak`. `--uninstall` is not v1.
@@ -934,7 +935,7 @@ Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZBM, or clone+promote
 | --- | --- | --- |
 | Accidental `omarchy-refresh-pacman` or metapackage install | high | Overlay stubs, `/usr/local/bin` stubs, never install metapackage, `monarchy_preserve_pacman_conf`, pacman.conf bak |
 | `omarchy-settings` rewrite of `/etc/os-release` | high | Never install it. Preflight `ID=cachyos` |
-| Plymouth-before-zfs or `plymouth-zfs` | high | plymouth after zfs; no plymouth-zfs; wrap the Omarchy plymouth write path |
+| `plymouth-zfs` or plymouth-before-zfs without a keyfile | high | keyfile-gated plymouth-before-zfs; no plymouth-zfs; wrap the Omarchy plymouth write path |
 | `bin/` names new relative to the lock on `--update` | high | Fail closed; classify into allow, wrap, or deny before applying |
 | Stock Omarchy greeter logs the last user into uwsm | high | Wrapped `omarchy-refresh-sddm` overlays multi-user `Main.qml`. Tests assert no uwsm auto-pick |
 | Hyprland + GTX 970M on bonw9 | medium | Do not run Omarchy nvidia.sh. Validate after kingfisher. Not live-verified here |
@@ -952,7 +953,7 @@ Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZBM, or clone+promote
 
 2. **Per-user greeter session: static default vs last-used?** SDDM's `RememberLastSession` is global (`state.conf` `[Last] Session=`). The overlay therefore hardcodes amie/olivier → Plasma and everyone else → Omarchy, and ignores `sessionModel.lastIndex`. Apply still writes AccountsService `Session=`, but the greeter does not read it. Remembering last session per user would be a Monarchy hook, not an SDDM feature, and would also remember an accidental Omarchy login for family. Dieuwe to review. Leave the static overlay defaults until then.
 
-Everything else that used to live here is a Key Decision: clone path, SigLevel, overlay-bin, Plymouth after zfs, Omarchy default terminal, family sees Omarchy, both CachyOS ZFS packages stay.
+Everything else that used to live here is a Key Decision: clone path, SigLevel, overlay-bin, Plymouth around zfs, Omarchy default terminal, family sees Omarchy, both CachyOS ZFS packages stay.
 
 ---
 
@@ -984,7 +985,7 @@ Everything else that used to live here is a Key Decision: clone path, SigLevel, 
 
 4. **SDDM, not plasma-login-manager.** Omarchy greeter theme, Hyprland greeter compositor, Plymouth color sync. `plasma-login-manager` is in `packages.deny`. Multi-user overlay is `misc/monarchy/sddm/Main.qml`. No autologin. Two DMs is still a brick.
 
-5. **ZFSBootMenu keeps the passphrase. Plymouth is post-unlock only, Omarchy theme, after zfs.** No `plymouth-zfs`. No plymouth-before-zfs. `omarchy-plymouth-set` restyles the SDDM greeter from the same tokens.
+5. **ZFSBootMenu keeps the passphrase.** Plymouth is the Omarchy theme on the host initramfs. It sits before zfs when the keyfile is in FILES, otherwise after. No `plymouth-zfs`. `omarchy-plymouth-set` restyles the SDDM greeter from the same tokens. Quiet cmdlines and later ZBM art: `docs/boot-flow.md`.
 
 6. **CachyOS updater remains the OS updater.** Omarchy's ALPM guard and `omarchy-refresh-pacman` are forbidden. Overlay **symlinks** clone `bin/omarchy` (the CLI router). Only `omarchy-update` and `omarchy-update-system-pkgs` wrap `setup-monarchy.sh --update`. `omarchy update` (two words) is the router dispatching to that wrapper. `omarchy-refresh-pacman` is a deny stub (exit 2), not a wrapper.
 
@@ -1058,7 +1059,7 @@ Each PR is independently reviewable and mergeable. Later PRs must not be require
 - **Title:** Enable Omarchy Plymouth after zfs (post-unlock)
 - **Files/components:** `scripts/lib/monarchy/splash.sh`, plymouth overlay wraps, inventories
 - **Dependencies:** PR 4b (session works without splash; Plymouth HOOKS change is a reboot risk)
-- **Description:** Install clone `default/plymouth` as the Omarchy theme. Insert plymouth **after** zfs. `mkinitcpio -P`. Wrap the plymouth write path so it cannot call Limine. plymouth-set restyles the SDDM greeter. Do not enable ZBM EFI UKI. Do not install plymouth-zfs.
+- **Description:** Install clone `default/plymouth` as the Omarchy theme. Insert plymouth around zfs (before when the keyfile is in FILES). `mkinitcpio -P`. Wrap the plymouth write path so it cannot call Limine. plymouth-set restyles the SDDM greeter. Do not enable ZBM EFI UKI. Do not install plymouth-zfs. Follow-on: `docs/boot-flow.md`.
 
 ### PR 6: Per-machine validation notes and README
 

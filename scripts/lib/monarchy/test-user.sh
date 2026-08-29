@@ -35,6 +35,10 @@ grep -q 'omarchy-emacs-setup' "$SCRIPT_DIR/user.sh" \
 setup_body=$(awk '/^monarchy_setup_user\(\)/,/^}$/' "$SCRIPT_DIR/user.sh")
 echo "$setup_body" | grep -q 'monarchy_clear_terminal_override' \
     || fail "monarchy_setup_user does not clear the terminal override"
+echo "$setup_body" | grep -q 'monarchy_seed_hyprland_config' \
+    || fail "monarchy_setup_user does not seed Hyprland config"
+grep -q 'monarchy_seed_hypr_boot_color' "$SCRIPT_DIR/user.sh" \
+    || fail "user.sh missing monarchy_seed_hypr_boot_color"
 echo "$setup_body" | grep -q 'monarchy_seed_capslock' \
     || fail "monarchy_setup_user does not restore Caps Lock"
 echo "$setup_body" | grep -q 'monarchy_user_omarchy_defaults' \
@@ -115,5 +119,15 @@ printf -- '-- Keep only your personal input overrides here.\n\nhl.config({\n  in
 monarchy_seed_capslock
 grep -q 'compose:ralt' "$input" || fail "capslock seed clobbered a custom kb_options"
 grep -q 'caps:capslock' "$input" && fail "capslock seed appended over a custom kb_options"
+
+hypr=$HOME/.config/hypr/hyprland.lua
+mkdir -p "$(dirname "$hypr")"
+printf 'require("hypr.looknfeel")\n' >"$hypr"
+monarchy_seed_hypr_boot_color
+[ -f "$HOME/.config/hypr/boot-color.lua" ] || fail "did not install boot-color.lua"
+grep -q 'require("hypr.boot-color")' "$hypr" || fail "did not require boot-color from hyprland.lua"
+monarchy_seed_hypr_boot_color
+n=$(grep -c 'hypr.boot-color' "$hypr")
+[ "$n" -eq 1 ] || fail "boot-color require is not idempotent ($n)"
 
 echo "user tests passed"

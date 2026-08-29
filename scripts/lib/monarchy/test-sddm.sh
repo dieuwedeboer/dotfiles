@@ -38,6 +38,13 @@ fi
 
 grep -q '^Current=omarchy$' "$conf" || fail "conf Current is not omarchy"
 grep -q 'start-hyprland' "$conf" || fail "conf missing start-hyprland"
+hypr="$MISC/sddm/hyprland.lua"
+[ -f "$hypr" ] || fail "missing $hypr"
+grep -q 'background_color' "$hypr" || fail "greeter hyprland.lua missing background_color"
+grep -q 'rgb(26, 27, 38)' "$hypr" || fail "greeter hyprland.lua missing Unlock rgb"
+boot_color="$MISC/hypr/boot-color.lua"
+[ -f "$boot_color" ] || fail "missing $boot_color"
+grep -q 'rgb(26, 27, 38)' "$boot_color" || fail "boot-color.lua missing Unlock rgb"
 if grep -q '^SessionCommand=' "$conf"; then
     fail "conf must not set SessionCommand"
 fi
@@ -264,6 +271,12 @@ EOF
         "$HOME/.config/omarchy/themes/jade-test/unlock.png"
 
     monarchy_refresh_sddm
+    grep -q 'background_color' "$MONARCHY_SDDM_HYPR" \
+        || fail "refresh_sddm did not install greeter hyprland.lua overlay"
+    grep -q 'rgb(26, 27, 38)' "$MONARCHY_SDDM_HYPR" \
+        || fail "refresh_sddm greeter hyprland.lua missing Unlock background"
+    [ ! -f "$MONARCHY_SDDM_THEME_DIR/hyprland.lua" ] \
+        || fail "hyprland.lua overlay leaked into the QML theme dir"
     grep -q '#1a1b26' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
         || fail "refresh_sddm should keep stock overlay tokens"
     grep -q 'cycleUser' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
