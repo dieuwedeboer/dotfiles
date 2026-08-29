@@ -122,6 +122,14 @@ Rectangle {
     return Math.max(0, sessionModel.lastIndex)
   }
 
+  // Filename only. Omarchy's Name is "Omarchy (Hyprland uwsm)".
+  function isStockHyprlandSession(i) {
+    var file = (sessionModel.data(sessionModel.index(i, 0), Qt.UserRole + 1) || "").toString().toLowerCase()
+    var parts = file.split("/")
+    var base = parts[parts.length - 1]
+    return base === "hyprland.desktop" || base === "hyprland-uwsm.desktop"
+  }
+
   function prefersPlasma(user) {
     return user === "amie" || user === "olivier"
   }
@@ -152,7 +160,13 @@ Rectangle {
     var n = sessionModel.rowCount()
     if (n <= 0)
       return
-    sessionIndex = (sessionIndex + delta + n) % n
+    var i = sessionIndex
+    var steps = 0
+    do {
+      i = (i + delta + n) % n
+      steps++
+    } while (isStockHyprlandSession(i) && steps < n)
+    sessionIndex = i
   }
 
   Connections {

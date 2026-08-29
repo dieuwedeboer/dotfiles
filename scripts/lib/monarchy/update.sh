@@ -89,6 +89,7 @@ monarchy_check() {
     [ -f "$monarchy_lib_dir/sddm-resume.sh" ] || monarchy_die "missing sddm-resume.sh"
     monarchy_check_session_lock_overlay
     monarchy_check_logind
+    monarchy_check_hidden_hyprland_sessions
     monarchy_assert_settings_assets
     grep -q 'mise activate' "$MONARCHY_MISC/10-monarchy" \
         || monarchy_die "10-monarchy missing mise activate"

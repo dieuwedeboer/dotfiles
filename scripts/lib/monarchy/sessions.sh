@@ -74,9 +74,63 @@ monarchy_install_omarchy_session() {
         monarchy_accountsservice_session "$USER" omarchy.desktop
     fi
 
+    monarchy_hide_stock_hyprland_sessions
     monarchy_skip_autologin
     monarchy_log "installed $dest ($exec_line)"
     return 0
+}
+
+# Keep hyprland.desktop on disk: omarchy.desktop Exec is
+# `uwsm start … hyprland.desktop`, and uwsm refuses Hidden=true.
+# NoDisplay=true drops it from SDDM's sessionModel. Same for hyprland-uwsm.
+monarchy_hide_stock_hyprland_sessions() {
+    local dir="${MONARCHY_WAYLAND_SESSIONS_DIR:-/usr/share/wayland-sessions}"
+    local name f
+    for name in hyprland.desktop hyprland-uwsm.desktop; do
+        f="$dir/$name"
+        [ -f "$f" ] || continue
+        if grep -q '^Hidden=true' "$f"; then
+            monarchy_die "$f is Hidden=true; uwsm start … hyprland.desktop would refuse it"
+        fi
+        if grep -q '^NoDisplay=true' "$f"; then
+            continue
+        fi
+        monarchy_set_desktop_nodisplay "$f"
+        monarchy_log "hid $f from SDDM (NoDisplay=true)"
+    done
+}
+
+monarchy_set_desktop_nodisplay() {
+    local f=$1
+    local tmp
+    tmp=$(mktemp)
+    awk '
+        BEGIN { seen = 0 }
+        /^NoDisplay=/ { print "NoDisplay=true"; seen = 1; next }
+        { print }
+        END { if (!seen) print "NoDisplay=true" }
+    ' "$f" >"$tmp"
+    if [ -w "$f" ]; then
+        install -m 644 "$tmp" "$f"
+    else
+        monarchy_sudo install -m 644 "$tmp" "$f"
+    fi
+    rm -f "$tmp"
+}
+
+monarchy_check_hidden_hyprland_sessions() {
+    local dir="${MONARCHY_WAYLAND_SESSIONS_DIR:-/usr/share/wayland-sessions}"
+    local name f
+    for name in hyprland.desktop hyprland-uwsm.desktop; do
+        f="$dir/$name"
+        [ -f "$f" ] || continue
+        if ! grep -q '^NoDisplay=true' "$f"; then
+            monarchy_die "$f is still visible in SDDM (need NoDisplay=true)"
+        fi
+        if grep -q '^Hidden=true' "$f"; then
+            monarchy_die "$f is Hidden=true; uwsm start … hyprland.desktop would refuse it"
+        fi
+    done
 }
 
 # Omarchy-settings would have installed these. Without them, CachyOS
