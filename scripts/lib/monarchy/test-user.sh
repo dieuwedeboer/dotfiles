@@ -35,6 +35,8 @@ grep -q 'omarchy-emacs-setup' "$SCRIPT_DIR/user.sh" \
 setup_body=$(awk '/^monarchy_setup_user\(\)/,/^}$/' "$SCRIPT_DIR/user.sh")
 echo "$setup_body" | grep -q 'monarchy_clear_terminal_override' \
     || fail "monarchy_setup_user does not clear the terminal override"
+echo "$setup_body" | grep -q 'monarchy_seed_capslock' \
+    || fail "monarchy_setup_user does not restore Caps Lock"
 echo "$setup_body" | grep -q 'monarchy_user_omarchy_defaults' \
     || fail "monarchy_setup_user does not install Omarchy user defaults"
 grep -q 'monarchy_user_emacs' "$SCRIPT_DIR/user.sh" \
@@ -88,5 +90,30 @@ monarchy_prefer_xdg_emacs
 [ -L "$HOME/.emacs.d.bak" ] || fail "did not keep ~/.emacs.d.bak"
 monarchy_prefer_xdg_emacs
 [ -L "$HOME/.emacs.d.bak" ] || fail "idempotent prefer_xdg clobbered the backup"
+
+input=$HOME/.config/hypr/input.lua
+mkdir -p "$(dirname "$input")"
+printf -- '-- Keep only your personal input overrides here.\n' >"$input"
+monarchy_seed_capslock
+grep -Eq '^[[:space:]]*kb_options[[:space:]]*=[[:space:]]*"caps:capslock"' "$input" \
+    || fail "capslock seed missing caps:capslock"
+grep -Eq '^[[:space:]]*kb_options.*compose:caps' "$input" \
+    && fail "capslock seed left compose:caps active"
+monarchy_seed_capslock
+n=$(grep -c 'caps:capslock' "$input")
+[ "$n" -eq 1 ] || fail "capslock seed is not idempotent ($n)"
+
+printf -- '-- Keep only your personal input overrides here.\n\nhl.config({\n  input = {\n    kb_options = "compose:caps,shift:both_capslock_cancel",\n  },\n})\n' >"$input"
+monarchy_seed_capslock
+grep -Eq '^[[:space:]]*kb_options[[:space:]]*=[[:space:]]*"caps:capslock"' "$input" \
+    || fail "capslock seed did not override compose:caps"
+monarchy_seed_capslock
+n=$(grep -c 'caps:capslock' "$input")
+[ "$n" -eq 1 ] || fail "capslock override is not idempotent ($n)"
+
+printf -- '-- Keep only your personal input overrides here.\n\nhl.config({\n  input = {\n    kb_options = "compose:ralt",\n  },\n})\n' >"$input"
+monarchy_seed_capslock
+grep -q 'compose:ralt' "$input" || fail "capslock seed clobbered a custom kb_options"
+grep -q 'caps:capslock' "$input" && fail "capslock seed appended over a custom kb_options"
 
 echo "user tests passed"
