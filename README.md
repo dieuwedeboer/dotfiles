@@ -99,7 +99,7 @@ cd dotfiles
 The install script will:
 - Install chezmoi if not present
 - Link dotfiles via chezmoi
-- Link agent instructions and skills (see [Agent Configuration](#agent-configuration))
+- Apply chezmoi (including agent instructions) and restore global skills from the lock (see [Agent Configuration](#agent-configuration))
 - Install packages and configure system
 - Optionally configure rEFInd with a custom theme (glow) if no custom theme is present
 - Quiet the ZFSBootMenu and host kernel command lines (`docs/boot-flow.md`)
@@ -110,21 +110,25 @@ The install script will:
 
 ### Agent Configuration
 
-`.agents/` in this repo is the single source of truth for coding-agent config, shared
-across every agent on the machine. `install.sh` symlinks `~/.agents` to it, then points
-each tool's expected path back at that:
+Home-level agent config is chezmoi-managed. `~/.agents` is a real directory, not a
+symlink into this repo. Vendored skill bodies are not git; the lock is.
 
-| Path | Points to |
+| Path | Source |
 | --- | --- |
-| `~/.agents` | `dotfiles/.agents` |
-| `~/.claude/CLAUDE.md` | `~/.agents/AGENTS.md` |
-| `~/.claude/skills` | `~/.agents/skills` |
-| `~/.config/opencode/AGENTS.md` | `~/.agents/AGENTS.md` (via chezmoi `symlink_` entry) |
+| `~/.agents/AGENTS.md` | `chezmoi/dot_agents/AGENTS.md` |
+| `~/.agents/.skill-lock.json` | `chezmoi/dot_agents/dot_skill-lock.json` |
+| `~/.claude/CLAUDE.md` | chezmoi symlink to `~/.agents/AGENTS.md` (`dot_claude/symlink_CLAUDE.md.tmpl`) |
+| `~/.claude/skills` | chezmoi symlink to `~/.agents/skills` (`dot_claude/symlink_skills.tmpl`) |
+| `~/.config/opencode/AGENTS.md` | chezmoi symlink to `~/.agents/AGENTS.md` (`dot_config/opencode/symlink_AGENTS.md.tmpl`) |
 
-So `.agents/AGENTS.md` is the only file to edit for global agent instructions, and
-skills installed into `~/.agents/skills` land in the repo as a normal git diff —
-including updates to `.agents/.skill-lock.json`, which supersedes the old root
-`skills-lock.json`.
+`install.sh` restores missing skills from the lock with `npx skills add … -g`. To bump:
+
+```bash
+npx skills update -g -y
+chezmoi re-add ~/.agents/.skill-lock.json
+```
+
+Hand-crafted global skills go in `chezmoi/dot_agents/skills/<name>/`. Skills that only apply when working in this repo go in `.agents/skills/` here.
 
 `~/.claude/settings.json` is chezmoi-managed (`chezmoi/dot_claude/settings.json`) and
 sets `permissions.defaultMode` to `acceptEdits`, so Claude Code auto-approves file
