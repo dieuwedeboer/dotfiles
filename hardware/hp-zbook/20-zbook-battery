@@ -1,0 +1,6 @@
+# /usr/share/uwsm/env.d/20-zbook-battery
+# Point Omarchy's battery script at the ZBook synthetic power_supply tree.
+# The kernel BAT0 current_now is ENODEV on this EC; the helper publishes
+# power_now from charge_now. See hardware/hp-zbook/apply.sh.
+
+export OMARCHY_POWER_SUPPLY_PATH=/run/zbook-battery/power_supply

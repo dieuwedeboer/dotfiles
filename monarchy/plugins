@@ -1,0 +1,6 @@
+# Third-party Omarchy shell plugins. Installed by install.sh into
+# ~/.config/omarchy/plugins/<id>/. Same contract as:
+#   omarchy plugin add <url> [--enable]
+# Apply clones and (with --enable) writes shell.json. It does not call the
+# live omarchy-plugin-add CLI, which needs a running omarchy-shell.
+https://github.com/dougfour/omarchy-grok-usage.git --enable

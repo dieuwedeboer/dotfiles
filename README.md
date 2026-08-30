@@ -11,7 +11,7 @@ Repeatable system setup for Arch Linux (CachyOS).
   - [Boot flow](#boot-flow)
   - [Dotfiles](#dotfiles)
   - [Agent Configuration](#agent-configuration)
-  - [Monarchy (optional Omarchy session)](#monarchy-optional-omarchy-session)
+  - [Monarchy (Omarchy session)](#monarchy-omarchy-session)
 - [Legacy Setup](#legacy-setup)
 
 ## Installation
@@ -55,18 +55,18 @@ reboot
 
 In ZFSBootMenu, press `Ctrl+D` to set pool as default.
 
-The first `generate-zbm` in that chroot writes a stock image. After `./scripts/install.sh`, `setup-zfs.sh` merges the quiet tokens into the pool property and `/etc/zfsbootmenu/config.yaml`, then regenerates the image if the yaml changed. See [Boot flow](#boot-flow).
+The first `generate-zbm` in that chroot writes a stock image. After `./install.sh`, `lib/zfs.sh` merges the quiet tokens into the pool property and `/etc/zfsbootmenu/config.yaml`, then regenerates the image if the yaml changed. See [Boot flow](#boot-flow).
 
 ### Boot flow
 
 Passphrase is ZFSBootMenu. Plymouth (Monarchy) covers the host initramfs after unlock. The 1-2s of console between rEFInd, ZBM, Plymouth, and Hyprland is documented and partly automated in `docs/boot-flow.md`.
 
-`setup-zfs.sh` (from `install.sh`) keeps:
+`lib/zfs.sh` (from `install.sh`) keeps:
 
 - `org.zfsbootmenu:commandline` on the pool: `rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0`
 - ZBM `Kernel.CommandLine`: `ro quiet loglevel=0 vt.global_cursor_default=0 fbcon=logo-count:0 rd.udev.log_level=0`
 
-Themed ZBM passphrase, HiDPI fonts, and a static ZBM splash are still planned in that doc. They are not in the image yet.
+Themed ZBM passphrase, HiDPI fonts, and a static ZBM splash are still planned in `docs/plans/zbm-ui.md`. They are not in the image yet.
 
 ### ZFS Maintenance
 
@@ -81,8 +81,8 @@ Feature flags can't be removed once enabled, and old ZBM images (and older live 
 
 **Snapshots:** two independent mechanisms:
 
-- `sanoid.timer` snapshots `zpcachyos/ROOT/cos/home` (`autosnap_*`, retention in `misc/sanoid.conf`). Data-only, not bootable.
-- The pacman hook (`misc/zfs-snapshot.hook`) recursively snapshots `zpcachyos/ROOT/cos` before every transaction (`pre-update-*`, keeps 3 per dataset). The `root` snapshots are bootable recovery points: boot them read-only from the ZFSBootMenu menu; clone + promote to make a rollback permanent.
+- `sanoid.timer` snapshots `zpcachyos/ROOT/cos/home` (`autosnap_*`, retention in `etc/sanoid/sanoid.conf`). Data-only, not bootable.
+- The pacman hook (`etc/pacman.d/hooks/zfs-snapshot.hook`) recursively snapshots `zpcachyos/ROOT/cos` before every transaction (`pre-update-*`, keeps 3 per dataset). The `root` snapshots are bootable recovery points: boot them read-only from the ZFSBootMenu menu; clone + promote to make a rollback permanent.
 
 ### First Boot Setup
 
@@ -93,7 +93,7 @@ Feature flags can't be removed once enabled, and old ZBM images (and older live 
 ```bash
 git clone git@github.com:dieuwedeboer/dotfiles.git
 cd dotfiles
-./scripts/install.sh
+./install.sh
 ```
 
 The install script will:
@@ -103,8 +103,10 @@ The install script will:
 - Install packages and configure system
 - Optionally configure rEFInd with a custom theme (glow) if no custom theme is present
 - Quiet the ZFSBootMenu and host kernel command lines (`docs/boot-flow.md`)
+- Apply hardware quirks when DMI or a device node matches
+- Install Monarchy (Omarchy Quattro as a second session; family default stays Plasma)
 
-`install.sh` does not install Monarchy. After it finishes, see [Monarchy](#monarchy-optional-omarchy-session).
+`./install.sh --check` is a Monarchy dry-run. Operator notes, rollback, and the greeter dropdown warning are in `docs/monarchy-install.md`.
 
 ### Agent Configuration
 
@@ -143,18 +145,11 @@ echo 'FILES+=(/etc/zfs/zroot.key)' | sudo tee -a /etc/mkinitcpio.conf
 sudo mkinitcpio -P
 ```
 
-### Monarchy (optional Omarchy session)
+### Monarchy (Omarchy session)
 
-Omarchy Quattro as a second Wayland session on the same CachyOS+ZFS+KDE box. Plasma stays the family default. Dieuwe picks Omarchy at the greeter.
+Omarchy Quattro as a second Wayland session on the same CachyOS+ZFS+KDE box. Plasma stays the family default. Dieuwe picks Omarchy at the greeter. `./install.sh` applies it on a new box and on a converting machine.
 
-After `./scripts/install.sh`:
-
-```bash
-./scripts/setup-monarchy.sh --check
-./scripts/setup-monarchy.sh
-```
-
-Then reboot. Operator notes, rollback, and the greeter dropdown warning are in `docs/monarchy-install.md`. Design and clash matrix are `docs/monarchy.md` and `docs/monarchy-clashes.md`.
+Design and clash matrix: `docs/monarchy.md` and `docs/monarchy-clashes.md`. Install notes: `docs/monarchy-install.md`.
 
 ---
 

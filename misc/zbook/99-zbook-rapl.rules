@@ -1,4 +1,0 @@
-# Intel RAPL energy_uj is root-only (PLATYPUS). Wheel can read it on this
-# single-user ZBook so userspace can sample package/psys watts without sudo.
-# Installed only by scripts/setup-zbook.sh after a DMI match.
-ACTION=="add", SUBSYSTEM=="powercap", KERNEL=="intel-rapl*", RUN+="/usr/local/lib/zbook/rapl-perms.sh"
