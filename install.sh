@@ -84,44 +84,10 @@ source "$LIB_DIR/packages.sh"
 echo "Installing system packages..."
 packages_install
 
-# Runs before chezmoi so ~/.agents exists when chezmoi links ~/.config/opencode/AGENTS.md into it.
-echo "=== Symlinking agent configuration ==="
-if [ ! -L "$HOME/.agents" ]; then
-    if [ -d "$HOME/.agents" ]; then
-        echo "Moving existing .agents to ~/.agents.bk..."
-        mv "$HOME/.agents" "$HOME/.agents.bk"
-    fi
-    echo "Linking agent instructions and skills..."
-    ln -s "$DOTFILES_DIR/.agents" "$HOME/.agents"
-else
-    echo "  ~/.agents already linked."
-fi
-
-# Claude Code reads its user instructions and skills from ~/.claude; point both at ~/.agents
-# so Claude, opencode and any other agent share one source of truth.
-mkdir -p "$HOME/.claude"
-
-if [ ! -L "$HOME/.claude/CLAUDE.md" ]; then
-    if [ -e "$HOME/.claude/CLAUDE.md" ]; then
-        echo "Moving existing CLAUDE.md to ~/.claude/CLAUDE.md.bk..."
-        mv "$HOME/.claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md.bk"
-    fi
-    ln -s "$HOME/.agents/AGENTS.md" "$HOME/.claude/CLAUDE.md"
-    echo "  linked ~/.claude/CLAUDE.md"
-else
-    echo "  ~/.claude/CLAUDE.md already linked."
-fi
-
-if [ ! -L "$HOME/.claude/skills" ]; then
-    if [ -e "$HOME/.claude/skills" ]; then
-        echo "Moving existing skills to ~/.claude/skills.bk..."
-        mv "$HOME/.claude/skills" "$HOME/.claude/skills.bk"
-    fi
-    ln -s "$HOME/.agents/skills" "$HOME/.claude/skills"
-    echo "  linked ~/.claude/skills"
-else
-    echo "  ~/.claude/skills already linked."
-fi
+# shellcheck source=lib/agents.sh
+source "$LIB_DIR/agents.sh"
+echo "=== Agent home (~/.agents) ==="
+agents_materialize_home
 
 echo "=== Applying dotfiles via chezmoi ==="
 if [ ! -L "$HOME/.local/share/chezmoi" ]; then
@@ -141,6 +107,9 @@ if command -v chezmoi &> /dev/null; then
 else
     echo "Warning: chezmoi not installed, skipped dotfiles setup"
 fi
+
+echo "=== Restoring agent skills from lock ==="
+agents_restore_skills
 
 echo "=== Configuring rEFInd theme ==="
 "$LIB_DIR/refind.sh"
