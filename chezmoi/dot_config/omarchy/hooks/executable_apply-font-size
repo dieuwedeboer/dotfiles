@@ -1,0 +1,74 @@
+#!/bin/bash
+# Omarchy 12px -> 9pt, plus MONARCHY_FONT_PT_OFFSET (0 if unset).
+# Persist the var in ~/.config/environment.d/ so emacs.service and the
+# session see it. fish local.fish does not.
+# Drop an executable in font-size.d/ to add an app; it receives the final pt as $1.
+set -euo pipefail
+
+usage() {
+  echo "Usage: apply-font-size [--print]"
+}
+
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+esac
+
+offset_from_environment_d() {
+  local f="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d/monarchy-font.conf"
+  [[ -f $f ]] || return 1
+  awk -F= '
+    $1 ~ /^[[:space:]]*MONARCHY_FONT_PT_OFFSET[[:space:]]*$/ {
+      v = $2
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
+      print v
+      exit
+    }
+  ' "$f"
+}
+
+if [[ -n ${MONARCHY_FONT_PT_OFFSET+x} ]]; then
+  offset=$MONARCHY_FONT_PT_OFFSET
+else
+  offset=$(offset_from_environment_d || true)
+fi
+[[ $offset =~ ^[+-]?[0-9]+$ ]] || offset=0
+
+px=12
+shell_config="$HOME/.config/omarchy/shell.toml"
+if [[ -f $shell_config ]]; then
+  v=$(awk '
+    /^[[:space:]]*\[/ { in_font = ($0 ~ /^[[:space:]]*\[font\]([[:space:]]|$)/); next }
+    in_font && /^[[:space:]]*base-size[[:space:]]*=/ {
+      v = $0
+      sub(/^[^=]*=[[:space:]]*/, "", v)
+      sub(/[[:space:]]*(#.*)?$/, "", v)
+      print v
+      exit
+    }
+  ' "$shell_config")
+  [[ $v =~ ^[0-9]+$ ]] && px=$v
+fi
+
+omarchy_pt=$(awk -v s="$px" 'BEGIN { printf "%d", int(s * 9 / 12 + 0.5) }')
+pt=$((omarchy_pt + offset))
+((pt < 1)) && pt=1
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy"
+mkdir -p "$state_dir"
+printf '%s\n' "$pt" >"$state_dir/font-pt"
+
+if [[ ${1:-} == --print ]]; then
+  printf '%s\n' "$pt"
+  exit 0
+fi
+
+hook_dir="$HOME/.config/omarchy/hooks/font-size.d"
+[[ -d $hook_dir ]] || exit 0
+for hook in "$hook_dir"/*; do
+  [[ -f $hook ]] || continue
+  [[ $hook == *.sample ]] && continue
+  bash "$hook" "$pt" || echo "Hook failed: $hook" >&2
+done

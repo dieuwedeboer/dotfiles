@@ -1,0 +1,7 @@
+#!/bin/bash
+pt=${1:-}
+[[ $pt =~ ^[0-9]+$ ]] || exit 0
+[[ -f ~/.config/ghostty/config ]] || exit 0
+grep -qE '^font-size = ' ~/.config/ghostty/config || exit 0
+sed -i -E "s/^font-size = .*/font-size = $pt/" ~/.config/ghostty/config
+pkill -SIGUSR2 ghostty 2>/dev/null || true

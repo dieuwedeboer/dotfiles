@@ -1,0 +1,4 @@
+#!/bin/bash
+# GUI Emacs reads ~/.local/state/omarchy/font-pt; this pokes a running daemon.
+command -v emacsclient >/dev/null 2>&1 || exit 0
+emacsclient --eval '(monarchy-emacs-apply-font-size)' >/dev/null 2>&1 || true

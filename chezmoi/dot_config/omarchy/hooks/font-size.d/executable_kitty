@@ -1,0 +1,6 @@
+#!/bin/bash
+pt=${1:-}
+[[ $pt =~ ^[0-9]+$ ]] || exit 0
+[[ -f ~/.config/kitty/kitty.conf ]] || exit 0
+sed -i -E "s/^font_size[[:space:]]+.*/font_size $pt.0/" ~/.config/kitty/kitty.conf
+pkill -USR1 kitty 2>/dev/null || true
