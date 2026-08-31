@@ -25,10 +25,14 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 | `tldr` vs `tealdeer` | Deny `tldr` |
 | `yay` vs `paru` | Deny `yay`. Overlay `yay` execs `paru` |
 | bash vs fish | Do not change login shells |
-| `mise-bin` | Allow. User setup runs `omarchy-refresh-applications` (mise stubs for grok, opencode, gh, …). `lib/packages.sh` uninstalls curl-pipe grok/opencode, pacman `bun`/`github-cli`/`opencode`, and the Spotify/Discord flatpaks |
+| `mise-bin` | Allow. User setup runs `omarchy-refresh-applications` (mise stubs for grok, opencode, gh, …). `lib/packages.sh` uninstalls curl-pipe grok/opencode/cursor-agent, pacman `bun`/`github-cli`/`opencode`, python-pipx, and the Spotify/Discord flatpaks |
 | Default terminal | Omarchy `xdg-terminal-exec`. Apply removes `~/.config/uwsm/env.d/20-monarchy-terminal` |
 | Spotify | Omarchy `omarchy-pkg-add spotify` (`/usr/bin/spotify`). Not the Flathub client |
 | Discord | Omarchy webapp `.desktop`. Not the Flathub client |
+| Chrome | `omarchy-install-browser chrome` (AUR `google-chrome` plus flags, theme, copy-url). Not a bare paru install |
+| Cursor | `omarchy-pkg-add cursor-bin` (CachyOS first-match) and `omarchy-pkg-add cursor-cli` (`/usr/bin/cursor-agent`). Not AUR `cursor-bin` or `curl https://cursor.com/install` |
+| Signal | `omarchy-pkg-add signal-desktop`. Same extra package, Omarchy installer owns it |
+| pipx | Retired. `uv` is in the household set. Strip `python-pipx` after apply. Leave leftover `~/.local/share/pipx/venvs` |
 | Emacs | `emacs-wayland` + `omarchy-emacs`. Live config is chezmoi `~/.config/emacs/` (`init.el` loads the omarchy shim). `~/.emacs.d` is moved aside. Stock `emacs` is uninstalled |
 | Nautilus vs Dolphin | Install nautilus. No user-global mimeapps |
 | `ufw-docker` | Deny. Never run `firewall.sh` |
