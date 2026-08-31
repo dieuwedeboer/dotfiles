@@ -1,3 +1,5 @@
+;;; web.el --- HTML, JS, CSS -*- lexical-binding: t -*-
+
 (use-package web-mode
   :straight t
   :mode
@@ -54,10 +56,11 @@
   :custom
   (css-indent-offset 2))
 
+;; antonj/scss-mode still pushes onto flymake-allowed-file-name-masks,
+;; which Emacs 31 removed. Built-in scss-mode (css-mode.el) is enough.
 (use-package scss-mode
-  :straight t
-  :custom
-  (scss-compile-at-save nil "turn off annoying auto-compile on save"))
+  :straight (:type built-in)
+  :mode "\\.scss\\'")
 
 (use-package apache-mode
   :straight t)

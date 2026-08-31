@@ -1,4 +1,4 @@
-;;; php-doc.el --- doc block generator/extractor for php
+;;; php-doc.el --- doc block generator/extractor for php -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2010, 2013 Stefan Siegl <stesie@brokenpipe.de>
 

@@ -1,3 +1,5 @@
+;;; ido.el --- unused Ido setup -*- lexical-binding: t -*-
+
 ;; ido.el is not loaded by default as we use helm - see init.el
 (use-package ido
   :straight t

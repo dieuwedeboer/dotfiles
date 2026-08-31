@@ -1,3 +1,5 @@
+;;; general.el --- shared Emacs defaults -*- lexical-binding: t -*-
+
 ;; General configuration - much taken from prelude
 
 ;; Disable toolbar.
@@ -241,7 +243,8 @@
 (use-package undo-tree
   :straight t
   :config
-  (setq undo-tree-history-directory-alist '(("." . "~/.emacs.d/undo")))
+  (setq undo-tree-history-directory-alist
+        `(("." . ,(expand-file-name "undo" user-emacs-directory))))
   (global-undo-tree-mode))
 
 ;; diff-hl - diff highlighting

@@ -1,3 +1,5 @@
+;;; helm.el --- unused Helm setup -*- lexical-binding: t -*-
+
 ;; No longer loaded - we use fido now.
 
 ;; Helm is like ido-mode, but lists options vertically instead of

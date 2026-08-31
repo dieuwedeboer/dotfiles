@@ -1,3 +1,5 @@
+;;; markup.el --- XML, Org, Markdown -*- lexical-binding: t -*-
+
 (use-package nxml-mode
   :custom
   (nxml-child-indent 4)

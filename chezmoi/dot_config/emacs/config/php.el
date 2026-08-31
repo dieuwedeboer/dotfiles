@@ -1,3 +1,5 @@
+;;; php.el --- PHP and Drupal -*- lexical-binding: t -*-
+
 (use-package php-mode
   :straight t)
 
