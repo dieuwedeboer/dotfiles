@@ -90,13 +90,13 @@ quattro-on-zfs `bin/` is 438 names at the current pin. Allow-default: every name
 | `monarchy/bin.wrap` | Exact filenames | Install a Monarchy wrapper |
 | `monarchy/bin.deny` | Brick list | Stub, exit 2, log to `/var/log/monarchy-setup.log` |
 
-`monarchy_rebuild_overlay` empties `$OMARCHY_PATH/bin`, installs deny stubs, allow symlinks, wrap scripts, and a `yay` wrapper that execs `paru`. The same names also land under `/usr/local/bin` so systemd user units and `sudo omarchy-pkg-add` resolve. Arch `secure_path` includes `/usr/local/bin`. Deny stubs still win for brick names. Apply also points `/usr/local/bin/setup-monarchy` at `install.sh`.
+`monarchy_rebuild_overlay` empties `$OMARCHY_PATH/bin`, installs deny stubs, allow symlinks, wrap scripts, and a `yay` wrapper that execs `paru`. The same names also land under `/usr/local/bin` so systemd user units and `sudo omarchy-pkg-add` resolve. Arch `secure_path` includes `/usr/local/bin`. Deny stubs still win for brick names. Apply points `/usr/local/bin/monarchy-update` at `install.sh` and removes leftover `setup-monarchy`.
 
 `bin/omarchy` is the CLI router. Overlay **symlinks** clone `bin/omarchy`. Wrapping `omarchy` itself would break every spaced command (`omarchy theme set`, `omarchy update`). `omarchy update` (two words) is the router calling `omarchy-update`. Only that binary is wrapped.
 
 Wraps:
 
-- `omarchy-update` / `omarchy-update-system-pkgs` → `install.sh --update`
+- `omarchy-update` / `omarchy-update-system-pkgs` → `monarchy-update`. The Omarchy menu still calls these names. The command to type is `monarchy-update`.
 - `omarchy-plymouth-set` / `omarchy-plymouth-reset` / `omarchy-refresh-plymouth` → Monarchy splash helpers (`mkinitcpio -P`, no Limine). plymouth-set restyles the greeter overlay.
 - `omarchy-refresh-sddm` → copy clone theme, overlay `Main.qml`
 - `omarchy-screensaver` → seed `screensaver.txt` from clone `logo.txt` if missing, then exec the clone binary
@@ -137,12 +137,12 @@ CachyOS does not Include drop-ins, so this lives in `pacman.conf` itself. First 
 Entry point: `install.sh`. bash, `set -e`, idempotent, sudo only where needed. Bare invocation is the full setup, including Monarchy apply. Flags are Monarchy-only.
 
 ```bash
-./install.sh --check   # Monarchy dry-run only. Writes nothing under /etc or /usr/local.
-./install.sh           # packages, chezmoi, hardware, ZFS, Monarchy apply
-./install.sh --update  # snapshot, fetch, check, apply
+./install.sh           # first run: packages, chezmoi, hardware, ZFS, Monarchy apply
+./install.sh --check   # Monarchy dry-run. Writes nothing under /etc or /usr/local.
+monarchy-update        # after that: snapshot, fetch, check, apply
 ```
 
-Invoked as `/usr/local/bin/setup-monarchy` (overlay symlink), a bare run is Monarchy apply, not the full bootstrap. That is what `omarchy-update` calls.
+`/usr/local/bin/monarchy-update` is a symlink to `install.sh`. Invoked by that name, a bare run is `--update`, not the household bootstrap. Wrapped `omarchy-update` execs it so the Omarchy Update menu does not run stock Omarchy.
 
 Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. That helper hard-codes `zpcachyos/ROOT/cos`. If it is missing or still has the varlog-only prune, apply installs the current copy from this repo, then asserts a `@pre-update-*` exists on `zpcachyos/ROOT/cos/root`. The pacman hook uses that installed helper.
 
@@ -304,7 +304,7 @@ ZFS datasets do not change: `zpcachyos/ROOT/cos/{root,home,varcache,varlog}`. Po
 | `/usr/local/share/omarchy` | working prefix: data symlinks + overlay `bin/` |
 | `/usr/local/bin/omarchy-*` | allow symlinks, wraps, and deny stubs |
 | `/usr/local/bin/monarchy-switch-user` | lock if needed, then return to SDDM |
-| `/usr/local/bin/setup-monarchy` | symlink to `install.sh` |
+| `/usr/local/bin/monarchy-update` | symlink to `install.sh`. Bare run is `--update` |
 | `/etc/systemd/logind.conf.d/10-monarchy-ignore-power-button.conf` | `HandlePowerKey=ignore`. A Bluetooth headset KEY_POWER has shut a host down. Shutdown is the System menu. |
 | `/usr/share/uwsm/env.d/10-monarchy` | working-prefix bootstrap + mise |
 | `/usr/share/plymouth/themes/omarchy/` | Omarchy Plymouth theme |
@@ -317,7 +317,7 @@ ZFS datasets do not change: `zpcachyos/ROOT/cos/{root,home,varcache,varlog}`. Po
 | Updater | Owns | Must not |
 | --- | --- | --- |
 | `cachy-update` / `pacman -Syu` | CachyOS kernel, ZFS modules, Plasma, already-installed leaf packages | Be aborted by omarchy-update-guard. Swap kernel. Drop `[cachyos*]`. Replace mirrorlist. |
-| `./install.sh --update` | Fetch quattro-on-zfs, dry-run vs lock inventories, overlay rebuild, filtered leaf packages, user/session/splash | Call `omarchy-refresh-pacman`. Unfiltered `-Syyuu`. Fast-forward past `bin/` names new to the lock. |
+| `monarchy-update` | Fetch quattro-on-zfs, dry-run vs lock inventories, overlay rebuild, filtered leaf packages, user/session/splash | Call `omarchy-refresh-pacman`. Unfiltered `-Syyuu`. Fast-forward past `bin/` names new to the lock. |
 
 Channel: `[omarchy]` **stable**. Clone follows `quattro-on-zfs`. Those two are allowed to differ. Hyprland and Quickshell stay on CachyOS first-match. Do not pull them from `[omarchy]` to "catch up."
 

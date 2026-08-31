@@ -107,6 +107,7 @@ monarchy_check() {
     fi
     [ -f "$monarchy_lib_dir/switch-user.sh" ] || monarchy_die "missing switch-user.sh"
     [ -f "$monarchy_lib_dir/sddm-resume.sh" ] || monarchy_die "missing sddm-resume.sh"
+    [ -f "$monarchy_lib_dir/stubs/wrap-update.sh" ] || monarchy_die "missing wrap-update.sh"
     monarchy_check_session_lock_overlay
     monarchy_check_logind
     monarchy_check_hidden_hyprland_sessions

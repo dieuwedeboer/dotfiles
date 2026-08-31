@@ -3,7 +3,7 @@
 # ttfx exits immediately without that file and omarchy-screensaver respawns it
 # in a tight loop, so a key never dismisses the fullscreen window.
 set -e
-setup=${MONARCHY_SETUP:-/usr/local/bin/setup-monarchy}
+setup=${MONARCHY_SETUP:-/usr/local/bin/monarchy-update}
 if [ ! -x "$setup" ]; then
     echo "monarchy: $setup is missing" >&2
     exit 1
