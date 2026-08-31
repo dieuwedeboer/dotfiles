@@ -164,8 +164,8 @@
 ;; whitespace-mode config
 (use-package whitespace
   :custom
-  (whitespace-line-column 80 "limit line length")
-  (whitespace-style '(face tabs empty trailing lines-tail)))
+  ;; No lines-tail: don't paint overflow past column 80.
+  (whitespace-style '(face tabs empty trailing)))
 
 ;; bookmarks
 (use-package bookmark
