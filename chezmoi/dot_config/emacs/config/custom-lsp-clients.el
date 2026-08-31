@@ -1,3 +1,5 @@
+;;; custom-lsp-clients.el --- extra lsp-mode clients -*- lexical-binding: t -*-
+
 ;; Ensure LSP is loaded.
 (require 'lsp-mode)
 

@@ -1,3 +1,5 @@
+;;; music.el --- LilyPond ALSA helpers -*- lexical-binding: t -*-
+
 ;; Commentary:
 
 ;; This file builds upon lilypond-mode to enable output to an ALSA
@@ -194,7 +196,7 @@ process and trigger keystroke events."
     (kill-process "compilation"))
   ;; Send an all-note-off CC message to the midi output port.
   (shell-command (concat "aplaymidi -p " midi-output-port
-                         " ~/.emacs.d/config/all-off.midi")))
+                         " ~/.config/emacs/config/all-off.midi")))
 
 ;; MIDI Event LilyPond Handlers
 

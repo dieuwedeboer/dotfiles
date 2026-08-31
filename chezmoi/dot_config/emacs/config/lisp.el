@@ -1,3 +1,5 @@
+;;; lisp.el --- Lisp language modes -*- lexical-binding: t -*-
+
 ;; Major language modes
 
 (use-package clojure-mode

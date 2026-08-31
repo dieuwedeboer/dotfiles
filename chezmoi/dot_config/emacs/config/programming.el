@@ -1,3 +1,5 @@
+;;; programming.el --- shared programming setup -*- lexical-binding: t -*-
+
 (setq c-basic-offset 2)
 (setq cperl-indent-level 2)
 
