@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# PR 3 greeter Exec. Logs a successful pick without launching Hyprland.
-# Replaced by uwsm start … hyprland.desktop once that desktop file exists.
+# Greeter Exec fallback when hyprland.desktop is missing. Logs a successful
+# pick without launching Hyprland. Apply rewrites Exec= to
+# `uwsm start … hyprland.desktop` once that file exists.
 set -e
 state="${XDG_STATE_HOME:-$HOME/.local/state}/monarchy"
 mkdir -p "$state"
