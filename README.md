@@ -131,10 +131,10 @@ chezmoi re-add ~/.agents/.skill-lock.json
 Hand-crafted global skills go in `chezmoi/dot_agents/skills/<name>/`. Skills that only apply when working in this repo go in `.agents/skills/` here.
 
 `~/.claude/settings.json` is chezmoi-managed (`chezmoi/dot_claude/settings.json`) and
-sets `permissions.defaultMode` to `acceptEdits`, so Claude Code auto-approves file
-edits but still prompts before running commands. Note that changes made in-session via
-`/config` write to the live file and will be reverted by the next `chezmoi apply` —
-run `chezmoi re-add ~/.claude/settings.json` to keep them.
+sets `permissions.defaultMode` to `auto`, so Claude Code auto-approves tool calls
+that pass its background safety checks. php-lsp is enabled. Note that changes made
+in-session via `/config` write to the live file and will be reverted by the next
+`chezmoi apply` — run `chezmoi re-add ~/.claude/settings.json` to keep them.
 
 ### Double Password Solution
 
