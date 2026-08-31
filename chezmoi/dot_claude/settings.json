@@ -1,12 +1,15 @@
 {
-  "model": "opus[1m]",
-  "theme": "auto",
-  "permissions": {
-    "defaultMode": "acceptEdits"
-  },
   "attribution": {
     "commit": "",
     "pr": "",
     "sessionUrl": false
+  },
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "model": "opus[1m]",
+  "theme": "auto",
+  "enabledPlugins": {
+    "php-lsp@claude-plugins-official": true
   }
 }
