@@ -6,15 +6,11 @@
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
 (setq native-comp-async-report-warnings-errors 'silent)
 
-;; Packaged omarchy.el looks for ~/.local/share/omarchy/bin; Monarchy uses
-;; /usr/local/share/omarchy/bin.
+;; Overlay bin, not ~/.local/share/omarchy/bin (that path is stock Omarchy).
 (let ((omarchy-bin "/usr/local/share/omarchy/bin"))
   (when (file-directory-p omarchy-bin)
     (add-to-list 'exec-path omarchy-bin)
     (setenv "PATH" (concat omarchy-bin ":" (or (getenv "PATH") "")))))
-
-;; Shim written by omarchy-emacs (not chezmoi). Missing-ok until first apply.
-(load (expand-file-name "omarchy" user-emacs-directory) t 'nomessage)
 
 (defvar bootstrap-version)
 (let ((bootstrap-file
@@ -40,6 +36,7 @@
 
 (defvar config-dir (expand-file-name "config" user-emacs-directory))
 
+(load (expand-file-name "theme.el" config-dir))
 (load (expand-file-name "general.el" config-dir))
 (load (expand-file-name "programming.el" config-dir))
 (load (expand-file-name "markup.el" config-dir))

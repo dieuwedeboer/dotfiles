@@ -55,10 +55,18 @@ monarchy_install_packages() {
     fi
 
     monarchy_refuse_partial_upgrade
-    monarchy_log "pacman -S --needed ${#pkgs[@]} filtered leaf packages"
-    monarchy_sudo pacman -S --needed --noconfirm "${pkgs[@]}"
+
+    # pacman -T follows Provides (neovim satisfies nvim) in one query.
+    local -a need=()
+    mapfile -t need < <(pacman -T "${pkgs[@]}" || true)
+    if [ "${#need[@]}" -eq 0 ]; then
+        monarchy_log "filtered leaf packages already installed (${#pkgs[@]})"
+    else
+        monarchy_log "pacman -S --needed ${#need[@]} of ${#pkgs[@]} filtered leaf packages"
+        monarchy_sudo pacman -S --needed --noconfirm "${need[@]}"
+        monarchy_log "packages installed"
+    fi
     monarchy_record_packages
     monarchy_skip_os_release_clobber
-    monarchy_log "packages installed"
     return 0
 }

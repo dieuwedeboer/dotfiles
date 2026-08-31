@@ -63,7 +63,7 @@ monarchy_clear_terminal_override() {
 }
 
 # ~/.emacs.d shadows ~/.config/emacs. Chezmoi owns init.el under XDG;
-# move a leftover ~/.emacs.d aside so Emacs reads the Omarchy layout.
+# move a leftover ~/.emacs.d aside so Emacs reads the XDG layout.
 monarchy_prefer_xdg_emacs() {
     local src="$HOME/.emacs.d"
     local dest
@@ -76,44 +76,79 @@ monarchy_prefer_xdg_emacs() {
     monarchy_log "moved $src -> $dest (Emacs uses ~/.config/emacs)"
 }
 
-monarchy_sync_omarchy_emacs_files() {
-    local share=/usr/share/omarchy-emacs
-    [ -d "$share" ] || return 0
-    mkdir -p "$HOME/.config/emacs/themes" "$HOME/.config/omarchy/themed"
-    cat >"$HOME/.config/emacs/omarchy.el" <<'EOF'
-;;; omarchy.el --- Omarchy Emacs integration shim -*- lexical-binding: t -*-
-;;; Managed by omarchy-emacs. Not chezmoi. Put personal Lisp in init.el.
+MONARCHY_EMACS_THEME_URL="${MONARCHY_EMACS_THEME_URL:-https://github.com/berenddeboer/omarchy-emacs-theme.git}"
+MONARCHY_EMACS_THEME_DIR="${MONARCHY_EMACS_THEME_DIR:-$HOME/.local/share/omarchy-emacs-theme}"
 
-(let ((omarchy--system-file "/usr/share/omarchy-emacs/config/omarchy.el"))
-  (when (file-exists-p omarchy--system-file)
-    (load omarchy--system-file)))
+# omarchy-emacs (scottjones) is Omarchy 3: it restarts Emacs and does not
+# use Quattro's themed/ + theme-set.d templates. Drop its assets/package.
+monarchy_drop_omarchy_emacs_package() {
+    rm -f "$HOME/.config/emacs/omarchy.el"
+    rm -f "$HOME/.config/emacs/themes/omarchy-theme.el"
+    rm -f "$HOME/.config/omarchy/themed/omarchy-colors.el.tpl"
+    rm -f "$HOME/.config/omarchy/hooks/theme-set.d/omarchy-emacs"
+    rm -f "$HOME/.config/omarchy/hooks/font-set.d/omarchy-emacs"
+    if monarchy_pkg_exactly omarchy-emacs; then
+        monarchy_log "removing omarchy-emacs (Quattro uses omarchy-emacs-theme)"
+        monarchy_sudo pacman -R --noconfirm omarchy-emacs \
+            || monarchy_log "warning: could not remove omarchy-emacs"
+    fi
+}
 
-;;; omarchy.el ends here
-EOF
-    if [ -f "$share/config/themes/omarchy-theme.el" ]; then
-        cp "$share/config/themes/omarchy-theme.el" "$HOME/.config/emacs/themes/"
+monarchy_sync_emacs_theme_repo() {
+    local dest=$MONARCHY_EMACS_THEME_DIR
+    export GIT_TERMINAL_PROMPT=0
+    mkdir -p "$(dirname "$dest")"
+    if [ -d "$dest/.git" ]; then
+        git -C "$dest" fetch --quiet origin \
+            && git -C "$dest" pull --ff-only --quiet \
+            || monarchy_log "warning: could not update $dest"
+        return 0
     fi
-    if [ -f "$share/omarchy-colors.el.tpl" ]; then
-        cp "$share/omarchy-colors.el.tpl" "$HOME/.config/omarchy/themed/"
+    if [ -e "$dest" ]; then
+        monarchy_die "$dest exists and is not a git clone"
     fi
-    if command -v omarchy-emacs-sync-hooks >/dev/null 2>&1; then
-        omarchy-emacs-sync-hooks || monarchy_log "warning: omarchy-emacs-sync-hooks failed"
+    git clone --depth 1 -- "$MONARCHY_EMACS_THEME_URL" "$dest" \
+        || monarchy_die "failed to clone $MONARCHY_EMACS_THEME_URL"
+}
+
+monarchy_install_emacs_theme() {
+    local setup="$MONARCHY_EMACS_THEME_DIR/bin/omarchy-emacs-theme-setup"
+    monarchy_sync_emacs_theme_repo
+    [ -x "$setup" ] || monarchy_die "missing $setup"
+    if ! "$setup"; then
+        monarchy_log "warning: omarchy-emacs-theme-setup failed"
+        return 0
     fi
+    monarchy_log "omarchy-emacs-theme hooked (themed/ + theme-set.d)"
+}
+
+monarchy_omarchy_pkg_add() {
+    local pkg=$1
+    if monarchy_pkg_installed "$pkg"; then
+        return 0
+    fi
+    if ! command -v omarchy-pkg-add >/dev/null 2>&1; then
+        monarchy_log "warning: omarchy-pkg-add missing; skipped $pkg"
+        return 0
+    fi
+    monarchy_log "omarchy-pkg-add $pkg"
+    omarchy-pkg-add "$pkg" || monarchy_log "warning: omarchy-pkg-add $pkg failed"
 }
 
 monarchy_user_emacs() {
     export OMARCHY_PATH
     export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
-    if pacman -Q emacs >/dev/null 2>&1 && ! pacman -Q emacs-wayland >/dev/null 2>&1; then
+    if monarchy_pkg_exactly emacs; then
         monarchy_sudo pacman -R --noconfirm emacs \
             || monarchy_log "warning: could not remove emacs (conflicts with emacs-wayland)"
     fi
-    if command -v omarchy-pkg-add >/dev/null 2>&1; then
-        omarchy-pkg-add omarchy-emacs || monarchy_log "warning: omarchy-pkg-add omarchy-emacs failed"
-    fi
+    # Keep emacs-wayland as explicit so dropping omarchy-emacs does not
+    # leave it as an unused dependency.
+    monarchy_sudo pacman -S --needed --noconfirm --asexplicit emacs-wayland \
+        || monarchy_log "warning: could not install emacs-wayland"
+    monarchy_drop_omarchy_emacs_package
     monarchy_prefer_xdg_emacs
-    # Skip the packaged interactive setup (it offers to move ~/.emacs.d).
-    monarchy_sync_omarchy_emacs_files
+    monarchy_install_emacs_theme
     systemctl --user enable --now emacs.service 2>/dev/null \
         || monarchy_log "warning: could not enable emacs.service"
 }
@@ -129,19 +164,21 @@ monarchy_user_omarchy_defaults() {
     elif [ -f "$MONARCHY_SRC/install/user/mise.sh" ]; then
         bash "$MONARCHY_SRC/install/user/mise.sh"
     fi
-    if command -v omarchy-pkg-add >/dev/null 2>&1; then
-        omarchy-pkg-add spotify || monarchy_log "warning: omarchy-pkg-add spotify failed"
-        omarchy-pkg-add signal-desktop || monarchy_log "warning: omarchy-pkg-add signal-desktop failed"
-        omarchy-pkg-add cursor-bin || monarchy_log "warning: omarchy-pkg-add cursor-bin failed"
-        omarchy-pkg-add cursor-cli || monarchy_log "warning: omarchy-pkg-add cursor-cli failed"
+    monarchy_omarchy_pkg_add spotify
+    monarchy_omarchy_pkg_add signal-desktop
+    monarchy_omarchy_pkg_add cursor-bin
+    monarchy_omarchy_pkg_add cursor-cli
+    if ! monarchy_pkg_installed google-chrome; then
+        if command -v omarchy-install-browser >/dev/null 2>&1; then
+            monarchy_log "omarchy-install-browser chrome"
+            omarchy-install-browser chrome \
+                || monarchy_log "warning: omarchy-install-browser chrome failed"
+        fi
     fi
-    if command -v omarchy-install-browser >/dev/null 2>&1; then
-        omarchy-install-browser chrome || monarchy_log "warning: omarchy-install-browser chrome failed"
+    if command -v mise >/dev/null 2>&1 && ! mise which bun >/dev/null 2>&1; then
+        monarchy_log "mise use -g bun@latest"
+        mise use -g bun@latest >/dev/null || monarchy_log "warning: mise bun failed"
     fi
-    if command -v mise >/dev/null 2>&1; then
-        mise use -g bun@latest || monarchy_log "warning: mise bun failed"
-    fi
-    monarchy_user_emacs
 }
 
 monarchy_mark_first_run_done() {
@@ -268,6 +305,9 @@ monarchy_setup_user() {
     monarchy_user_xcompose
     monarchy_user_git
     monarchy_user_theme
+    # After theme-set so omarchy-emacs-theme-setup's `omarchy theme refresh`
+    # can render the palette file before the daemon starts.
+    monarchy_user_emacs
     monarchy_run_install_script "$MONARCHY_SRC/install/user/chromium.sh"
     monarchy_run_install_script "$MONARCHY_SRC/install/user/default-keyring.sh"
     monarchy_run_install_script "$MONARCHY_SRC/install/user/first-run/gnome-theme.sh"
