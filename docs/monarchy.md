@@ -10,7 +10,7 @@ Omarchy Quattro as a second Wayland session on CachyOS+ZFS+KDE. Plasma stays the
 | `docs/monarchy-install.md` | Operator steps, apply checklist, rollback |
 | `docs/monarchy-clashes.md` | `packages.deny`, overlay-bin, clash policy |
 | `docs/boot-flow.md` | Firmware to greeter. Plymouth around zfs. |
-| `docs/plans/` | Work that is not in the tree yet (ZBM UI, zbook fingerprint) |
+| `docs/plans/` | Work that is not in the tree yet (extra themes, ZBM UI, zbook fingerprint) |
 
 ## What it is
 
