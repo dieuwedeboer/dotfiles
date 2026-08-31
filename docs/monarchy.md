@@ -148,9 +148,9 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 
 `monarchy_apply` order: snapshot, guards, clone, working prefix, overlay, lock/menu patch, switch-user helper, `/etc/omarchy.conf`, `[omarchy]` repo, leaf packages, settings files, a short list of clone `install/config/*.sh`, SDDM, lock PAM, session desktop, logind, UWSM env, portals, Dieuwe user setup, mime assert, Plymouth.
 
-Dieuwe-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, Super+Ctrl+U bind, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), `omarchy-pkg-add spotify`, `mise use -g bun`, `omarchy-emacs` (`emacs-wayland`, chezmoi `~/.config/emacs/`), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
+Dieuwe-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, Super+Ctrl+U bind, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), `omarchy-pkg-add` of spotify, signal-desktop, cursor-bin, cursor-cli, `omarchy-install-browser chrome`, `mise use -g bun`, `omarchy-emacs` (`emacs-wayland`, chezmoi `~/.config/emacs/`), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
 
-`lib/packages.sh` installs the shared set before apply. After apply it strips competing copies (pacman emacs/bun/gh, Spotify/Discord flatpaks) once `/etc/omarchy.conf` exists, so a box that has not finished apply is still usable.
+`lib/packages.sh` installs the shared set before apply. After apply or `--update` it strips competing copies (pacman emacs/bun/gh, Spotify/Discord flatpaks, curl-pipe cursor-agent, python-pipx) once `/etc/omarchy.conf` exists, so a box that has not finished apply is still usable. Native Zoom stays in the AUR list.
 
 ### Repo layout
 

@@ -119,7 +119,8 @@ monarchy_user_emacs() {
 }
 
 # Webapp launchers, mise agent stubs, and the tools that used to be competing
-# copies in lib/packages.sh (Spotify flatpak, pacman bun, curl grok/opencode).
+# copies in lib/packages.sh (Spotify/Discord flatpaks, pacman bun/signal,
+# AUR chrome/cursor-bin, curl grok/opencode/cursor-agent).
 monarchy_user_omarchy_defaults() {
     export OMARCHY_PATH
     export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
@@ -130,6 +131,12 @@ monarchy_user_omarchy_defaults() {
     fi
     if command -v omarchy-pkg-add >/dev/null 2>&1; then
         omarchy-pkg-add spotify || monarchy_log "warning: omarchy-pkg-add spotify failed"
+        omarchy-pkg-add signal-desktop || monarchy_log "warning: omarchy-pkg-add signal-desktop failed"
+        omarchy-pkg-add cursor-bin || monarchy_log "warning: omarchy-pkg-add cursor-bin failed"
+        omarchy-pkg-add cursor-cli || monarchy_log "warning: omarchy-pkg-add cursor-cli failed"
+    fi
+    if command -v omarchy-install-browser >/dev/null 2>&1; then
+        omarchy-install-browser chrome || monarchy_log "warning: omarchy-install-browser chrome failed"
     fi
     if command -v mise >/dev/null 2>&1; then
         mise use -g bun@latest || monarchy_log "warning: mise bun failed"

@@ -58,12 +58,20 @@ fi
 
 # shellcheck source=lib/monarchy.sh
 source "$LIB_DIR/monarchy.sh"
+# shellcheck source=lib/packages.sh
+source "$LIB_DIR/packages.sh"
 
 monarchy_cli() {
     case "$1" in
         check) monarchy_check ;;
-        apply) monarchy_apply ;;
-        update) monarchy_update ;;
+        apply)
+            monarchy_apply
+            packages_strip_omarchy_owned
+            ;;
+        update)
+            monarchy_update
+            packages_strip_omarchy_owned
+            ;;
         splash) monarchy_splash_only ;;
         *)
             echo "unknown monarchy mode: $1" >&2
@@ -79,8 +87,6 @@ fi
 
 echo "=== Welcome back, commander ==="
 
-# shellcheck source=lib/packages.sh
-source "$LIB_DIR/packages.sh"
 echo "Installing system packages..."
 packages_install
 
@@ -173,8 +179,6 @@ echo "=== Configuring ZFS monitoring and snapshots ==="
 
 echo "=== Monarchy (Omarchy session on this CachyOS box) ==="
 monarchy_cli apply
-
-packages_strip_omarchy_owned
 
 echo "=== System installation complete ==="
 echo "Reboot so SDDM is the greeter. Plasma stays the family default."
