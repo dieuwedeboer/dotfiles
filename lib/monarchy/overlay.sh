@@ -83,7 +83,7 @@ monarchy_rebuild_overlay() {
             [ -e "$src_bin/$name" ] || monarchy_die "allowlisted $name missing from clone bin/"
             monarchy_sudo ln -sfn "$src_bin/$name" "/usr/local/bin/$name"
         done
-        monarchy_sudo ln -sfn "$MONARCHY_SETUP" /usr/local/bin/setup-monarchy
+        monarchy_install_update
     fi
 }
 
@@ -210,6 +210,13 @@ monarchy_overlay_session_lock() {
     }
     monarchy_overlay_replace_file "$menu_dest" "$menu_tmp"
     monarchy_log "overlaid $menu_dest"
+}
+
+monarchy_install_update() {
+    [ -f "$MONARCHY_SETUP" ] || monarchy_die "missing $MONARCHY_SETUP"
+    monarchy_sudo ln -sfn "$MONARCHY_SETUP" /usr/local/bin/monarchy-update
+    monarchy_sudo rm -f /usr/local/bin/setup-monarchy
+    monarchy_log "installed /usr/local/bin/monarchy-update"
 }
 
 monarchy_install_switch_user() {

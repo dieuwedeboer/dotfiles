@@ -2,7 +2,7 @@
 # Overlay wrapper for omarchy-refresh-sddm. Copies the clone theme, then the
 # multi-user Main.qml overlay. Never leaves stock last-user/uwsm-only QML.
 set -e
-setup=${MONARCHY_SETUP:-/usr/local/bin/setup-monarchy}
+setup=${MONARCHY_SETUP:-/usr/local/bin/monarchy-update}
 if [ ! -x "$setup" ]; then
     echo "monarchy: $setup is missing" >&2
     exit 1

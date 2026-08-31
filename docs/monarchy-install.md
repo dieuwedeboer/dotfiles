@@ -28,7 +28,7 @@ Any machine that followed the README Calamares path (CachyOS, encrypted ZFS, KDE
 
 Household daily drivers and less-used boxes that already have the old package set (pacman emacs/bun/gh, Spotify/Discord flatpaks, curl-pipe cursor-agent, python-pipx, omarchy-emacs) run the same `./install.sh`. Confirm TLP is absent (`pacman -Q tlp-pd` should fail). Apply aborts if it is installed. `cachy-update` (or `sudo pacman -Syu`) first: apply refuses to install Omarchy leaves while upgrades are pending.
 
-`lib/packages.sh` installs the shared set, then Monarchy apply writes `/etc/omarchy.conf`, then the strip removes the competing copies. `--update` and `setup-monarchy` apply run the same strip. Until that conf exists, emacs/bun/gh/spotify/discord/cursor-agent/pipx stay so a box that has not finished apply is still usable.
+`lib/packages.sh` installs the shared set, then Monarchy apply writes `/etc/omarchy.conf`, then the strip removes the competing copies. `--update` and `monarchy-update` run the same strip. Until that conf exists, emacs/bun/gh/spotify/discord/cursor-agent/pipx stay so a box that has not finished apply is still usable.
 
 Optional dry-run first:
 
@@ -71,7 +71,7 @@ If Hyprland fails, stay on Plasma, boot a `pre-update-*` snapshot from ZFSBootMe
 
 `--no-packages` skips the leaf set (still does overlay, repo, and session).
 
-`--update` is what `omarchy-update` calls (via `/usr/local/bin/setup-monarchy`).
+After apply, `monarchy-update` is the PATH command (`install.sh --update`). The Omarchy menu's `omarchy-update` wraps it.
 
 ## Check (review only)
 

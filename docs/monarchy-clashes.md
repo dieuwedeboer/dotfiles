@@ -47,7 +47,7 @@ See `monarchy/packages.deny`. Curated bricks only: two DMs (`plasma-login-manage
 ## Overlay bin
 
 - `monarchy/bin.allow`: symlink to clone `bin/<name>`
-- `monarchy/bin.wrap`: `omarchy-update` and `omarchy-update-system-pkgs` call `install.sh --update`. Plymouth write-path names skip Limine and restyle the SDDM greeter from Monarchy `Main.qml`. `omarchy-refresh-sddm` copies the clone theme then overlays that QML (Unlock default). Apply then follows Style > Unlock if plymouth is already a named theme. The session theme does not restyle the greeter.
+- `monarchy/bin.wrap`: `omarchy-update` and `omarchy-update-system-pkgs` exec `monarchy-update`. Plymouth write-path names skip Limine and restyle the SDDM greeter from Monarchy `Main.qml`. `omarchy-refresh-sddm` copies the clone theme then overlays that QML (Unlock default). Apply then follows Style > Unlock if plymouth is already a named theme. The session theme does not restyle the greeter.
 - `monarchy/bin.deny`: brick list only (pacman.conf, Limine, ISO provisioner, factory reset, dataset upgrade). Stub, exit 2. Also installed under `/usr/local/bin` on apply.
 
 Omarchy-first: `generate-inventories.py` allows every other `clone/bin` name, including `omarchy-install-*` and `omarchy-pkg-*`. Apply installs the omarchy-settings file tree via `settings.skip`. `omarchy` itself is the CLI router. `omarchy-refresh-pacman` stays deny, not a wrap.

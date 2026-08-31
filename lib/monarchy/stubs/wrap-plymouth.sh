@@ -3,7 +3,7 @@
 # plymouth-set restyles the Monarchy Main.qml overlay (Style > Unlock).
 set -e
 name=$(basename -- "$0")
-setup=${MONARCHY_SETUP:-/usr/local/bin/setup-monarchy}
+setup=${MONARCHY_SETUP:-/usr/local/bin/monarchy-update}
 if [ ! -x "$setup" ]; then
     echo "monarchy: $setup is missing" >&2
     exit 1

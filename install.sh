@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# One-shot setup from a CachyOS+ZFS+KDE Calamares install.
-# No flags: packages, chezmoi, hardware, ZFS, then Monarchy apply.
-# --check / --update / --splash-only / --no-packages: Monarchy only
-# (same as the old setup-monarchy.sh). Overlay wraps call this as
-# /usr/local/bin/setup-monarchy --update.
+# First run: ./install.sh from this clone (household bootstrap + Monarchy).
+# After that, PATH has monarchy-update (this file, --update).
 set -e
 VERBOSE=0
 MODE=full
@@ -22,17 +19,19 @@ for arg in "$@"; do
         -h|--help)
             cat <<'EOF'
 usage: install.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
+       monarchy-update [same flags]
 
   (none)          Full setup from a CachyOS+ZFS+KDE base: packages,
                   chezmoi, rEFInd glow, services, hardware quirks, ZFS
-                  snapshots, then Monarchy apply. Idempotent.
+                  snapshots, then Monarchy apply. First run from the
+                  git clone. Not installed on PATH.
   --check         Monarchy dry-run. Writes nothing under /etc or /usr/local.
   --update        Monarchy snapshot, fetch, check, then apply.
   --no-packages   Monarchy apply without pacman leaf packages.
   --splash-only   Omarchy Plymouth theme, plymouth around zfs, retain-splash.
 
-  Invoked as setup-monarchy (overlay symlink): (none) is Monarchy apply
-  only, not the full bootstrap.
+  After the first install, /usr/local/bin/monarchy-update is this file
+  with --update. omarchy-update (Omarchy menu) wraps that.
 
   MONARCHY_TRUST_OMARCHY_KEY=1 skips the packaging-key prompt.
 EOF
@@ -47,13 +46,12 @@ done
 [ "$VERBOSE" = 1 ] && set -x
 export VERBOSE
 
-DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 LIB_DIR="$DOTFILES_DIR/lib"
 
-# Overlay wraps install this file as /usr/local/bin/setup-monarchy.
-# Bare that name is Monarchy apply, not the full bootstrap.
-if [ "$(basename -- "$0")" = setup-monarchy ] && [ "$MODE" = full ]; then
-    MODE=apply
+# Overlay installs this file as /usr/local/bin/monarchy-update.
+if [ "$(basename -- "$0")" = monarchy-update ] && [ "$MODE" = full ]; then
+    MODE=update
 fi
 
 # shellcheck source=lib/monarchy.sh
