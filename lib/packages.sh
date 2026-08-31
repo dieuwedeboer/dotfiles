@@ -44,6 +44,7 @@ AUR_PACKAGES=(
 
 FLATPAK_PACKAGES=(
     com.adamcake.Bolt
+    info.beyondallreason.bar
 )
 
 # Omarchy owns these: mise stubs for grok/opencode/gh/bun, native Spotify,
