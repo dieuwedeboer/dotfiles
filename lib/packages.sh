@@ -47,7 +47,7 @@ FLATPAK_PACKAGES=(
 )
 
 # Omarchy owns these: mise stubs for grok/opencode/gh/bun, native Spotify,
-# Discord webapp, omarchy-emacs (emacs-wayland), cursor-cli, Chrome via
+# Discord webapp, emacs-wayland + omarchy-emacs-theme, cursor-cli, Chrome via
 # omarchy-install-browser. Do not reinstall the competing copies after apply.
 # Keep this strip for boxes still converting from the pre-Monarchy package set.
 OMARCHY_OWNED_PACMAN=(
@@ -60,10 +60,11 @@ OMARCHY_OWNED_FLATPAKS=(
     com.discordapp.Discord
     com.spotify.Client
 )
-# Household set dropped these. uv replaced pipx. Strip after apply so a
-# converting box keeps pipx until the rest of the new set is in place.
+# Household set dropped these. uv replaced pipx. omarchy-emacs is Omarchy 3
+# and does not follow Quattro palettes; omarchy-emacs-theme does.
 RETIRED_PACMAN=(
     python-pipx
+    omarchy-emacs
 )
 
 packages_install() {
@@ -144,37 +145,54 @@ packages_strip_curl_pipe_cursor() {
 
 packages_strip_omarchy_owned() {
     local pkg
+    local -a remove=()
     if [ ! -f /etc/omarchy.conf ]; then
         echo "  leaving emacs/bun/gh/spotify/discord/cursor-agent/pipx until Monarchy apply writes /etc/omarchy.conf"
         return 0
     fi
 
-    echo "=== Removing packages Omarchy now owns ==="
     for pkg in "${OMARCHY_OWNED_PACMAN[@]}"; do
-        if pacman -Q "$pkg" &> /dev/null; then
-            echo "  removing $pkg (Omarchy/mise owns this)"
-            sudo pacman -R --noconfirm "$pkg"
+        if monarchy_pkg_exactly "$pkg"; then
+            remove+=("$pkg")
         fi
     done
+    if [ "${#remove[@]}" -gt 0 ]; then
+        echo "=== Removing packages Omarchy now owns ==="
+        for pkg in "${remove[@]}"; do
+            echo "  removing $pkg (Omarchy/mise owns this)"
+        done
+        monarchy_sudo pacman -R --noconfirm "${remove[@]}" \
+            || echo "  warning: pacman -R failed for ${remove[*]}"
+    fi
 
     if command -v flatpak &> /dev/null; then
         for pkg in "${OMARCHY_OWNED_FLATPAKS[@]}"; do
             if flatpak list --app | grep -q "$pkg"; then
                 echo "  removing flatpak $pkg (Omarchy owns this)"
-                flatpak uninstall -y "$pkg"
+                if ! flatpak uninstall -y "$pkg" 2>/dev/null; then
+                    monarchy_sudo flatpak uninstall -y "$pkg" \
+                        || echo "  warning: flatpak uninstall failed for $pkg"
+                fi
             fi
         done
     fi
 
     packages_strip_curl_pipe_cursor
 
-    echo "=== Removing retired household packages ==="
+    remove=()
     for pkg in "${RETIRED_PACMAN[@]}"; do
-        if pacman -Q "$pkg" &> /dev/null; then
-            echo "  removing $pkg"
-            sudo pacman -R --noconfirm "$pkg"
+        if monarchy_pkg_exactly "$pkg"; then
+            remove+=("$pkg")
         fi
     done
+    if [ "${#remove[@]}" -gt 0 ]; then
+        echo "=== Removing retired household packages ==="
+        for pkg in "${remove[@]}"; do
+            echo "  removing $pkg"
+        done
+        monarchy_sudo pacman -R --noconfirm "${remove[@]}" \
+            || echo "  warning: pacman -R failed for ${remove[*]}"
+    fi
     if [ -d "$HOME/.local/share/pipx/venvs" ] && \
         [ -n "$(ls -A "$HOME/.local/share/pipx/venvs" 2>/dev/null)" ]; then
         echo "  leftover pipx venvs in $HOME/.local/share/pipx/venvs (not removing)"

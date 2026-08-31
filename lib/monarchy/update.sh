@@ -172,11 +172,10 @@ monarchy_update() {
     monarchy_load_lock
     monarchy_load_inventories
     monarchy_snapshot_first
-    monarchy_ensure_clone_for_check
-    if [ -d "$MONARCHY_SRC/.git" ]; then
-        git -C "$MONARCHY_SRC" fetch --quiet origin "$MONARCHY_LOCK_BRANCH" || \
-            monarchy_sudo git -C "$MONARCHY_SRC" fetch --quiet origin "$MONARCHY_LOCK_BRANCH"
-    fi
+    # Root-owned clone. Fetch+checkout the lock commit as root before
+    # check so a lock bump is classified against the new tree, not the
+    # previous checkout. User git hits "dubious ownership" on this dest.
+    monarchy_sync_omarchy_clone
     monarchy_check
     monarchy_apply
 }

@@ -80,6 +80,9 @@ monarchy_install_snapshot_helper() {
 
 monarchy_snapshot_first() {
     local helper=/root/.local/bin/zfs-snapshot-pre-update.sh
+    if [ "${MONARCHY_SNAPSHOT_DONE:-0}" = 1 ]; then
+        return 0
+    fi
     monarchy_install_snapshot_helper
     if ! monarchy_sudo test -x "$helper"; then
         monarchy_die "missing $helper"
@@ -87,6 +90,7 @@ monarchy_snapshot_first() {
     monarchy_log "snapshot via $helper"
     monarchy_sudo "$helper"
     monarchy_assert_root_pre_update_snapshot
+    MONARCHY_SNAPSHOT_DONE=1
 }
 
 monarchy_assert_zfs_layout() {
@@ -104,9 +108,21 @@ monarchy_assert_os_release() {
     [ "$id" = "cachyos" ] || monarchy_die "/etc/os-release ID is '$id', expected cachyos"
 }
 
+# pacman -Q follows Provides: neovim satisfies nvim, emacs-wayland
+# satisfies emacs. Use this when asking "is this name already covered?"
 monarchy_pkg_installed() {
     command -v pacman >/dev/null 2>&1 || return 1
     pacman -Q "$1" >/dev/null 2>&1
+}
+
+# True only if a package with this exact name is installed. Needed before
+# pacman -R: emacs-wayland provides emacs, but -R emacs then says
+# "target not found".
+monarchy_pkg_exactly() {
+    command -v pacman >/dev/null 2>&1 || return 1
+    local got
+    got=$(pacman -Qq "$1" 2>/dev/null) || return 1
+    [ "$got" = "$1" ]
 }
 
 monarchy_refuse_bootloader() {

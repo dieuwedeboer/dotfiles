@@ -138,12 +138,12 @@ monarchy_trust_omarchy_key() {
 monarchy_install_omarchy_keyring() {
     if monarchy_pkg_installed omarchy-keyring; then
         monarchy_log "omarchy-keyring already installed"
-    else
-        monarchy_log "pacman -Sy then install omarchy-keyring"
-        monarchy_sudo pacman -Sy --noconfirm
-        monarchy_sudo pacman -S --needed --noconfirm omarchy-keyring \
-            || monarchy_die "omarchy-keyring install failed (is [omarchy] in pacman.conf?)"
+        return 0
     fi
+    monarchy_log "pacman -Sy then install omarchy-keyring"
+    monarchy_sudo pacman -Sy --noconfirm
+    monarchy_sudo pacman -S --needed --noconfirm omarchy-keyring \
+        || monarchy_die "omarchy-keyring install failed (is [omarchy] in pacman.conf?)"
     if [ -f /usr/share/pacman/keyrings/omarchy.gpg ]; then
         monarchy_sudo pacman-key --populate omarchy
     fi

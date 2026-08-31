@@ -40,8 +40,12 @@ monarchy_ensure_clone_for_check() {
 }
 
 monarchy_sync_omarchy_clone() {
+    if [ "${MONARCHY_CLONE_SYNCED:-0}" = 1 ]; then
+        return 0
+    fi
     monarchy_log "clone $MONARCHY_LOCK_REMOTE $MONARCHY_LOCK_BRANCH @ $MONARCHY_LOCK_COMMIT"
     monarchy_clone_git "$MONARCHY_SRC" 1
+    MONARCHY_CLONE_SYNCED=1
 }
 
 monarchy_install_file() {

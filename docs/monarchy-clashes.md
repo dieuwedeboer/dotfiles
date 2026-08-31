@@ -33,7 +33,7 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 | Cursor | `omarchy-pkg-add cursor-bin` (CachyOS first-match) and `omarchy-pkg-add cursor-cli` (`/usr/bin/cursor-agent`). Not AUR `cursor-bin` or `curl https://cursor.com/install` |
 | Signal | `omarchy-pkg-add signal-desktop`. Same extra package, Omarchy installer owns it |
 | pipx | Retired. `uv` is in the household set. Strip `python-pipx` after apply. Leave leftover `~/.local/share/pipx/venvs` |
-| Emacs | `emacs-wayland` + `omarchy-emacs`. Live config is chezmoi `~/.config/emacs/` (`init.el` loads the omarchy shim). `~/.emacs.d` is moved aside. Stock `emacs` is uninstalled |
+| Emacs | `emacs-wayland` + [omarchy-emacs-theme](https://github.com/berenddeboer/omarchy-emacs-theme) (Quattro `themed/` + `theme-set.d`). Live config is chezmoi `~/.config/emacs/`. `~/.emacs.d` is moved aside. Stock `emacs` and `omarchy-emacs` are uninstalled |
 | Nautilus vs Dolphin | Install nautilus. No user-global mimeapps |
 | `ufw-docker` | Deny. Never run `firewall.sh` |
 | NVIDIA 580xx-dkms vs `chwd` | Never run Omarchy `nvidia.sh` |

@@ -201,25 +201,33 @@ monarchy_enable_omarchy_services() {
     fi
 }
 
+# $2=1 runs as root. Clone install/config/*.sh write under /etc and /usr.
 monarchy_run_install_script() {
     local script=$1
+    local as_root=${2:-0}
+    local rc=0
     [ -f "$script" ] || return 0
     export OMARCHY_PATH="${OMARCHY_PATH:-$MONARCHY_PATH}"
     export OMARCHY_INSTALL="${OMARCHY_PATH}/install"
     export PATH="${OMARCHY_PATH}/bin:${PATH:-/usr/bin}"
-    if bash "$script"; then
+    if [ "$as_root" = 1 ]; then
+        monarchy_sudo bash "$script" && rc=0 || rc=$?
+    else
+        bash "$script" && rc=0 || rc=$?
+    fi
+    if [ "$rc" -eq 0 ]; then
         monarchy_log "ran $script"
     else
-        monarchy_log "warning: $script exited $?"
+        monarchy_log "warning: $script exited $rc"
     fi
 }
 
 monarchy_run_omarchy_config() {
     local inst="${OMARCHY_PATH:-$MONARCHY_PATH}/install"
-    monarchy_run_install_script "$inst/config/theme-system.sh"
-    monarchy_run_install_script "$inst/config/ssh-command-path.sh"
-    monarchy_run_install_script "$inst/config/ssh-keepalive.sh"
-    monarchy_run_install_script "$inst/config/fix-powerprofilesctl-shebang.sh"
+    monarchy_run_install_script "$inst/config/theme-system.sh" 1
+    monarchy_run_install_script "$inst/config/ssh-command-path.sh" 1
+    monarchy_run_install_script "$inst/config/ssh-keepalive.sh" 1
+    monarchy_run_install_script "$inst/config/fix-powerprofilesctl-shebang.sh" 1
     monarchy_enable_omarchy_services
 }
 
