@@ -59,7 +59,7 @@ The first `generate-zbm` in that chroot writes a stock image. After `./install.s
 
 ### Boot flow
 
-Passphrase is ZFSBootMenu. Plymouth (Monarchy) covers the host initramfs after unlock. The 1-2s of console between rEFInd, ZBM, Plymouth, and Hyprland is documented and partly automated in `docs/boot-flow.md`.
+Passphrase is ZFSBootMenu. Plymouth (Monarchy) covers the host initramfs after unlock. Quiet cmdlines and Plymouth-around-zfs are in `docs/boot-flow.md`. The 1-2s of console between rEFInd, ZBM, Plymouth, and Hyprland is still there.
 
 `lib/zfs.sh` (from `install.sh`) keeps:
 
@@ -104,9 +104,9 @@ The install script will:
 - Optionally configure rEFInd with a custom theme (glow) if no custom theme is present
 - Quiet the ZFSBootMenu and host kernel command lines (`docs/boot-flow.md`)
 - Apply hardware quirks when DMI or a device node matches
-- Install Monarchy (Omarchy Quattro as a second session; family default stays Plasma)
+- Install Monarchy (Omarchy Quattro as a second session. Family default stays Plasma)
 
-`./install.sh --check` is a Monarchy dry-run. Operator notes, rollback, and the greeter dropdown warning are in `docs/monarchy-install.md`.
+`./install.sh --check` is a Monarchy dry-run. Operator notes and rollback are in `docs/monarchy-install.md`.
 
 ### Agent Configuration
 
@@ -151,9 +151,9 @@ sudo mkinitcpio -P
 
 ### Monarchy (Omarchy session)
 
-Omarchy Quattro as a second Wayland session on the same CachyOS+ZFS+KDE box. Plasma stays the family default. Dieuwe picks Omarchy at the greeter. `./install.sh` applies it on a new box and on a converting machine.
+Omarchy Quattro as a second Wayland session on the same CachyOS+ZFS+KDE box. Plasma stays the family default. Dieuwe's user defaults to Omarchy at SDDM. `./install.sh` applies it.
 
-Design and clash matrix: `docs/monarchy.md` and `docs/monarchy-clashes.md`. Install notes: `docs/monarchy-install.md`.
+How it is put together: `docs/monarchy.md`. Clash policy: `docs/monarchy-clashes.md`. Operator notes: `docs/monarchy-install.md`.
 
 ---
 

@@ -76,8 +76,8 @@ def main() -> int:
         print(f"no bin/ under {clone}", file=sys.stderr)
         return 2
 
-    repo = Path(__file__).resolve().parents[3]
-    dest = repo / "misc" / "monarchy"
+    repo = Path(__file__).resolve().parents[2]
+    dest = repo / "monarchy"
     dest.mkdir(parents=True, exist_ok=True)
 
     names = sorted(p.name for p in bin_dir.iterdir() if p.is_file())

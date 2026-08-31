@@ -1,22 +1,18 @@
 # Boot flow: ZFSBootMenu, Plymouth, greeter
 
-How this box should look from firmware to a session. Applies to every CachyOS+ZFS machine that follows `install.sh`. Monarchy adds Plymouth and the Omarchy greeter on top; it does not own the passphrase.
+Firmware to a session on every CachyOS+ZFS machine that follows `install.sh`. Passphrase is ZFSBootMenu. Monarchy adds Plymouth and the Omarchy greeter on top. It does not own the unlock.
 
-Themed ZBM passphrase, HiDPI fonts, and static ZBM frames are still planned in `docs/plans/zbm-ui.md`. Live investigation notes live in `~/projects/zfsbootmenu` (upstream clone, not this repo).
+Quiet cmdlines, plymouth-around-zfs, retain-splash, and greeter first-frame color are shipped. Themed ZBM passphrase, HiDPI fonts, and static ZBM frames are `docs/plans/zbm-ui.md`. Live investigation notes live in `~/projects/zfsbootmenu` (upstream clone, not this repo).
 
-## What is wrong today
+## Remaining ZBM UI
 
 The passphrase prompt is OpenZFS `zfs load-key -L prompt` after `tput clear`. It sits at the top of the screen. The countdown and fzf menus are centered. That mismatch is the ZBM UI bug.
 
 On a 3K or ultrawide panel, ZBM autosize stops at `ter-v32b` (16x32). The console then fills the whole GOP framebuffer, so the TUI looks like a tiny ruler stretched across the glass.
 
-Between rEFInd, ZBM, Plymouth, and Hyprland the console wins 1-2 second races:
+Between rEFInd, ZBM, Plymouth, and Hyprland the console still wins 1-2 second races. rEFInd chainloads ZBM Components (kernel+initramfs, not a UKI) with no `SplashImage`, so there is a cursor on black while kmods load.
 
-1. rEFInd chainloads ZBM Components (kernel+initramfs, not a UKI). No `SplashImage`. Cursor on black while kmods load.
-2. Host cmdline is only `rw quiet splash`. The mkinitcpio `zfs` hook prints `ZFS: Importing pool` before Plymouth starts (`HOOKS=... zfs plymouth filesystems`).
-3. `sddm.service` is `After=plymouth-quit.service`, so Plymouth tears down onto a tty, then Hyprland starts. Greeter `hyprland.lua` never sets `misc.background_color`.
-
-ZBM cannot run Plymouth. GPU drivers are omitted so kexec can reinit the card. `EFI.Enabled` stays false. AUR `plymouth-zfs` is forbidden; that hook steals `zfs load-key` into a Plymouth passphrase dialog.
+ZBM cannot run Plymouth. GPU drivers are omitted so kexec can reinit the card. `EFI.Enabled` stays false. AUR `plymouth-zfs` is forbidden. That hook steals `zfs load-key` into a Plymouth passphrase dialog.
 
 ## Constraints
 
@@ -29,7 +25,7 @@ ZBM cannot run Plymouth. GPU drivers are omitted so kexec can reinit the card. `
 
 Shipped in `lib/zfs.sh` (every machine) and Monarchy apply from `install.sh` (Plymouth + greeter).
 
-| Win | Where | What |
+| Item | Where | What |
 | --- | --- | --- |
 | Quiet host cmdline | `org.zfsbootmenu:commandline` on the pool | Merge `rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0` |
 | Quiet ZBM image | `/etc/zfsbootmenu/config.yaml` `Kernel.CommandLine` | Merge `ro quiet loglevel=0 vt.global_cursor_default=0 fbcon=logo-count:0 rd.udev.log_level=0`, then `generate-zbm` if the file changed |
