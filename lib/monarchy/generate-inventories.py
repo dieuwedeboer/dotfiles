@@ -23,6 +23,7 @@ WRAP = {
     "omarchy-refresh-plymouth",
     "omarchy-refresh-sddm",
     "omarchy-screensaver",
+    "omarchy-display-text-size",
     "omarchy-version",
     "omarchy-version-branch",
     "omarchy-version-channel",

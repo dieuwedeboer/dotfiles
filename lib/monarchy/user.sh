@@ -245,6 +245,24 @@ EOF
     monarchy_log "seeded Super+Ctrl+U switch-user bind in $dest"
 }
 
+monarchy_seed_emacs_bind() {
+    local dest="$HOME/.config/hypr/bindings.lua"
+    local unbind='hl.unbind("SUPER + SHIFT + E")'
+    local bind='o.bind("SUPER + SHIFT + E", "Emacs", "emacsclient -c --no-wait")'
+    mkdir -p "$(dirname "$dest")"
+    [ -f "$dest" ] || printf -- '-- Keep only your personal keybinding overrides here.\n' >"$dest"
+    if grep -Fq "$bind" "$dest" 2>/dev/null; then
+        return 0
+    fi
+    cat >>"$dest" <<EOF
+
+-- Omarchy default is HEY email. Dieuwe uses emacsclient.
+$unbind
+$bind
+EOF
+    monarchy_log "seeded Super+Shift+E emacsclient bind in $dest"
+}
+
 monarchy_seed_kwallet_autostart() {
     local dest="$HOME/.config/hypr/autostart.lua"
     mkdir -p "$(dirname "$dest")"
@@ -296,6 +314,7 @@ monarchy_setup_user() {
     [ "$USER" != "root" ] || monarchy_die "user setup must not run as root"
     monarchy_seed_hyprland_config
     monarchy_seed_switch_user_bind
+    monarchy_seed_emacs_bind
     monarchy_seed_kwallet_autostart
     monarchy_seed_capslock
     monarchy_seed_branding

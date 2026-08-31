@@ -1,0 +1,5 @@
+#!/bin/bash
+pt=${1:-}
+[[ $pt =~ ^[0-9]+$ ]] || exit 0
+[[ -f ~/.config/alacritty/alacritty.toml ]] || exit 0
+sed -i -E "s/^size[[:space:]]*=.*/size = $pt/" ~/.config/alacritty/alacritty.toml
