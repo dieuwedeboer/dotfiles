@@ -100,7 +100,7 @@ Wraps:
 - `omarchy-plymouth-set` / `omarchy-plymouth-reset` / `omarchy-refresh-plymouth` → Monarchy splash helpers (`mkinitcpio -P`, no Limine). plymouth-set restyles the greeter overlay.
 - `omarchy-refresh-sddm` → copy clone theme, overlay `Main.qml`
 - `omarchy-screensaver` → seed `screensaver.txt` from clone `logo.txt` if missing, then exec the clone binary
-- `omarchy-display-text-size` → clone binary, then `omarchy-hook display-text-size`. Chezmoi `hooks/apply-font-size` adds `MONARCHY_FONT_PT_OFFSET` (from the environment or `~/.config/environment.d/monarchy-font.conf`) on top of the 12px→9pt mapping and runs `hooks/font-size.d/*` (foot, Alacritty, Emacs, …)
+- `omarchy-display-text-size` → clone binary, then `omarchy-hook display-text-size`. Chezmoi `hooks/apply-font-size` reads `~/.config/environment.d/monarchy.conf` (`MONARCHY_FONT_PT_OFFSET`, `MONARCHY_ALPHA`) and runs `hooks/font-size.d/*` plus `hooks/alpha.d/*` (foot, Alacritty, Emacs, …)
 - `omarchy-version` / `omarchy-version-branch` / `omarchy-version-channel` → Fastfetch About. Version is `$OMARCHY_PATH/version` plus `-git`. Branch is the apply pin. Channel is the `[omarchy]` pkg repo. The clone is detached and root-owned, so these do not run `git`.
 
 `omarchy-refresh-pacman` stays in `bin.deny`. Its contract is "replace pacman.conf". Redirecting it to `--update` would hide that.

@@ -42,12 +42,12 @@ The Omarchy theme paints both `hl-line' and code blocks with `surface'."
         (set-face-attribute 'line-number-current-line nil :background hl)))))
 
 (defun monarchy-font--file-int (path)
-  "First signed integer on its own line in PATH, or nil."
+  "First number on its own line in PATH, or nil."
   (when (file-readable-p path)
     (with-temp-buffer
       (insert-file-contents path)
       (goto-char (point-min))
-      (when (re-search-forward "^[+-]?[0-9]+" nil t)
+      (when (re-search-forward "^[+-]?[0-9]+\\(\\.[0-9]+\\)?" nil t)
         (string-to-number (match-string 0))))))
 
 (defun monarchy-font-pt ()
@@ -73,9 +73,32 @@ FRAME if given is refreshed too; otherwise every live frame is."
         (set-face-attribute 'default fr :height height)))
     height))
 
+(defun monarchy-alpha ()
+  "Background opacity from MONARCHY_ALPHA, or nil if unset."
+  (let ((env (getenv "MONARCHY_ALPHA"))
+        (state (expand-file-name "~/.local/state/omarchy/alpha")))
+    (cond
+     ((and env (string-match-p "\\`[0-9]+\\(\\.[0-9]+\\)?\\'" env))
+      (string-to-number env))
+     ((monarchy-font--file-int state))
+     (t nil))))
+
+(defun monarchy-emacs-apply-alpha (&optional frame)
+  "Set GUI frame background opacity from `monarchy-alpha'.
+Text stays opaque, matching foot's colors.alpha. FRAME if given is
+refreshed too; otherwise every live frame is."
+  (let ((a (monarchy-alpha)))
+    (when a
+      (setf (alist-get 'alpha-background default-frame-alist) a)
+      (dolist (fr (if frame (list frame) (frame-list)))
+        (when (display-graphic-p fr)
+          (ignore-errors (set-frame-parameter fr 'alpha-background a)))))
+    a))
+
 (defun monarchy-emacs-after-omarchy-theme ()
-  "Font size, distinct current line, and TTY background after a palette load."
+  "Font size, alpha, distinct current line, and TTY background after a palette load."
   (monarchy-emacs-apply-font-size)
+  (monarchy-emacs-apply-alpha)
   (monarchy-emacs-hl-line-distinct-from-blocks)
   (mapc #'monarchy-emacs-tty-no-background (frame-list)))
 
@@ -87,9 +110,11 @@ FRAME if given is refreshed too; otherwise every live frame is."
   (add-hook 'omarchy-emacs-theme-after-load-hook #'monarchy-emacs-after-omarchy-theme)
   (add-hook 'after-make-frame-functions #'monarchy-emacs-tty-no-background)
   (add-hook 'after-make-frame-functions #'monarchy-emacs-apply-font-size)
+  (add-hook 'after-make-frame-functions #'monarchy-emacs-apply-alpha)
   (omarchy-emacs-theme-load))
 
 ;; Emoji support 👌
 (set-fontset-font t 'symbol "Noto Color Emoji" nil 'append)
 
 (monarchy-emacs-apply-font-size)
+(monarchy-emacs-apply-alpha)
