@@ -6,7 +6,7 @@ WINIT_X11_SCALE_FACTOR = "1"
 dynamic_padding = true
 decorations = "full"
 title = "Alacritty@CachyOS"
-opacity = 0.8
+opacity = 0.88
 decorations_theme_variant = "Dark"
 
 [window.dimensions]

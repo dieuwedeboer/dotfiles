@@ -1,0 +1,12 @@
+#!/bin/bash
+alpha=${1:-}
+[[ $alpha =~ ^[0-9]+(\.[0-9]+)?$ ]] || exit 0
+f=$HOME/.config/alacritty/alacritty.toml
+[[ -f $f ]] || exit 0
+if grep -qE '^opacity[[:space:]]*=' "$f"; then
+  sed -i -E "s/^opacity[[:space:]]*=.*/opacity = $alpha/" "$f"
+elif grep -qE '^\[window\]' "$f"; then
+  sed -i -E "/^\[window\]/a opacity = $alpha" "$f"
+else
+  printf '\n[window]\nopacity = %s\n' "$alpha" >>"$f"
+fi

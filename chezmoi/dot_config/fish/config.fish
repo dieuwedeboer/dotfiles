@@ -31,6 +31,7 @@ direnv hook fish | source
 fish_add_path ~/.config/composer/vendor/bin
 
 # local exports and overrides
-# MONARCHY_FONT_PT_OFFSET belongs in ~/.config/environment.d/monarchy-font.conf,
-# not here: emacs.service and omarchy hooks never see fish local.
+# Monarchy vars (MONARCHY_FONT_PT_OFFSET, MONARCHY_ALPHA) live in
+# ~/.config/environment.d/monarchy.conf, not here: emacs.service and
+# omarchy hooks never see fish local.
 source ~/.config/fish/local.fish

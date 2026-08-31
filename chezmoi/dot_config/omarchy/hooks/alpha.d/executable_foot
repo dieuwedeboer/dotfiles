@@ -1,0 +1,10 @@
+#!/bin/bash
+alpha=${1:-}
+[[ $alpha =~ ^[0-9]+(\.[0-9]+)?$ ]] || exit 0
+f=$HOME/.config/foot/foot.ini
+[[ -f $f ]] || exit 0
+if grep -qE '^alpha=' "$f"; then
+  sed -i -E "s/^alpha=.*/alpha=$alpha/" "$f"
+else
+  printf '\n[colors-dark]\nalpha=%s\n' "$alpha" >>"$f"
+fi

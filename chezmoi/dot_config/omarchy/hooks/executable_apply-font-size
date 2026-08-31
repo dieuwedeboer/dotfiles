@@ -1,8 +1,9 @@
 #!/bin/bash
-# Omarchy 12px -> 9pt, plus MONARCHY_FONT_PT_OFFSET (0 if unset).
-# Persist the var in ~/.config/environment.d/ so emacs.service and the
-# session see it. fish local.fish does not.
-# Drop an executable in font-size.d/ to add an app; it receives the final pt as $1.
+# Apply Dieuwe's monarchy prefs on top of Omarchy.
+# Vars live in ~/.config/environment.d/monarchy.conf (not fish local):
+#   MONARCHY_FONT_PT_OFFSET  points added to Omarchy's 12px -> 9pt mapping
+#   MONARCHY_ALPHA           background opacity for foot/alacritty/emacs (e.g. 0.88)
+# Drop an executable in font-size.d/ or alpha.d/; they receive the value as $1.
 set -euo pipefail
 
 usage() {
@@ -16,24 +17,38 @@ case "${1:-}" in
     ;;
 esac
 
-offset_from_environment_d() {
-  local f="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d/monarchy-font.conf"
-  [[ -f $f ]] || return 1
-  awk -F= '
-    $1 ~ /^[[:space:]]*MONARCHY_FONT_PT_OFFSET[[:space:]]*$/ {
+MONARCHY_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d/monarchy.conf"
+
+monarchy_var() {
+  local key=$1
+  if [[ -n ${!key+x} ]]; then
+    printf '%s\n' "${!key}"
+    return 0
+  fi
+  [[ -f $MONARCHY_CONF ]] || return 1
+  awk -F= -v key="$key" '
+    $1 ~ "^[[:space:]]*" key "[[:space:]]*$" {
       v = $2
       gsub(/^[[:space:]]+|[[:space:]]+$/, "", v)
       print v
       exit
     }
-  ' "$f"
+  ' "$MONARCHY_CONF"
 }
 
-if [[ -n ${MONARCHY_FONT_PT_OFFSET+x} ]]; then
-  offset=$MONARCHY_FONT_PT_OFFSET
-else
-  offset=$(offset_from_environment_d || true)
-fi
+run_hooks() {
+  local dir=$1
+  local val=$2
+  [[ -d $dir ]] || return 0
+  local hook
+  for hook in "$dir"/*; do
+    [[ -f $hook ]] || continue
+    [[ $hook == *.sample ]] && continue
+    bash "$hook" "$val" || echo "Hook failed: $hook" >&2
+  done
+}
+
+offset=$(monarchy_var MONARCHY_FONT_PT_OFFSET || true)
 [[ $offset =~ ^[+-]?[0-9]+$ ]] || offset=0
 
 px=12
@@ -56,19 +71,22 @@ omarchy_pt=$(awk -v s="$px" 'BEGIN { printf "%d", int(s * 9 / 12 + 0.5) }')
 pt=$((omarchy_pt + offset))
 ((pt < 1)) && pt=1
 
+alpha=$(monarchy_var MONARCHY_ALPHA || true)
+[[ $alpha =~ ^[0-9]+(\.[0-9]+)?$ ]] || alpha=
+
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy"
 mkdir -p "$state_dir"
 printf '%s\n' "$pt" >"$state_dir/font-pt"
+if [[ -n $alpha ]]; then
+  printf '%s\n' "$alpha" >"$state_dir/alpha"
+fi
 
 if [[ ${1:-} == --print ]]; then
   printf '%s\n' "$pt"
   exit 0
 fi
 
-hook_dir="$HOME/.config/omarchy/hooks/font-size.d"
-[[ -d $hook_dir ]] || exit 0
-for hook in "$hook_dir"/*; do
-  [[ -f $hook ]] || continue
-  [[ $hook == *.sample ]] && continue
-  bash "$hook" "$pt" || echo "Hook failed: $hook" >&2
-done
+run_hooks "$HOME/.config/omarchy/hooks/font-size.d" "$pt"
+if [[ -n $alpha ]]; then
+  run_hooks "$HOME/.config/omarchy/hooks/alpha.d" "$alpha"
+fi
