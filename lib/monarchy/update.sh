@@ -68,6 +68,16 @@ monarchy_check_packages_deny() {
     return 0
 }
 
+monarchy_check_applications_drop() {
+    local name
+    [ -f "$MONARCHY_MISC/applications.drop" ] || monarchy_die "missing applications.drop"
+    for name in "${MONARCHY_APP_DROP[@]}"; do
+        [ -f "$MONARCHY_SRC/applications/${name}.desktop" ] \
+            || monarchy_die "applications.drop $name missing from clone applications/"
+    done
+    return 0
+}
+
 monarchy_check() {
     monarchy_load_lock
     monarchy_load_inventories
@@ -92,6 +102,7 @@ monarchy_check() {
     monarchy_check_clone_bin_classified
     monarchy_check_migrations
     monarchy_check_packages_deny
+    monarchy_check_applications_drop
     monarchy_check_plugins
     [ -f "$MONARCHY_MISC/omarchy.desktop" ] || monarchy_die "missing omarchy.desktop"
     grep -q '^DesktopNames=Hyprland$' "$MONARCHY_MISC/omarchy.desktop" \

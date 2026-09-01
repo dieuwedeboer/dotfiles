@@ -29,6 +29,7 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 | Default terminal | Omarchy `xdg-terminal-exec`. Apply removes `~/.config/uwsm/env.d/20-monarchy-terminal` |
 | Spotify | Omarchy `omarchy-pkg-add spotify` (`/usr/bin/spotify`). Not the Flathub client |
 | Discord | Omarchy webapp `.desktop`. Not the Flathub client |
+| Zoom | Omarchy webapp `.desktop` (`zoommtg://`). AUR `zoom` is stripped after apply |
 | Chrome | `omarchy-install-browser chrome` (AUR `google-chrome` plus flags, theme, copy-url). Not a bare paru install |
 | Cursor | `omarchy-pkg-add cursor-bin` (CachyOS first-match) and `omarchy-pkg-add cursor-cli` (`/usr/bin/cursor-agent`). Not AUR `cursor-bin` or `curl https://cursor.com/install` |
 | Signal | `omarchy-pkg-add signal-desktop`. Same extra package, Omarchy installer owns it |
