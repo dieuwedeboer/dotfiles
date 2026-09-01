@@ -164,10 +164,12 @@ monarchy_user_omarchy_defaults() {
     elif [ -f "$MONARCHY_SRC/install/user/mise.sh" ]; then
         bash "$MONARCHY_SRC/install/user/mise.sh"
     fi
+    monarchy_drop_webapps
     monarchy_omarchy_pkg_add spotify
     monarchy_omarchy_pkg_add signal-desktop
     monarchy_omarchy_pkg_add cursor-bin
     monarchy_omarchy_pkg_add cursor-cli
+    monarchy_omarchy_pkg_add omakade
     if ! monarchy_pkg_installed google-chrome; then
         if command -v omarchy-install-browser >/dev/null 2>&1; then
             monarchy_log "omarchy-install-browser chrome"
@@ -245,6 +247,36 @@ EOF
     monarchy_log "seeded Super+Ctrl+U switch-user bind in $dest"
 }
 
+monarchy_drop_webapps() {
+    local name desktop icon_slug
+    local app_dir="$HOME/.local/share/applications"
+    local icon_dir="$HOME/.local/share/icons/hicolor/256x256/apps"
+    local old_icon_dir="$HOME/.local/share/applications/icons"
+    [ "${#MONARCHY_APP_DROP[@]}" -gt 0 ] || return 0
+    for name in "${MONARCHY_APP_DROP[@]}"; do
+        desktop="$app_dir/${name}.desktop"
+        [ -f "$desktop" ] || continue
+        icon_slug=$(printf '%s\n' "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^[:alnum:]]\+/-/g; s/^-//; s/-$//')
+        rm -f "$desktop"
+        rm -f "$icon_dir/${icon_slug}.png" "$icon_dir/${name}.png" "$old_icon_dir/${name}.png"
+        monarchy_log "dropped webapp $name"
+    done
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "$app_dir" >/dev/null 2>&1 || true
+    fi
+}
+
+monarchy_seed_hypr_unbind() {
+    local dest="$HOME/.config/hypr/bindings.lua"
+    local chord=$1
+    local line="hl.unbind(\"$chord\")"
+    mkdir -p "$(dirname "$dest")"
+    [ -f "$dest" ] || printf -- '-- Keep only your personal keybinding overrides here.\n' >"$dest"
+    grep -Fq "$line" "$dest" 2>/dev/null && return 0
+    printf '\n%s\n' "$line" >>"$dest"
+    monarchy_log "unbound $chord in $dest"
+}
+
 monarchy_seed_emacs_bind() {
     local dest="$HOME/.config/hypr/bindings.lua"
     local unbind='hl.unbind("SUPER + SHIFT + E")'
@@ -315,6 +347,8 @@ monarchy_setup_user() {
     monarchy_seed_hyprland_config
     monarchy_seed_switch_user_bind
     monarchy_seed_emacs_bind
+    monarchy_seed_hypr_unbind "SUPER + SHIFT + C"
+    monarchy_seed_hypr_unbind "SUPER + SHIFT + ALT + E"
     monarchy_seed_kwallet_autostart
     monarchy_seed_capslock
     monarchy_seed_branding

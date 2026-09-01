@@ -37,7 +37,6 @@ AUR_PACKAGES=(
     cura-bin
     ddev-bin
     xmcl-launcher
-    zoom
     sanoid
     zotero-bin
 )
@@ -48,9 +47,10 @@ FLATPAK_PACKAGES=(
 )
 
 # Omarchy owns these: mise stubs for grok/opencode/gh/bun, native Spotify,
-# Discord webapp, emacs-wayland + omarchy-emacs-theme, cursor-cli, Chrome via
-# omarchy-install-browser. Do not reinstall the competing copies after apply.
-# Keep this strip for boxes still converting from the pre-Monarchy package set.
+# Discord and Zoom webapps, emacs-wayland + omarchy-emacs-theme, cursor-cli,
+# Chrome via omarchy-install-browser. Do not reinstall the competing copies
+# after apply. Keep this strip for boxes still converting from the
+# pre-Monarchy package set.
 OMARCHY_OWNED_PACMAN=(
     bun
     emacs
@@ -62,10 +62,12 @@ OMARCHY_OWNED_FLATPAKS=(
     com.spotify.Client
 )
 # Household set dropped these. uv replaced pipx. omarchy-emacs is Omarchy 3
-# and does not follow Quattro palettes; omarchy-emacs-theme does.
+# and does not follow Quattro palettes; omarchy-emacs-theme does. AUR zoom
+# lost to the Omarchy Zoom webapp (zoommtg://).
 RETIRED_PACMAN=(
     python-pipx
     omarchy-emacs
+    zoom
 )
 
 packages_install() {

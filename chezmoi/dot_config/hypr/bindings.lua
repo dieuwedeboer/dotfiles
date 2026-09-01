@@ -34,3 +34,6 @@ o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user", { locked = tru
 -- Omarchy default is HEY email. Dieuwe uses emacsclient.
 hl.unbind("SUPER + SHIFT + E")
 o.bind("SUPER + SHIFT + E", "Emacs", "emacsclient -c --no-wait")
+-- HEY calendar and compose. Left free.
+hl.unbind("SUPER + SHIFT + C")
+hl.unbind("SUPER + SHIFT + ALT + E")

@@ -1,0 +1,4 @@
+# Desktop names (no .desktop suffix). Stripped after omarchy-refresh-applications
+# copies clone applications/*.desktop into ~/.local/share/applications.
+Basecamp
+HEY
