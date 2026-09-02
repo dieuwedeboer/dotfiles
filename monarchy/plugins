@@ -4,3 +4,4 @@
 # Apply clones and (with --enable) writes shell.json. It does not call the
 # live omarchy-plugin-add CLI, which needs a running omarchy-shell.
 https://github.com/dougfour/omarchy-grok-usage.git --enable
+https://github.com/stappmus/omarchy-activity-monitor.git --enable
