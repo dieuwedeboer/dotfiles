@@ -130,3 +130,20 @@ end)
 hl.on("monitor.layout_changed", function()
   apply()
 end)
+
+-- Keep the Omarchy screensaver (and the lock that follows it) away while
+-- games or video are on screen. Hyprland's idle_inhibit rule suppresses the
+-- ext-idle-notify events that omarchy-shell counts idle time from.
+-- https://wiki.hypr.land/Configuring/Window-Rules/
+
+-- Native Steam games get class steam_app_<appid>, and some are wrapped in
+-- gamescope. Omarchy only inhibits while such a window is fullscreen, which
+-- misses borderless-windowed games, so inhibit for as long as one is open.
+o.window("^steam_app_[0-9]+$", { idle_inhibit = "always" })
+o.window("^gamescope$", { idle_inhibit = "always" })
+
+-- Proton and Wine games report the Windows executable as their class.
+o.window("\\.exe$", { idle_inhibit = "fullscreen" })
+
+-- Local video players. Browsers hold their own inhibitor during playback.
+o.window("^(mpv|vlc)$", { idle_inhibit = "fullscreen" })
