@@ -12,9 +12,9 @@ end
 
 # aliases (discouraged - not transparent)
 alias vi nvim
+alias e 'emacsclient -nw'
 
 # abbreviations (encouraged)
-abbr e 'emacsclient -nw'
 abbr z 'zellij'
 abbr drush 'ddev drush'
 
