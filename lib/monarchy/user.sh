@@ -2,6 +2,11 @@
 # Sourced into one shell by lib/monarchy.sh; common.sh state is in scope.
 # shellcheck disable=SC2153
 
+# chezmoi owns the personal override files under ~/.config/hypr. Monarchy used
+# to append to them too, and the two only agreed because the literals matched
+# character for character. See docs/adr/0001-chezmoi-owns-user-config.md.
+MONARCHY_CHEZMOI_HYPR="bindings.lua looknfeel.lua input.lua autostart.lua"
+
 monarchy_copy_if_missing() {
     local src=$1
     local dest=$2
@@ -18,9 +23,16 @@ monarchy_seed_hyprland_config() {
     local f
     [ -d "$src" ] || monarchy_die "missing $src"
     mkdir -p "$dest"
+    local base
     for f in "$src"/*; do
         [ -e "$f" ] || continue
-        monarchy_copy_if_missing "$f" "$dest/$(basename "$f")"
+        base=$(basename "$f")
+        # chezmoi owns these. Copying the clone's stock version over a missing
+        # one would turn "run chezmoi apply" into a silent content mismatch.
+        case " $MONARCHY_CHEZMOI_HYPR " in
+            *" $base "*) continue ;;
+        esac
+        monarchy_copy_if_missing "$f" "$dest/$base"
     done
     monarchy_seed_hypr_boot_color
     monarchy_log "seeded $dest (existing files left in place)"
@@ -286,47 +298,6 @@ monarchy_drop_webapps() {
     fi
 }
 
-# chezmoi owns the personal override files under ~/.config/hypr. Monarchy used
-# to append to them too, and the two only agreed because the literals matched
-# character for character. See docs/adr/0001-chezmoi-owns-user-config.md.
-MONARCHY_CHEZMOI_HYPR="bindings.lua looknfeel.lua input.lua autostart.lua"
-
-# Remove a block an earlier apply wrote, now that chezmoi carries the same
-# content. This is what the markers added in step 4 were for.
-monarchy_release_block() {
-    local file=$1
-    local id=$2
-    local begin="-- BEGIN monarchy: $id"
-    local end="-- END monarchy: $id"
-    local tmp kept
-    [ -f "$file" ] || return 0
-    monarchy_has_block "$file" "$id" || return 0
-    kept=$(awk -v b="$begin" -v e="$end" '
-        $0 == b { skip = 1; next }
-        $0 == e { skip = 0; next }
-        skip { next }
-        /^[[:space:]]*$/ { blank++; next }
-        { if (blank && NR > blank) print ""; blank = 0; print }
-    ' "$file")
-    tmp=$(mktemp)
-    printf '%s\n' "$kept" >"$tmp"
-    install -m 644 "$tmp" "$file"
-    rm -f "$tmp"
-    monarchy_log "released $id block in $file to chezmoi"
-}
-
-# Hand back everything monarchy used to append to a chezmoi-owned file.
-monarchy_release_user_config() {
-    local bindings="$HOME/.config/hypr/bindings.lua"
-    local chord
-    monarchy_release_block "$bindings" switch-user
-    monarchy_release_block "$bindings" emacs-bind
-    for chord in unbind-super-shift-c unbind-super-shift-alt-e; do
-        monarchy_release_block "$bindings" "$chord"
-    done
-    monarchy_release_block "$HOME/.config/hypr/autostart.lua" kwallet
-    monarchy_release_block "$HOME/.config/hypr/input.lua" capslock
-}
 
 # Never run chezmoi apply from here: it prompts when a target has been
 # modified, and omarchy-update reaches this through the Omarchy menu with no
@@ -343,7 +314,14 @@ monarchy_assert_chezmoi_hypr() {
     if [ -n "$missing" ]; then
         monarchy_die "missing in $dir:$missing. Run: chezmoi apply ~/.config/hypr"
     fi
-    status=$(chezmoi status "$dir" 2>/dev/null || true)
+    # Keep stderr and the exit code. chezmoi status prints its errors to
+    # stderr and leaves stdout empty when the source dir is missing, so
+    # discarding both made "chezmoi is not managing anything here" look
+    # identical to "clean".
+    if ! status=$(chezmoi status "$dir" 2>&1); then
+        printf '%s\n' "$status" >&2
+        monarchy_die "chezmoi status failed for $dir; is chezmoi linked? Run: chezmoi apply ~/.config/hypr"
+    fi
     if [ -n "$status" ]; then
         printf '%s\n' "$status" >&2
         monarchy_die "$dir has drifted from chezmoi. Run: chezmoi apply ~/.config/hypr"
@@ -360,7 +338,6 @@ monarchy_user_git() {
 monarchy_setup_user() {
     [ "$USER" != "root" ] || monarchy_die "user setup must not run as root"
     monarchy_seed_hyprland_config
-    monarchy_release_user_config
     monarchy_assert_chezmoi_hypr
     monarchy_seed_branding
     monarchy_clear_terminal_override

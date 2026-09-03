@@ -39,9 +39,30 @@ Seeding an absent file was considered and rejected: it would keep Monarchy a
 writer of that path, which is the property being removed.
 
 Boxes an earlier apply wrote to carry Monarchy's marked blocks in those files.
-`monarchy_release_user_config` removes them, which is what the markers were
-added for. After that the file matches what chezmoi carries.
+Monarchy does **not** remove them: `chezmoi apply` overwrites the file and
+drops them anyway, and a Monarchy that edits the file to tidy up is still a
+Monarchy that writes there. An earlier version of this change released the
+blocks itself and was removed — it deleted working keybindings from disk and
+only then failed, leaving `~/.config/hypr` actively degraded until the user ran
+the command it named. Failing before touching anything is the whole point.
 
 The first apply after this change fails on any box whose `~/.config/hypr` has
-not been brought up to the current chezmoi state. That is the intended
-behaviour: the fix is one command, and the alternative is silent divergence.
+not been brought up to the current chezmoi state. That is intended: the fix is
+one command, nothing has been changed on disk when it fires, and the
+alternative is silent divergence.
+
+`monarchy_seed_hyprland_config` skips these four names when seeding from the
+pinned clone. The clone ships its own `bindings.lua`, `input.lua`,
+`autostart.lua` and `looknfeel.lua`; copying one in because it was missing
+would turn "run chezmoi apply" into a content mismatch against Omarchy's stock
+file.
+
+A failing `chezmoi status` is not a pass. chezmoi writes its errors to stderr
+and leaves stdout empty when the source directory is missing, so testing only
+whether stdout was empty made an unmanaged directory look clean.
+
+One behaviour is deliberately lost. The old `monarchy_seed_capslock` left a
+`kb_options` the user had customised to anything other than Omarchy's
+`compose:caps` default alone. chezmoi's `input.lua` sets `caps:capslock`
+unconditionally, so a per-account keyboard preference now belongs in the
+chezmoi source, not in the deployed file.

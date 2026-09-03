@@ -23,8 +23,6 @@ py="$LIB/overlay-lock.py"
 grep -q 'monarchy_overlay_session_lock' "$LIB/update.sh" || fail "apply does not overlay lock"
 grep -q 'monarchy_install_switch_user' "$LIB/update.sh" || fail "apply does not install monarchy-switch-user"
 grep -q 'monarchy_check_session_lock_overlay' "$LIB/update.sh" || fail "check does not verify lock overlay"
-grep -q 'monarchy_release_block' "$LIB/user.sh" \
-    || fail "user.sh cannot release the bind block it used to write"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -198,7 +196,7 @@ grep -q 'signal switchUserRequested' "$clone/shell/plugins/lock/LockView.qml" \
     && fail "clone LockView.qml was patched"
 [ -L "$MONARCHY_PATH/logo.txt" ] || fail "prefix logo.txt should stay a symlink"
 
-# The bind is chezmoi's now; monarchy asserts and releases. See
+# The bind is chezmoi's now; monarchy only asserts. See
 # docs/adr/0001-chezmoi-owns-user-config.md.
 src="$REPO/chezmoi/dot_config/hypr/bindings.lua"
 [ -f "$src" ] || fail "chezmoi does not carry bindings.lua"
@@ -212,26 +210,18 @@ printf '%s\n' "$setup_body" | grep -q 'monarchy_assert_chezmoi_hypr' \
 printf '%s\n' "$setup_body" | grep -q 'monarchy_seed_switch_user_bind' \
     && fail "monarchy_setup_user still seeds the switch-user bind"
 
-# A box an older apply wrote to keeps a marked block. Releasing must remove it
-# and leave the user's own lines alone.
-export HOME=$tmp/home
-bind=$HOME/.config/hypr/bindings.lua
-mkdir -p "$(dirname "$bind")"
-cat >"$bind" <<'LUA'
--- Keep only your personal keybinding overrides here.
-o.bind("SUPER + F3", "Mine", "true")
+# Monarchy must not write a chezmoi-owned file at all, not even to remove its
+# own old blocks: chezmoi apply overwrites the file and drops them anyway.
+grep -q 'monarchy_release_block' "$LIB/user.sh" \
+    && fail "user.sh still edits a chezmoi-owned file"
+printf '%s\n' "$setup_body" | grep -qE '^[[:space:]]*monarchy_seed_(switch_user_bind|emacs_bind|hypr_unbind|kwallet_autostart|capslock)' \
+    && fail "monarchy_setup_user still seeds a chezmoi-owned file"
 
--- BEGIN monarchy: switch-user
-o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user", { locked = true })
--- END monarchy: switch-user
-LUA
-chmod 644 "$bind"
-monarchy_release_block "$bind" switch-user >/dev/null
-grep -q 'BEGIN monarchy: switch-user' "$bind" && fail "release left the marker behind"
-grep -q 'monarchy-switch-user' "$bind" && fail "release left the seeded bind behind"
-grep -q 'SUPER + F3' "$bind" || fail "release removed the user's own bind"
-[ "$(stat -c %a "$bind")" = 644 ] || fail "release changed the file mode"
-monarchy_release_block "$bind" switch-user >/dev/null
-grep -q 'SUPER + F3' "$bind" || fail "release is not idempotent"
+# The clone ships its own bindings.lua/input.lua/autostart.lua/looknfeel.lua.
+# Seeding must skip them, or a missing file gets Omarchy's stock version
+# instead of chezmoi's and the failure becomes a content mismatch.
+seed_body=$(awk '/^monarchy_seed_hyprland_config\(\)/,/^}$/' "$LIB/user.sh")
+printf '%s\n' "$seed_body" | grep -q 'MONARCHY_CHEZMOI_HYPR' \
+    || fail "monarchy_seed_hyprland_config does not skip the chezmoi-owned files"
 
 echo "switch-user tests passed"

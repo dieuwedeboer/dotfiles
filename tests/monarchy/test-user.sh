@@ -41,8 +41,14 @@ grep -q 'monarchy_seed_hypr_boot_color' "$LIB/user.sh" \
     || fail "user.sh missing monarchy_seed_hypr_boot_color"
 echo "$setup_body" | grep -q 'monarchy_assert_chezmoi_hypr' \
     || fail "monarchy_setup_user does not assert chezmoi owns ~/.config/hypr"
-echo "$setup_body" | grep -q 'monarchy_release_user_config' \
-    || fail "monarchy_setup_user does not release its old blocks"
+# A failing chezmoi status must not read as clean: chezmoi prints its errors
+# to stderr and leaves stdout empty when the source dir is missing.
+# shellcheck disable=SC2016  # grep pattern, not an expansion
+grep -q 'chezmoi status "$dir" 2>&1' "$LIB/user.sh" \
+    || fail "assert discards chezmoi's stderr, so an unlinked chezmoi looks clean"
+printf '%s\n' "$(awk '/^monarchy_assert_chezmoi_hypr\(\)/,/^}$/' "$LIB/user.sh")" \
+    | grep -q 'if ! status=' \
+    || fail "assert ignores the exit status of chezmoi status"
 grep -q 'chezmoi apply' "$LIB/user.sh" \
     || fail "user.sh does not name the command to run when hypr has drifted"
 # The die messages name the command, so match an actual invocation: a line
