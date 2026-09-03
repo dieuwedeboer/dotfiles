@@ -69,11 +69,14 @@ monarchy_install_omarchy_session() {
     [ -f /usr/share/wayland-sessions/plasma.desktop ] || \
         monarchy_log "warning: plasma.desktop missing; family Plasma session may not appear"
 
-    monarchy_accountsservice_session dieuwe omarchy.desktop
-    monarchy_accountsservice_session amie plasma.desktop
-    monarchy_accountsservice_session olivier plasma.desktop
-    if [ "$USER" != "dieuwe" ] && [ "$USER" != "root" ]; then
-        monarchy_accountsservice_session "$USER" omarchy.desktop
+    # Roles come from /etc/monarchy/users.conf; no usernames live in this repo.
+    local u r
+    while read -r u r; do
+        monarchy_accountsservice_session "$u" "$(monarchy_role_session "$r")"
+    done < <(monarchy_users)
+    # An account absent from users.conf is a serf and takes the default.
+    if [ "$USER" != root ] && [ -z "$(monarchy_users | awk -v u="$USER" '$1==u{print}')" ]; then
+        monarchy_accountsservice_session "$USER" "$(monarchy_role_session serf)"
     fi
 
     monarchy_hide_stock_hyprland_sessions

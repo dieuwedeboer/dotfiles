@@ -182,4 +182,4 @@ monarchy_cli apply
 
 echo "=== System installation complete ==="
 echo "Reboot so SDDM is the greeter. Plasma stays the family default."
-echo "Dieuwe's user defaults to Omarchy. See docs/monarchy-install.md"
+echo "The king's user defaults to Omarchy. See docs/monarchy-install.md"

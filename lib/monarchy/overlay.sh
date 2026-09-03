@@ -197,6 +197,13 @@ monarchy_install_update() {
     monarchy_log "installed /usr/local/bin/monarchy-update"
 }
 
+monarchy_install_user_setup() {
+    local src="$monarchy_lib_dir/user-setup.sh"
+    [ -f "$src" ] || monarchy_die "missing $src"
+    monarchy_sudo install -m 755 "$src" /usr/local/bin/monarchy-user-setup
+    monarchy_log "installed /usr/local/bin/monarchy-user-setup"
+}
+
 monarchy_install_switch_user() {
     local src="$monarchy_lib_dir/switch-user.sh"
     [ -f "$src" ] || monarchy_die "missing $src"

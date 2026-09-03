@@ -203,6 +203,28 @@ monarchy/
   logind/
 ```
 
+### Roles
+
+Every account holds one role, defined in `CONTEXT.md`: king, queen, kid, serf.
+Membership lives in `/etc/monarchy/users.conf` on each box, two columns,
+`username role`, written by `monarchy-user-setup`. It is never committed:
+usernames are personal information and this repo is public. The repo ships
+`monarchy/users.conf.example` with the role words as placeholder usernames.
+
+An account absent from the file is a serf. That is a valid state, not an error,
+and nothing is done to serfs beyond the defaults.
+
+Session follows from role: the default is Omarchy, and queen and kid are
+overridden to Plasma. `monarchy_install_omarchy_session` writes AccountsService
+`Session=` from the file, and `monarchy_sddm_write_plasma_users` generates the
+greeter's list into the deployed `Main.qml` at apply time. The greeter does not
+read the file: this SDDM theme reads nothing at runtime, and the login path is
+not where to add that. The repo's `Main.qml` ships an empty list.
+
+`tests/monarchy/test-no-names.sh` reads the usernames out of `users.conf` and
+fails if any appears under `lib/`, `monarchy/`, `docs/` or `tests/`. The test
+holds no names itself, so it works in a fork.
+
 ### Tests
 
 `./tests/run.sh` before any apply. No sudo, no writes under `/etc` or `/usr`:

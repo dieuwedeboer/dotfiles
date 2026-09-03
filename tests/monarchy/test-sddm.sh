@@ -25,18 +25,25 @@ if grep -q 'blob.indexOf("hyprland")' "$qml"; then
     fail "Main.qml must not hide Omarchy by matching the word hyprland"
 fi
 grep -q 'prefersPlasma' "$qml" || fail "Main.qml missing prefersPlasma"
-# Do not name anyone here: read both lists out of the code and require they
-# agree. The greeter's picker default and the AccountsService Session= writer
-# have to describe the same people, or a user sees one default and gets another.
-# Step 6 moves both to /etc/monarchy/users.conf and this reads that instead.
-qml_plasma=$(sed -n '/function prefersPlasma/,/^  }/p' "$qml" \
-    | grep -oE 'user === "[^"]+"' | sed 's/.*"\(.*\)"/\1/' | sort)
-svc_plasma=$(grep -oE '^[[:space:]]*monarchy_accountsservice_session [^ ]+ plasma\.desktop' \
-    "$LIB/sessions.sh" | awk '{print $2}' | sort)
-[ -n "$qml_plasma" ] || fail "Main.qml prefersPlasma names nobody"
-[ -n "$svc_plasma" ] || fail "sessions.sh defaults nobody to plasma.desktop"
-[ "$qml_plasma" = "$svc_plasma" ] \
-    || fail "greeter and AccountsService disagree on who defaults to Plasma"
+# The greeter's Plasma list is generated at apply time from
+# /etc/monarchy/users.conf. This SDDM theme reads no files at runtime, so the
+# list is written into the deployed QML rather than read by it.
+grep -q 'property var plasmaUsers' "$qml" || fail "Main.qml has no plasmaUsers property"
+grep -qE '^[[:space:]]*property var plasmaUsers: \[\]' "$qml" \
+    || fail "the repo copy of Main.qml must ship an empty plasmaUsers list"
+grep -qE 'user === "[a-z]' "$qml" \
+    && fail "Main.qml hardcodes a username; the list is generated"
+grep -q 'monarchy_sddm_write_plasma_users' "$LIB/sddm.sh" \
+    || fail "sddm.sh does not generate the greeter plasma list"
+printf '%s\n' "$(awk '/^monarchy_sddm_write_qml\(\)/,/^}$/' "$LIB/sddm.sh")" \
+    | grep -q 'monarchy_sddm_write_plasma_users' \
+    || fail "the plasma list is not regenerated when Main.qml is deployed"
+
+# sessions.sh must drive AccountsService from the roles file, not from names.
+printf '%s\n' "$(awk '/^monarchy_install_omarchy_session\(\)/,/^}$/' "$LIB/sessions.sh")" \
+    | grep -q 'monarchy_users' \
+    || fail "sessions.sh does not read roles from users.conf"
+
 grep -q 'Qt.Key_Tab' "$qml" || fail "Main.qml missing Tab user cycle"
 grep -q 'Qt.Key_Down' "$qml" || fail "Main.qml missing Down session cycle"
 grep -q 'background.jpg' "$qml" || fail "Main.qml missing optional background.jpg overlay"
@@ -135,6 +142,8 @@ grep -q 'omarchy-refresh-sddm' "$LIB/overlay.sh" \
 source "$LIB/common.sh"
 # shellcheck source=../../lib/monarchy/sessions.sh
 source "$LIB/sessions.sh"
+# shellcheck source=../../lib/monarchy/sddm.sh
+source "$LIB/users.sh"
 # shellcheck source=../../lib/monarchy/sddm.sh
 source "$LIB/sddm.sh"
 # shellcheck source=../../lib/monarchy/splash.sh
@@ -341,5 +350,37 @@ EOF
 else
     echo "test-sddm: skip live theme restyle (no $CLONE/default/sddm/omarchy)" >&2
 fi
+
+
+# Generation itself: a temp users.conf in, the right QML line out.
+gen=$(mktemp -d)
+cat >"$gen/users.conf" <<'CONF'
+# comment
+someking   king
+somequeen  queen
+somekid    kid
+nosuchuser kid
+CONF
+cp "$qml" "$gen/Main.qml"
+(
+    # Read by monarchy_users, which is called via monarchy_plasma_users.
+    # shellcheck disable=SC2034
+    MONARCHY_USERS_CONF="$gen/users.conf"
+    # Only accounts that exist on the box may reach the greeter list, so stub
+    # getent to accept two of them.
+    # shellcheck disable=SC2329
+    # someking exists too, so the assertion below tests the ROLE filter and
+    # not just this stub. Only nosuchuser is absent from the box.
+    getent() { case "$2" in someking|somequeen|somekid) return 0 ;; *) return 1 ;; esac; }
+    # shellcheck disable=SC2329
+    monarchy_sudo() { "$@"; }
+    monarchy_sddm_write_plasma_users "$gen/Main.qml" >/dev/null
+)
+line=$(grep -E '^[[:space:]]*property var plasmaUsers:' "$gen/Main.qml")
+[ "$line" = '  property var plasmaUsers: ["somekid", "somequeen"]' ] \
+    || fail "generated plasma list is: $line"
+grep -q 'someking' "$gen/Main.qml" && fail "king reached the Plasma list"
+grep -q 'nosuchuser' "$gen/Main.qml" && fail "an account with no passwd entry reached the greeter list"
+rm -rf "$gen"
 
 echo "sddm tests passed"

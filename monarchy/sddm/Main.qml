@@ -130,8 +130,17 @@ Rectangle {
     return base === "hyprland.desktop" || base === "hyprland-uwsm.desktop"
   }
 
+  // Generated at apply time from /etc/monarchy/users.conf. The repo never
+  // holds a username. Empty here means every account takes the default
+  // session, which is Omarchy.
+  property var plasmaUsers: []
+
   function prefersPlasma(user) {
-    return user === "amie" || user === "olivier"
+    for (var i = 0; i < plasmaUsers.length; i++) {
+      if (plasmaUsers[i] === user)
+        return true
+    }
+    return false
   }
 
   function defaultSessionFor(user) {

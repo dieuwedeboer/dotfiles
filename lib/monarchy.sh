@@ -4,6 +4,8 @@
 _monarchy_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/monarchy" && pwd)
 # shellcheck source=monarchy/common.sh
 source "$_monarchy_dir/common.sh"
+# shellcheck source=monarchy/users.sh
+source "$_monarchy_dir/users.sh"
 # shellcheck source=monarchy/denylist.sh
 source "$_monarchy_dir/denylist.sh"
 # shellcheck source=monarchy/clone.sh

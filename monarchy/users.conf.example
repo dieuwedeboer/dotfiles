@@ -1,0 +1,22 @@
+# Monarchy account roles. Copy to /etc/monarchy/users.conf on each box.
+# NEVER commit the real file: usernames are personal information, and this
+# repo is public. See the No names rule in AGENTS.md.
+#
+#   <username> <role>
+#
+# king   administers the box. One per machine.
+# queen  co-adult, unrestricted, does not administer. One per machine.
+# kid    supervised. Many. Future restrictions hang off this role.
+# serf   anyone else, including guests. Many.
+#
+# An account missing from this file is a serf. That is a valid state, not an
+# error, and nothing is done to serfs beyond the defaults.
+#
+# Session at the greeter follows from the role: the default is Omarchy, and
+# queen and kid are overridden to Plasma. Roles are defined in CONTEXT.md.
+#
+# Fill this in with monarchy-user-setup, or by hand:
+
+king    king
+queen   queen
+kid1    kid

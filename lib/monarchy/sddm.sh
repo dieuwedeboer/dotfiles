@@ -159,6 +159,7 @@ monarchy_sddm_write_qml() {
     fi
     monarchy_sudo install -m 644 "$tmp" "$dest"
     rm -f "$tmp"
+    monarchy_sddm_write_plasma_users "$dest"
 }
 
 monarchy_sddm_install_overlay_assets() {
@@ -367,6 +368,27 @@ monarchy_install_sddm_resume() {
         monarchy_sudo systemctl enable --now monarchy-sddm-resume.service
     fi
     monarchy_log "installed monarchy-sddm-resume"
+}
+
+# The greeter cannot read /etc/monarchy/users.conf: this SDDM theme reads no
+# files at runtime, and adding that to the login path is not worth the risk.
+# Apply writes the list into the deployed QML instead, the same way the lock
+# plugin is patched. The repo copy keeps an empty list and holds no username.
+monarchy_sddm_write_plasma_users() {
+    local qml=$1
+    local list tmp
+    [ -f "$qml" ] || monarchy_die "missing $qml"
+    grep -q 'property var plasmaUsers:' "$qml" \
+        || monarchy_die "$qml has no plasmaUsers property to generate into"
+    list=$(monarchy_plasma_users | awk '{printf "%s\"%s\"", sep, $0; sep=", "}')
+    tmp=$(mktemp)
+    awk -v repl="  property var plasmaUsers: [$list]" '
+        /^[[:space:]]*property var plasmaUsers:/ { print repl; next }
+        { print }
+    ' "$qml" >"$tmp"
+    monarchy_sudo install -m 644 "$tmp" "$qml"
+    rm -f "$tmp"
+    monarchy_log "greeter plasma users: [$list]"
 }
 
 monarchy_keep_sddm() {

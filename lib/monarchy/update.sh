@@ -151,6 +151,7 @@ monarchy_apply() {
     monarchy_rebuild_overlay
     monarchy_overlay_session_lock
     monarchy_install_switch_user
+    monarchy_install_user_setup
     monarchy_write_omarchy_conf
     export OMARCHY_PATH
     monarchy_add_omarchy_repo
