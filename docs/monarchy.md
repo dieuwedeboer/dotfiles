@@ -178,6 +178,12 @@ lib/monarchy/
   update.sh              # --check, apply, --update
   user.sh
   stubs/                 # deny, wrap-update, wrap-plymouth, wrap-sddm, …
+tests/
+  run.sh                 # every tests/**/test-*.sh, then shellcheck
+  helpers.sh             # REPO, LIB, MISC, HARDWARE, fail()
+  monarchy/              # overlay, sddm, sddm-resume, switch-user, lock, splash, user
+  zbm/                   # boot cmdline merge
+  hardware/              # DMI detection
 monarchy/
   omarchy.lock
   packages.deny
@@ -196,6 +202,20 @@ monarchy/
   hypr/boot-color.lua
   logind/
 ```
+
+### Tests
+
+`./tests/run.sh` before any apply. No sudo, no writes under `/etc` or `/usr`:
+the tests drive the real functions against temp prefixes through
+`MONARCHY_SRC`, `MONARCHY_PATH`, `MONARCHY_INSTALL_SUDO_STUBS=0`,
+`MONARCHY_LOG` and `ZBOOK_DMI`. It also runs shellcheck over `lib/`, `tests/`,
+`hardware/` and `install.sh`, and skips that arm if shellcheck is absent.
+
+The suite covers the bricking surface only — see `brick` in `CONTEXT.md`.
+Greeter, session desktop, lock PAM, switch-user, overlay `bin/` classification,
+the initramfs HOOKS rewrite and the ZBM cmdline. Branding, version strings,
+settings file lists and the battery helper are deliberately uncovered; those
+tests are recoverable from `8fcaa34^` if that judgement changes.
 
 ### Guards
 

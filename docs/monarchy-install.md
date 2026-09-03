@@ -89,6 +89,17 @@ Boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZFSBootMenu, or clone+promote. 
 
 If the host has no `/etc/zfs/zroot.key`, plymouth stays after zfs and the mkinitcpio `zfs` hook prompts on the console. That is a second passphrase look, not a stolen ZBM prompt. Do not "fix" it with `plymouth-zfs`. With the keyfile in FILES, plymouth sits in front of zfs so import is under the splash (`docs/boot-flow.md`).
 
+## Before an apply
+
+```bash
+./tests/run.sh      # no sudo, writes nothing; must be green
+./install.sh --check # dry run against this host
+```
+
+There is no canary box, and `zfs-snapshot-pre-update` keeps three snapshots
+with a 15-minute dedup window, so repeated applies burn the rollback. The
+suite and `--check` are the cheap gates; use them first.
+
 ## Family greeter
 
 SDDM runs the Omarchy theme with a Monarchy overlay. Tab cycles users. Up/Down cycles sessions. Queen and kid accounts default to Plasma. The king defaults to Omarchy. Do not enable autologin. Do not write `/var/lib/sddm/state.conf`. SDDM does not remember last session per user. Those static defaults are the picker.
