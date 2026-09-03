@@ -40,10 +40,38 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 | NVIDIA 580xx-dkms vs `chwd` | Never run Omarchy `nvidia.sh` |
 | `tuxedo-drivers-nocompatcheck-dkms` | Deny the package and the script |
 | `tlp-pd` vs `power-profiles-daemon` | Abort if TLP is installed. Omarchy calls `powerprofilesctl` |
+| AUR packages that `depends=('omarchy')` | Assume the metapackage at the overlay's version, link `/usr/share/omarchy`. See below |
 
 ## `packages.deny`
 
 See `monarchy/packages.deny`. Curated bricks only: two DMs (`plasma-login-manager`), metapackages (`omarchy` / `omarchy-settings*`), Limine, Snapper, stock `linux`/`linux-ptl*`, `tldr` (tealdeer), and `ufw-docker` (kingfisher keeps ufw disabled). `yay` is allowed. Overlay `yay` still execs `paru` when an Omarchy script calls it from session PATH.
+
+## AUR packages that depend on `omarchy`
+
+The Omarchy ecosystem on the AUR declares `depends=('omarchy')`. That
+metapackage is denied, and it is not what those packages want: it drags in
+limine, `limine-mkinitcpio-hook`, `limine-snapper-sync` and snapper. What they
+want is the shell QML. flea is the worked example — its PKGBUILD symlinks
+`ui/Commons` and `ui/Ui` into `/usr/share/omarchy/shell/`, and says so in a
+comment.
+
+Both halves are handled in `lib/packages.sh`:
+
+- `OMARCHY_AUR_PACKAGES` is installed with `paru -S --assume-installed
+  omarchy=<version>`, reading the version from `$MONARCHY_PATH/version`. paru
+  resolves without pulling the metapackage.
+- `packages_link_omarchy_share` links `/usr/share/omarchy` to
+  `$MONARCHY_PATH`, so the hardcoded path resolves. It refuses to replace
+  anything already at that path.
+
+Do **not** satisfy the dependency with a local package that
+`provides=('omarchy')`. `monarchy_refuse_omarchy` checks with
+`monarchy_pkg_installed`, which is `pacman -Q` and follows Provides, so a stub
+makes every check and apply after it die with "omarchy metapackage is
+installed".
+
+This step runs after apply, not with `packages_install`: the version file and
+the QML it links to are both produced by the overlay.
 
 ## Overlay bin
 

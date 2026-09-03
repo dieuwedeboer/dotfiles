@@ -74,10 +74,12 @@ monarchy_cli() {
         apply)
             monarchy_apply
             packages_strip_omarchy_owned
+            packages_install_omarchy_aur
             ;;
         update)
             monarchy_update
             packages_strip_omarchy_owned
+            packages_install_omarchy_aur
             ;;
         splash) monarchy_splash_only ;;
         *)

@@ -41,6 +41,17 @@ AUR_PACKAGES=(
     zotero-bin
 )
 
+# AUR packages for the Omarchy desktop whose PKGBUILD depends on the omarchy
+# metapackage. That package is in packages.deny: it pulls limine,
+# limine-mkinitcpio-hook, limine-snapper-sync and snapper. What these packages
+# actually need is /usr/share/omarchy/shell, which the overlay has under
+# $MONARCHY_PATH, so paru is told to assume omarchy at the overlay's own
+# version and packages_link_omarchy_share makes the hardcoded path resolve.
+# Installed after apply, because both halves need the overlay on disk.
+OMARCHY_AUR_PACKAGES=(
+    flea
+)
+
 FLATPAK_PACKAGES=(
     com.adamcake.Bolt
     info.beyondallreason.bar
@@ -130,6 +141,60 @@ packages_install() {
                 ;;
         esac
     fi
+}
+
+# Upstream Omarchy packages hardcode /usr/share/omarchy; the overlay lives at
+# /usr/local/share/omarchy. flea symlinks ui/Commons and ui/Ui into the former
+# at package time, so they dangle without this. One link serves the class.
+# Refuses to touch anything already there: a real directory would mean the
+# denied omarchy package got installed, which is a bigger problem than flea.
+packages_link_omarchy_share() {
+    local link=/usr/share/omarchy
+    if [ -L "$link" ]; then
+        [ "$(readlink "$link")" = "$MONARCHY_PATH" ] && return 0
+        echo "  warning: $link points elsewhere, leaving it" >&2
+        return 1
+    fi
+    if [ -e "$link" ]; then
+        echo "  warning: $link is not a symlink, leaving it" >&2
+        return 1
+    fi
+    echo "  linking $link -> $MONARCHY_PATH"
+    monarchy_sudo ln -sT "$MONARCHY_PATH" "$link"
+}
+
+# Runs after apply, not with the rest of the packages: the version file and
+# the shell QML both come from the overlay.
+packages_install_omarchy_aur() {
+    [ "${#OMARCHY_AUR_PACKAGES[@]}" -gt 0 ] || return 0
+    if [ "${MONARCHY_NO_PACKAGES:-0}" = 1 ]; then
+        echo "  skipping Omarchy AUR packages (--no-packages)"
+        return 0
+    fi
+    if ! command -v paru &> /dev/null; then
+        echo "  paru not found, skipping Omarchy AUR packages"
+        return 0
+    fi
+
+    local version
+    version=$(cat "$MONARCHY_PATH/version" 2>/dev/null || true)
+    if [ -z "$version" ]; then
+        echo "  no $MONARCHY_PATH/version, skipping Omarchy AUR packages"
+        return 0
+    fi
+    packages_link_omarchy_share || return 0
+
+    echo "=== Installing Omarchy AUR packages ==="
+    local pkg
+    for pkg in "${OMARCHY_AUR_PACKAGES[@]}"; do
+        if paru -Q "$pkg" &> /dev/null; then
+            echo "  $pkg already installed"
+        else
+            echo "  Installing $pkg (assuming omarchy=$version)..."
+            paru -S --noconfirm "$pkg" --assume-installed "omarchy=$version" \
+                || echo "  warning: paru -S $pkg failed"
+        fi
+    done
 }
 
 packages_strip_curl_pipe_cursor() {
