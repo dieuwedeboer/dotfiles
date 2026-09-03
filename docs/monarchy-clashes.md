@@ -2,7 +2,7 @@
 
 Source of truth for `packages.deny` and overlay-bin policy. Architecture is `docs/monarchy.md`.
 
-Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c01df169` (438 `bin/` names: 408 allow, 10 wrap, 20 deny).
+Pin: `berenddeboer/omarchy` `quattro-on-zfs` `1297c7bc98cba3183d6037e19761dcb99e0c902e` (442 `bin/` names: 411 allow, 11 wrap, 20 deny).
 
 ## Blocker
 

@@ -49,6 +49,7 @@ omarchy-clipboard-paste-text
 omarchy-cmd-missing
 omarchy-cmd-present
 omarchy-cmd-terminal-cwd
+omarchy-crash-mute
 omarchy-crash-watch
 omarchy-debug
 omarchy-debug-idle
@@ -77,6 +78,7 @@ omarchy-font-list
 omarchy-font-set
 omarchy-games-retro-cores
 omarchy-games-retro-install
+omarchy-git-url-check
 omarchy-hibernation-available
 omarchy-hook
 omarchy-hook-install
@@ -86,6 +88,7 @@ omarchy-hw-asus-zenbook-ux5406aa
 omarchy-hw-clamshell
 omarchy-hw-dell-xps-haptic-touchpad
 omarchy-hw-dell-xps-oled
+omarchy-hw-dell-xps13-sidecar-amps
 omarchy-hw-display
 omarchy-hw-external-monitors
 omarchy-hw-fingerprint
@@ -340,6 +343,7 @@ omarchy-theme-refresh
 omarchy-theme-remove
 omarchy-theme-set
 omarchy-theme-set-browser
+omarchy-theme-set-browser-policy
 omarchy-theme-set-claude
 omarchy-theme-set-foot
 omarchy-theme-set-gnome
