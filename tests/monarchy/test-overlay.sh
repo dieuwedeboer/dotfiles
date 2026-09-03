@@ -104,4 +104,32 @@ build_at=$(line_of 'monarchy_rebuild_overlay')
 [ "$inv_at" -lt "$build_at" ] || fail "inventory guard runs after the overlay is built"
 [ "$cls_at" -lt "$build_at" ] || fail "classification guard runs after the overlay is built"
 
+# monarchy_write_to is the whole difference between building the overlay as
+# the user on a temp prefix and as root on a real box. The temp-prefix run
+# above only exercises the writable path, so drive the dispatch directly with
+# monarchy_sudo stubbed out. Skipped as root, where -w is always true.
+if [ "${EUID:-$(id -u)}" -ne 0 ]; then
+    wt=$(mktemp -d)
+    calls=$wt/calls
+    : >"$calls"
+    # Called indirectly, by monarchy_write_to.
+    # shellcheck disable=SC2329
+    monarchy_sudo() { printf 'sudo %s\n' "$*" >>"$calls"; }
+
+    mkdir -p "$wt/open"
+    monarchy_write_to "$wt/open" touch "$wt/open/f"
+    [ -f "$wt/open/f" ] || fail "write_to did not run the command on a writable dir"
+    [ ! -s "$calls" ] || fail "write_to elevated for a writable dir"
+
+    mkdir -p "$wt/closed"
+    chmod 500 "$wt/closed"
+    monarchy_write_to "$wt/closed" touch "$wt/closed/f"
+    grep -q '^sudo touch ' "$calls" || fail "write_to did not elevate for an unwritable dir"
+    [ ! -e "$wt/closed/f" ] || fail "write_to ran unelevated against an unwritable dir"
+
+    chmod 700 "$wt/closed"
+    rm -rf "$wt"
+    unset -f monarchy_sudo
+fi
+
 echo "overlay test passed ($allow_n allow, $wrap_n wrap, $deny_n deny)"

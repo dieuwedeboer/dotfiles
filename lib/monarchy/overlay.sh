@@ -41,39 +41,21 @@ monarchy_rebuild_overlay() {
 
     monarchy_log "rebuild overlay $dest"
     parent=$(dirname "$dest")
-    if [ -w "$parent" ] 2>/dev/null; then
-        mkdir -p "$dest"
-        find "$dest" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-        for name in "${MONARCHY_BIN_DENY[@]}"; do
-            install -m 755 "$stub" "$dest/$name"
-        done
-        for name in "${MONARCHY_BIN_ALLOW[@]}"; do
-            [ -e "$src_bin/$name" ] || monarchy_die "allowlisted $name missing from clone bin/"
-            ln -sfn "$src_bin/$name" "$dest/$name"
-        done
-        for name in "${MONARCHY_BIN_WRAP[@]}"; do
-            wrap_stub=$(monarchy_wrap_stub_for "$name")
-            [ -f "$wrap_stub" ] || monarchy_die "missing $wrap_stub"
-            install -m 755 "$wrap_stub" "$dest/$name"
-        done
-        install -m 755 "$yay" "$dest/yay"
-    else
-        monarchy_sudo mkdir -p "$dest"
-        monarchy_sudo find "$dest" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-        for name in "${MONARCHY_BIN_DENY[@]}"; do
-            monarchy_sudo install -m 755 "$stub" "$dest/$name"
-        done
-        for name in "${MONARCHY_BIN_ALLOW[@]}"; do
-            [ -e "$src_bin/$name" ] || monarchy_die "allowlisted $name missing from clone bin/"
-            monarchy_sudo ln -sfn "$src_bin/$name" "$dest/$name"
-        done
-        for name in "${MONARCHY_BIN_WRAP[@]}"; do
-            wrap_stub=$(monarchy_wrap_stub_for "$name")
-            [ -f "$wrap_stub" ] || monarchy_die "missing $wrap_stub"
-            monarchy_sudo install -m 755 "$wrap_stub" "$dest/$name"
-        done
-        monarchy_sudo install -m 755 "$yay" "$dest/yay"
-    fi
+    monarchy_write_to "$parent" mkdir -p "$dest"
+    monarchy_write_to "$parent" find "$dest" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+    for name in "${MONARCHY_BIN_DENY[@]}"; do
+        monarchy_write_to "$parent" install -m 755 "$stub" "$dest/$name"
+    done
+    for name in "${MONARCHY_BIN_ALLOW[@]}"; do
+        [ -e "$src_bin/$name" ] || monarchy_die "allowlisted $name missing from clone bin/"
+        monarchy_write_to "$parent" ln -sfn "$src_bin/$name" "$dest/$name"
+    done
+    for name in "${MONARCHY_BIN_WRAP[@]}"; do
+        wrap_stub=$(monarchy_wrap_stub_for "$name")
+        [ -f "$wrap_stub" ] || monarchy_die "missing $wrap_stub"
+        monarchy_write_to "$parent" install -m 755 "$wrap_stub" "$dest/$name"
+    done
+    monarchy_write_to "$parent" install -m 755 "$yay" "$dest/yay"
 
     if [ "${MONARCHY_INSTALL_SUDO_STUBS:-1}" = 1 ]; then
         monarchy_sudo mkdir -p /usr/local/bin
@@ -132,41 +114,31 @@ monarchy_explode_symlink_dir() {
         [ -e "$name" ] || continue
         ln -sfn "$name" "$tmp/$(basename "$name")"
     done
-    if [ -w "$(dirname "$dest")" ] 2>/dev/null; then
-        rm -f "$dest"
-        mkdir -p "$dest"
-        mv "$tmp"/* "$dest"/
-        rmdir "$tmp"
-    else
-        monarchy_sudo rm -f "$dest"
-        monarchy_sudo mkdir -p "$dest"
-        monarchy_sudo mv "$tmp"/* "$dest"/
-        rmdir "$tmp" 2>/dev/null || true
-    fi
+    local parent
+    parent=$(dirname "$dest")
+    monarchy_write_to "$parent" rm -f "$dest"
+    monarchy_write_to "$parent" mkdir -p "$dest"
+    monarchy_write_to "$parent" mv "$tmp"/* "$dest"/
+    # $tmp is ours either way: mktemp -d ran as the calling user.
+    rmdir "$tmp" 2>/dev/null || true
 }
 
 monarchy_overlay_replace_dir() {
     local dest=$1
     local src_copy=$2
-    if [ -w "$(dirname "$dest")" ] 2>/dev/null; then
-        rm -rf "$dest"
-        mv "$src_copy" "$dest"
-    else
-        monarchy_sudo rm -rf "$dest"
-        monarchy_sudo mv "$src_copy" "$dest"
-    fi
+    local parent
+    parent=$(dirname "$dest")
+    monarchy_write_to "$parent" rm -rf "$dest"
+    monarchy_write_to "$parent" mv "$src_copy" "$dest"
 }
 
 monarchy_overlay_replace_file() {
     local dest=$1
     local src_copy=$2
-    if [ -w "$(dirname "$dest")" ] 2>/dev/null; then
-        rm -f "$dest"
-        mv "$src_copy" "$dest"
-    else
-        monarchy_sudo rm -f "$dest"
-        monarchy_sudo mv "$src_copy" "$dest"
-    fi
+    local parent
+    parent=$(dirname "$dest")
+    monarchy_write_to "$parent" rm -f "$dest"
+    monarchy_write_to "$parent" mv "$src_copy" "$dest"
 }
 
 monarchy_check_session_lock_overlay() {

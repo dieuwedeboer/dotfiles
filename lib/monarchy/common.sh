@@ -42,6 +42,20 @@ monarchy_sudo() {
     fi
 }
 
+# Run one command against a destination, elevating only when the directory
+# that has to be written is not already writable. The overlay is built as the
+# user on a temp prefix in tests and as root on a real box; this is the only
+# difference between those two paths.
+monarchy_write_to() {
+    local dir=$1
+    shift
+    if [ -w "$dir" ]; then
+        "$@"
+    else
+        monarchy_sudo "$@"
+    fi
+}
+
 monarchy_load_lock() {
     local lock="$MONARCHY_MISC/omarchy.lock"
     [ -f "$lock" ] || monarchy_die "missing $lock"
