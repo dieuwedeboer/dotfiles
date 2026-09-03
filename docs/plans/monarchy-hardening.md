@@ -1,175 +1,170 @@
 # Plan: Monarchy hardening
 
-- **Status:** plan. Agreed 2026-09-03, not started. Uncommitted by request.
-- **Audience:** whoever works the sequence below, in order.
-- **Constraint:** no canary box and no snapshot headroom. `KEEP=3` and a
-  15-minute dedup window in `zfs-snapshot-pre-update` stay as they are, so
-  iterating by running apply burns the rollback. Verification happens in
-  `tests/` and `--check`, which write nothing.
+- **Status:** the seven steps are implemented, `605370e..d5d7209`, 2026-09-03.
+  What remains is in [Still open](#still-open). Uncommitted by request.
+- **Audience:** whoever picks up the open items.
+- **Constraint, unchanged:** no canary box, and `zfs-snapshot-pre-update` keeps
+  three snapshots with a 15-minute dedup window, so repeated applies burn the
+  rollback. `./tests/run.sh` and `./install.sh --check` write nothing and are
+  the cheap gates. `--only=<unit>` now shrinks a real apply to one subsystem.
 
-Seven findings from an architectural review, resequenced so nothing on the
-bricking surface moves before the tests that cover it exist. `brick` is defined
-in `CONTEXT.md` and is the sole criterion for whether behaviour is tested.
+Originating review: seven findings against `lib/monarchy/`. `brick` in
+`CONTEXT.md` is the criterion for whether behaviour is tested. How the overlay
+works now is `docs/monarchy.md`; this file is only the plan's own record.
 
-## Sequence
+## What shipped
 
-| # | Work | Risk | Covered by |
-| --- | --- | --- | --- |
-| 0 | Dead code, docs name scrub | None | — |
-| 1 | Revive tests into `tests/` | None | — |
-| 2 | Inventory guards in `monarchy_apply` | Low | `test-overlay.sh` |
-| 3 | Collapse privilege dispatch in `overlay.sh` | Bricking | `test-overlay.sh` |
-| 4 | Marker blocks for seeders | Low | `test-user.sh` |
-| 5 | chezmoi owns `~/.config/hypr` | Low, every box | `test-user.sh` |
-| 6 | Roles and `users.conf` | Bricking | `test-sddm.sh`, no-names |
-| 7 | Unit list with check/apply verbs | Highest | whole suite |
+| # | Work | Commits |
+| --- | --- | --- |
+| 0 | Dead code, docs name scrub | `605370e` |
+| 1 | shellcheck-clean, then 9 tests revived into `tests/` | `068ad3d` `c733e69` |
+| 2 | Inventory guards reach `monarchy_apply` | `3bc5192` |
+| 3 | Privilege dispatch collapsed, −58 lines | `ff4c097` |
+| 4 | Marked, replaceable seed blocks | `5cb3ad8` |
+| 5 | chezmoi owns `~/.config/hypr`; monarchy asserts | `f975725` |
+| 6 | Roles in `/etc/monarchy/users.conf`; no names in code | `6cde27f` |
+| 7 | One ordered unit list, `--only=<unit>` | `3e0bbfc` |
 
-### 0. Dead code and docs scrub
+Fixes to the above, found by review or by testing rather than by reading:
+`bac43b6` (the ordering test failed without saying why), `6243a9b` (the test
+revival reintroduced names into a public repo), `3dbe817` (two clone-dependent
+tests passed while asserting nothing), `b208a96` (`seed_block` tightened file
+modes to 600 and its unanchored patterns ate user lines), `1cda2f3` (the assert
+read an unmanaged chezmoi as clean, and the release path deleted user content
+past a truncated marker), `e7dc8c2` (apply verified before it acted, which
+aborted both a fresh box and a converting box), `d5d7209` (`--only` skipped
+every host guard; a quote in a username would have produced an unparseable
+greeter; a CRLF `users.conf` silently moved the whole household to Omarchy; and
+those warnings went to stdout, which both callers read as data).
 
-Delete `monarchy_migration_denied` (`lib/monarchy/update.sh:3`). It is never
-called — `monarchy_check_migrations` reimplements it inline — and its logic is
-wrong: the outer condition matches `/etc/os-release` or `nvidia-dkms`, but the
-only route to a "denied" return is a second match on limine/pacman, so an
-os-release-clobbering migration falls through to allowed.
+## Where this deviated from the plan as written
 
-Delete the `set -a` / `set +a` pair and its orphaned `# shellcheck disable=SC1090`
-at `lib/monarchy/common.sh:49-51`. Nothing sits between them; it is left over
-from when the lock was sourced rather than parsed.
+**Step 2 placement.** The plan said put the inventory guards "at the top of
+`monarchy_apply`, before `monarchy_sync_omarchy_clone`". Both read
+`$MONARCHY_SRC/bin`, which does not exist until the clone is synced, so that
+would abort every first install. They sit immediately after the sync and before
+anything is built from the clone. Confirmed independently in review.
 
-Remove personal names from prose. Known sites: `docs/monarchy-install.md:94`,
-`docs/monarchy.md:233`, `docs/monarchy.md:247`, plus the author references
-throughout `docs/plans/themes.md` and `docs/plans/zbook-fingerprint.md`. Since
-nothing is grandfathered in step 6, every one of these must go or the no-names
-test fails. Rewrite them by role — "the king", "the machine's king" — not by
-name. Code sites wait for step 6.
+**Step 6 greeter mechanism.** The plan left open "what the SDDM theme can read
+at greeter privilege". It reads nothing: the theme's only file references are
+image sources. Rather than add a runtime read on the login path, apply
+generates the list into the deployed `Main.qml`, the way `overlay-lock.py`
+already patches the lock QML. The repo copy ships an empty list. That closes
+the question without needing a live greeter to test.
 
-### 1. Revive the tests
+**Step 1 scope.** Nine of the fourteen recovered tests were kept. Branding,
+version, settings, logind and battery-rate are not bricking by the `CONTEXT.md`
+definition and stay in `8fcaa34^`. An unplanned commit, `068ad3d`, came first:
+shellcheck found three real defects in `lib/`, so the tree had to be clean
+before shellcheck could join the gate.
 
-Fourteen test files, 1,588 lines, were deleted as collateral in `8fcaa34`, the
-`scripts/` to `lib/` restructure. Recover each with
-`git show 8fcaa34^:scripts/lib/<path>`.
+**Step 5, and then the reverse.** The plan and ADR 0001 said monarchy must
+never invoke `chezmoi apply`, because it prompts and `omarchy-update` reaches
+the code from the Omarchy menu with no terminal. That was too broad: an
+interactive `./install.sh` has a terminal, and printing a command for the
+operator to paste back was busywork. `916037f` gates on `monarchy_can_prompt`
+instead — fix it when someone can answer, report and stop when nobody can. The
+same gate offers `monarchy-user-setup` when `/etc/monarchy/users.conf` is
+missing.
 
-They are not unit tests. They run the real functions against temp prefixes
-through seams that still exist — `MONARCHY_SRC`, `MONARCHY_PATH`,
-`MONARCHY_INSTALL_SUDO_STUBS=0`, `MONARCHY_LOG`, `ZBOOK_DMI`. Every header says
-"No sudo". `MONARCHY_INSTALL_SUDO_STUBS` still sits at `lib/monarchy/overlay.sh:76`
-as a seam with nothing using it.
+**Steps 4 and 5, the release path.** Step 4's stated purpose was to make the
+appends removable in step 5. They were removable, and then the removal itself
+was deleted: `chezmoi apply` overwrites the file and drops the blocks anyway, so
+a monarchy that edits the file to tidy up is still a monarchy that writes there.
+The markers earned their place on idempotence alone.
 
-```text
-tests/
-├── run.sh                  # every tests/**/test-*.sh, then shellcheck
-├── monarchy/test-*.sh
-├── zbm/test-boot.sh
-└── hardware/test-detect.sh
-```
+**Step 5 scope.** chezmoi owns four files, not the whole directory.
+`hyprland.lua` and `boot-color.lua` stay monarchy's: they are overlay assets
+from the pinned clone, not personal config.
 
-Plain bash, no bats. Fixtures are built inline with `mktemp -d`, so nothing
-needs committing alongside. Fix the `scripts/lib/...` source paths and the
-`setup-monarchy` to `monarchy-update` rename. Drop assertions about behaviour
-that has genuinely changed; keep the rest.
+**Step 7 ordering.** Apply runs each unit's apply and *then* its check. A
+unit's check is a postcondition. Checking first aborted every fresh box
+(`monarchy_check_hidden_hyprland_sessions` needs the `NoDisplay` that
+`monarchy_install_omarchy_session` writes) and every converting box
+(`monarchy_assert_sddm_runtime` refuses the `plasma-login-manager` that
+`monarchy_keep_sddm` removes).
 
-Judge each test against the `brick` definition. `test-sddm.sh`,
-`test-sddm-resume.sh`, `test-switch-user.sh`, `test-lock.sh`, `test-overlay.sh`
-and `test-splash.sh` cover the bricking surface. `test-branding.sh` and
-`test-version.sh` do not — a wrong version string is broken, not bricking.
+## Still open
 
-`tests/run.sh` is the gate to run before any apply.
+### 1. No apply and no greeter round-trip yet
 
-### 2. Inventory guards in apply
+The two provisioning steps are done on this box, observed 2026-09-03:
+`/etc/monarchy/users.conf` exists with a king, a queen and a kid, and
+`chezmoi status ~/.config/hypr` is clean, so `monarchy_assert_chezmoi_hypr`
+passes and `monarchy_plasma_users` resolves the queen and the kid. The
+no-names test now runs against real names and reports clean.
 
-`monarchy_apply` never calls `monarchy_check_inventory_complete` or
-`monarchy_check_clone_bin_classified`, and `monarchy_rebuild_overlay`
-(`update.sh:156`) runs before `monarchy_add_omarchy_repo` (`:160`), so the
-overlay is rebuilt from a possibly-unclassified clone before any guard fires.
-Call both at the top of `monarchy_apply`, before `monarchy_sync_omarchy_clone`.
+Since `916037f` an interactive run repairs both by itself: a drifted
+`~/.config/hypr` gets `chezmoi apply`, and a missing `users.conf` gets
+`monarchy-user-setup`. A menu-driven `omarchy-update` still reports and stops.
 
-The review originally claimed apply also omits `monarchy_refuse_archzfs`,
-`monarchy_refuse_omarchy_zfs_repo`, `monarchy_preserve_pacman_conf` and
-`monarchy_refuse_partial_upgrade`. That was wrong. All four are reached
-indirectly — the first three inside `monarchy_add_omarchy_repo`
-(`pacman.sh:160-161`), the fourth inside `monarchy_install_packages`
-(`packages.sh:57`). Only the two inventory guards are genuinely absent.
-
-`test-overlay.sh` already called both, so this defect is downstream of the test
-deletion in step 1.
-
-### 3. Privilege dispatch
-
-`monarchy_rebuild_overlay` writes its deny/allow/wrap loop twice, once plain and
-once behind `monarchy_sudo`. `monarchy_explode_symlink_dir`,
-`monarchy_overlay_replace_dir` and `monarchy_overlay_replace_file` repeat the
-same if/else. Roughly 50 lines of parallel logic that can drift.
-
-```bash
-# Run a command, elevating only if the destination's parent is not writable.
-monarchy_write_to() {
-    local dir=$1; shift
-    if [ -w "$dir" ]; then "$@"; else monarchy_sudo "$@"; fi
-}
-```
-
-### 4. Marker blocks
-
-Every `monarchy_seed_*` in `lib/monarchy/user.sh` appends to a user file and
-detects prior state by grepping for an exact literal. `pacman.sh:155` already
-has the right pattern — a `# BEGIN monarchy-omarchy` / `# END` block replaced in
-place. Wrap the seeders in the same shape. This lands before step 5 so the
-seeders are removable without leaving orphaned appends in files already on disk.
-
-### 5. chezmoi owns the hypr config
-
-See `docs/adr/0001-chezmoi-owns-user-config.md`. Remove the seeders from
-`monarchy_setup_user`; replace with a `chezmoi status ~/.config/hypr` check that
-dies naming the command to run. Missing and drifted fail identically.
-
-### 6. Roles and users.conf
-
-Four roles, defined in `CONTEXT.md`: king (one), queen (one), kid (many), serf
-(many). Membership lives in `/etc/monarchy/users.conf`, two columns,
-`username role`, never committed. The repo ships `monarchy/users.conf.example`
-with placeholder usernames. An account absent from the file is a serf; that is a
-valid state, not an error, and nothing is done to serfs beyond the defaults.
-
-Session preference is a separate field from role. Default is Omarchy; queen and
-kid are overridden to Plasma; king and serf take the default.
-
-UIDs were considered and rejected. They are allocated sequentially in account
-creation order from `UID_MIN` 1000, so a repo-committed UID map would misassign
-roles on any machine built in a different order — a child account silently
-holding adult rules. Usernames on a machine are harmless;
-only usernames in the repo are the problem. Groups were also considered and
-deferred: the `family` group is for shared directories, a different problem from
-session and rule policy, and does not exist on this box yet.
-
-`monarchy/sddm/Main.qml:134` hardcodes two names in `prefersPlasma()`. QML cannot
-read `getent`, so apply enumerates `users.conf` and generates the override list
-the greeter reads. **Unverified:** what the SDDM theme can read at greeter
-privilege. Establish that before fixing the file format.
-
-Write the no-names test first in this step, watch it fail, then make it pass.
-It reads the usernames from `/etc/monarchy/users.conf` and greps `lib/`,
-`monarchy/` and `tests/` for each. The test itself contains no names, so it works
-in a fork without knowing who lives there. Nothing is grandfathered.
-
-### 7. Unit list
-
-Replace the two hand-maintained linear lists in `monarchy_check` and
-`monarchy_apply` with one ordered array and per-unit `check` / `apply` verbs.
+What has not happened is an apply. The suite drives the real functions against
+temp prefixes; a fixture is not a login screen, and steps 5, 6 and 7 all
+changed the login path.
 
 ```bash
-MONARCHY_UNITS=(guards pacman clone overlay settings sddm session logind portals user splash)
+./tests/run.sh                  # must be green first
+./install.sh --check            # dry run; --only=<unit> narrows it
+./install.sh --only=sddm        # smallest real change to the greeter
 ```
 
-Check can no longer fall behind apply, the ordering constraint becomes readable
-rather than tacit, and `--only=<unit>` shrinks the blast radius of an iteration
-from twenty subsystems to one — which is what makes it worth doing at all, given
-there is no canary box and no snapshot headroom. It goes last because it
-rewrites the two functions whose failure modes are worst, and it should happen
-with the suite green on both sides.
+Then log out and back in: pick a user with Tab, a session with Up/Down, confirm
+the queen and the kid land on Plasma and the king on Omarchy, and confirm
+Super+Ctrl+U reaches the greeter from a locked session. That last one is the
+path that has hard-crashed a host before.
+
+### 2. The gate depends on a tool the repo does not install
+
+`tests/run.sh` runs shellcheck and skips that arm when it is absent, so the
+gate silently weakens on a box without it. It was installed here with
+`mise use -g shellcheck`, which writes `~/.config/mise/config.toml` — not
+chezmoi-managed, so that is machine-local state the repo does not capture.
+
+Decide one: add `shellcheck` to `PACMAN_PACKAGES` in `lib/packages.sh`; or put
+mise's global config under chezmoi; or make `run.sh` fail rather than skip.
+
+### 3. No CI
+
+Q3 settled on shellcheck-in-CI, and what shipped was shellcheck-in-`run.sh`.
+There is still no `.github/`. Measured rather than assumed: with
+`MONARCHY_SRC=/nonexistent`, seven tests produce byte-identical output and so
+assert exactly as much without a clone — `test-user`, `test-splash`,
+`test-units`, `test-sddm-resume`, `test-no-names`, `hardware/test-detect`,
+`zbm/test-boot`. Those seven plus shellcheck are safe on a plain runner.
+
+`test-sddm` also exits 0 without a clone but skips its whole
+`monarchy_refresh_sddm` block, so in CI it would pass while testing less than
+it appears to. Either give it the same `require_clone` treatment as
+`test-lock`, `test-overlay` and `test-switch-user`, or split the clone-dependent
+half out. The remaining three already hard-require a clone and would fail
+honestly.
+
+`test-no-names` is a special case: it is a no-op without `/etc/monarchy/users.conf`,
+which a CI runner will not have. It cannot enforce the rule in CI, only locally.
+
+### 4. The lock carries two keys nothing reads
+
+`monarchy_load_lock` parses `hyprland` and `quickshell` from
+`monarchy/omarchy.lock`, both empty, and no code consumes either. `068ad3d`
+marked them rather than deleting them, because whether the lock format should
+still offer those keys is a decision about the format, not a lint fix. Either
+drop the parsing and the keys, or record what is supposed to read them.
+
+### 5. A per-account keyboard preference has nowhere to go
+
+The old `monarchy_seed_capslock` left a `kb_options` the user had customised
+alone. chezmoi's `input.lua` now sets `caps:capslock` unconditionally for
+everyone it is applied to. Noted in the ADR. If a queen or a kid ever wants a
+different keyboard layout, that needs a per-account answer.
+
+### 6. Five tests were dropped on a judgement call
+
+Branding, version, settings, logind and battery-rate. All in `8fcaa34^`. If the
+`brick` definition in `CONTEXT.md` changes, revisit.
 
 ## Not doing
 
-- Raising `KEEP` or adding a held snapshot. Declined; the helper stays as is.
+- Raising `KEEP` or holding a snapshot. Declined; the helper stays as is.
 - Rewriting git history to remove names already published. Scrubbing `HEAD`
   limits future exposure and does not undo past exposure. A separate decision.
 - bats, or any test framework.

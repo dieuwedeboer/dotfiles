@@ -104,4 +104,13 @@ for fn in monarchy_assert_zfs_layout monarchy_assert_os_release \
         || fail "$fn is not in monarchy_guards_check, so --only can skip it"
 done
 
+# The role vocabulary is written down twice: user-setup.sh is installed
+# standalone at /usr/local/bin and cannot source the library. Nothing else
+# catches the two drifting apart.
+lib_roles=$(printf '%s\n' "$MONARCHY_ROLES" | tr ' ' '\n' | sort | paste -sd' ' -)
+setup_roles=$(sed -n 's/^ROLES="\(.*\)"$/\1/p' "$LIB/user-setup.sh" | tr ' ' '\n' | sort | paste -sd' ' -)
+[ -n "$setup_roles" ] || fail "no ROLES in user-setup.sh"
+[ "$lib_roles" = "$setup_roles" ] \
+    || fail "roles differ: users.sh has [$lib_roles], user-setup.sh has [$setup_roles]"
+
 echo "unit tests passed"
