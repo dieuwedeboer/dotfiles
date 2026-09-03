@@ -5,3 +5,7 @@
 # live omarchy-plugin-add CLI, which needs a running omarchy-shell.
 https://github.com/dougfour/omarchy-grok-usage.git --enable
 https://github.com/stappmus/omarchy-activity-monitor.git --enable
+https://github.com/IM0001GT/omarchy-screens.git --enable
+https://github.com/lgse/sandman.git --enable
+https://github.com/stappmus/Omarchy-Spotify.git --enable
+https://github.com/huacnlee/omamail.git --enable
