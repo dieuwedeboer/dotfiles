@@ -51,10 +51,23 @@ printf '%s\n' "$(awk '/^monarchy_assert_chezmoi_hypr\(\)/,/^}$/' "$LIB/user.sh")
     || fail "assert ignores the exit status of chezmoi status"
 grep -q 'chezmoi apply' "$LIB/user.sh" \
     || fail "user.sh does not name the command to run when hypr has drifted"
-# The die messages name the command, so match an actual invocation: a line
-# that starts with it, rather than one that merely contains it in a string.
-grep -qE '^[[:space:]]*chezmoi[[:space:]]+apply' "$LIB/user.sh" \
-    && fail "user.sh must never invoke chezmoi apply itself; it prompts, and omarchy-update has no terminal"
+# chezmoi apply may be invoked, but only behind a terminal check: it prompts
+# when a target has been modified, and the Omarchy menu wraps omarchy-update
+# with no tty to answer on.
+apply_fn=$(awk '/^monarchy_chezmoi_apply_hypr\(\)/,/^}$/' "$LIB/user.sh")
+[ -n "$apply_fn" ] || fail "no monarchy_chezmoi_apply_hypr; who runs chezmoi apply?"
+printf '%s\n' "$apply_fn" | grep -q 'monarchy_can_prompt' \
+    || fail "chezmoi apply is not gated on there being a terminal"
+printf '%s\n' "$apply_fn" | grep -q 'chezmoi apply ~/.config/hypr' \
+    || fail "the no-terminal path must still name the command to run"
+gate_at=$(printf '%s\n' "$apply_fn" | grep -n 'monarchy_can_prompt' | head -1 | cut -d: -f1)
+run_at=$(printf '%s\n' "$apply_fn" | grep -nE '^[[:space:]]*chezmoi[[:space:]]+apply' | head -1 | cut -d: -f1)
+[ -n "$run_at" ] || fail "monarchy_chezmoi_apply_hypr never runs chezmoi apply"
+[ "$gate_at" -lt "$run_at" ] || fail "chezmoi apply runs before the terminal check"
+
+# Nothing outside that one function may invoke it.
+other=$(grep -cE '^[[:space:]]*chezmoi[[:space:]]+apply' "$LIB/user.sh")
+[ "$other" -eq 1 ] || fail "chezmoi apply is invoked from $other places; expected only the gated one"
 echo "$setup_body" | grep -q 'monarchy_user_omarchy_defaults' \
     || fail "monarchy_setup_user does not install Omarchy user defaults"
 grep -q 'monarchy_user_emacs' "$LIB/user.sh" \

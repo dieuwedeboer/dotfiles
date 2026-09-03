@@ -302,6 +302,21 @@ monarchy_drop_webapps() {
 # Never run chezmoi apply from here: it prompts when a target has been
 # modified, and omarchy-update reaches this through the Omarchy menu with no
 # terminal to answer on. Report, name the command, stop.
+# chezmoi owns these files, so chezmoi is what fixes them. With a terminal,
+# just run it: an interactive install or a hand-run monarchy-update can answer
+# the overwrite prompt. Without one, report and stop rather than hang a
+# menu-driven update on a question nobody can see.
+monarchy_chezmoi_apply_hypr() {
+    local why=$1
+    local dir="$HOME/.config/hypr"
+    if ! monarchy_can_prompt; then
+        monarchy_die "$why. Run: chezmoi apply ~/.config/hypr"
+    fi
+    monarchy_log "$why; running chezmoi apply $dir"
+    chezmoi apply "$dir" \
+        || monarchy_die "chezmoi apply $dir failed. Fix it, then re-run."
+}
+
 monarchy_assert_chezmoi_hypr() {
     local dir="$HOME/.config/hypr"
     local name missing="" status
@@ -312,7 +327,8 @@ monarchy_assert_chezmoi_hypr() {
         [ -f "$dir/$name" ] || missing="$missing $name"
     done
     if [ -n "$missing" ]; then
-        monarchy_die "missing in $dir:$missing. Run: chezmoi apply ~/.config/hypr"
+        monarchy_chezmoi_apply_hypr "missing in $dir:$missing" || return 1
+        missing=""
     fi
     # Keep stderr and the exit code. chezmoi status prints its errors to
     # stderr and leaves stdout empty when the source dir is missing, so
@@ -324,9 +340,11 @@ monarchy_assert_chezmoi_hypr() {
     fi
     if [ -n "$status" ]; then
         printf '%s\n' "$status" >&2
-        monarchy_die "$dir has drifted from chezmoi. Run: chezmoi apply ~/.config/hypr"
+        monarchy_chezmoi_apply_hypr "$dir has drifted from chezmoi" || return 1
+        status=$(chezmoi status "$dir" 2>&1) || true
+        [ -z "$status" ] || monarchy_die "$dir still differs after chezmoi apply"
     fi
-    monarchy_log "chezmoi owns $dir; monarchy asserted only"
+    monarchy_log "chezmoi owns $dir"
 }
 
 monarchy_user_git() {

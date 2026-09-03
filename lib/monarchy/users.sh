@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Sourced into one shell by lib/monarchy.sh; common.sh state is in scope.
-# shellcheck disable=SC2153
+# shellcheck disable=SC2153,SC2154
 #
 # Account roles. The repo holds what each role gets; the box holds who is who.
 # Usernames never appear in this repo: they are personal information, the repo
@@ -65,4 +65,20 @@ monarchy_plasma_users() {
         getent passwd "$user" >/dev/null 2>&1 || continue
         printf '%s\n' "$user"
     done < <(monarchy_users) | sort -u
+}
+
+# Roles decide the greeter default, so an empty users.conf quietly gives every
+# account Omarchy. With a terminal, ask now. Without one, say so and carry on:
+# an absent file means every account is a serf, which is a valid state.
+monarchy_ensure_users_conf() {
+    local setup
+    [ ! -f "$MONARCHY_USERS_CONF" ] || return 0
+    setup=/usr/local/bin/monarchy-user-setup
+    [ -x "$setup" ] || setup="$monarchy_lib_dir/user-setup.sh"
+    if ! monarchy_can_prompt || [ ! -f "$setup" ]; then
+        monarchy_log "warning: no $MONARCHY_USERS_CONF; every account is a serf and defaults to Omarchy. Run monarchy-user-setup"
+        return 0
+    fi
+    monarchy_log "no $MONARCHY_USERS_CONF; asking for roles"
+    bash "$setup" </dev/tty || monarchy_log "warning: monarchy-user-setup did not complete"
 }

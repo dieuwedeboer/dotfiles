@@ -46,6 +46,15 @@ monarchy_sudo() {
 # that has to be written is not already writable. The overlay is built as the
 # user on a temp prefix in tests and as root on a real box; this is the only
 # difference between those two paths.
+# True when there is a real terminal to ask on. The Omarchy menu wraps
+# omarchy-update, which execs monarchy-update with no tty, and chezmoi apply
+# prompts whenever a target has been modified. With a tty we can fix things;
+# without one we can only report and stop.
+monarchy_can_prompt() {
+    [ "${MONARCHY_NONINTERACTIVE:-0}" != 1 ] || return 1
+    [ -t 0 ] && [ -t 1 ]
+}
+
 monarchy_write_to() {
     local dir=$1
     shift

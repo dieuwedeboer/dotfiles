@@ -9,15 +9,16 @@ onto an earlier seed that did not match.
 
 chezmoi now owns the personal override files outright — `bindings.lua`,
 `looknfeel.lua`, `input.lua`, `autostart.lua`. Monarchy detects drift with
-`chezmoi status ~/.config/hypr` and dies with the command to run. It never
-writes them and never invokes `chezmoi apply` on the user's behalf.
+``chezmoi status ~/.config/hypr` and never writes them itself. When there is a
+terminal to answer on it runs `chezmoi apply ~/.config/hypr` and re-verifies;
+without one it dies naming the command.
 
 Two files in that directory stay Monarchy's, because they are overlay assets
 rather than personal config: `hyprland.lua`, seeded from the pinned Omarchy
 clone, and `boot-color.lua`, copied from `monarchy/hypr/`. Monarchy still adds
 the `boot-color` require to `hyprland.lua` as a marked block.
 
-## Why not have Monarchy run `chezmoi apply` itself
+## Why the terminal check, rather than always or never
 
 Because `chezmoi apply` prompts. From `chezmoi apply --help`: "If a target has
 been modified since chezmoi last wrote it then the user will be prompted if
@@ -25,6 +26,14 @@ they want to overwrite the file." `omarchy-update` is wired into the Omarchy
 menu, which wrapped-execs `monarchy-update`, so a prompt in that path blocks a
 GUI-invoked update with no terminal to answer it. `--force` avoids the prompt
 by silently destroying deliberate local edits, which is worse than failing.
+
+So the rule is not "never run it", it is "never run it where nobody can answer".
+An interactive `./install.sh` or a hand-run `monarchy-update` has a terminal:
+there, fixing the problem beats printing a command for the operator to paste
+back. `monarchy_can_prompt` is the gate, and `MONARCHY_NONINTERACTIVE=1` forces
+the reporting behaviour. The same gate decides whether a missing
+`/etc/monarchy/users.conf` triggers `monarchy-user-setup` or just a warning;
+an absent file is a valid state, so that one never dies.
 
 The new-box case needs no special handling: `install.sh` installs chezmoi in
 `packages_install`, runs `chezmoi apply`, and only then runs Monarchy apply. By

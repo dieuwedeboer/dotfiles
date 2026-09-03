@@ -281,6 +281,7 @@ monarchy_apply() {
     monarchy_load_lock
     monarchy_load_inventories
     monarchy_snapshot_first
+    monarchy_ensure_users_conf
     # Apply first, then verify. A unit's check is a postcondition: it asserts
     # what that unit's apply is supposed to have produced. Checking first
     # aborted every fresh box, because monarchy_check_hidden_hyprland_sessions
