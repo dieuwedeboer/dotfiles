@@ -25,8 +25,18 @@ if grep -q 'blob.indexOf("hyprland")' "$qml"; then
     fail "Main.qml must not hide Omarchy by matching the word hyprland"
 fi
 grep -q 'prefersPlasma' "$qml" || fail "Main.qml missing prefersPlasma"
-grep -q 'amie' "$qml" || fail "Main.qml missing family user amie"
-grep -q 'olivier' "$qml" || fail "Main.qml missing family user olivier"
+# Do not name anyone here: read both lists out of the code and require they
+# agree. The greeter's picker default and the AccountsService Session= writer
+# have to describe the same people, or a user sees one default and gets another.
+# Step 6 moves both to /etc/monarchy/users.conf and this reads that instead.
+qml_plasma=$(sed -n '/function prefersPlasma/,/^  }/p' "$qml" \
+    | grep -oE 'user === "[^"]+"' | sed 's/.*"\(.*\)"/\1/' | sort)
+svc_plasma=$(grep -oE '^[[:space:]]*monarchy_accountsservice_session [^ ]+ plasma\.desktop' \
+    "$LIB/sessions.sh" | awk '{print $2}' | sort)
+[ -n "$qml_plasma" ] || fail "Main.qml prefersPlasma names nobody"
+[ -n "$svc_plasma" ] || fail "sessions.sh defaults nobody to plasma.desktop"
+[ "$qml_plasma" = "$svc_plasma" ] \
+    || fail "greeter and AccountsService disagree on who defaults to Plasma"
 grep -q 'Qt.Key_Tab' "$qml" || fail "Main.qml missing Tab user cycle"
 grep -q 'Qt.Key_Down' "$qml" || fail "Main.qml missing Down session cycle"
 grep -q 'background.jpg' "$qml" || fail "Main.qml missing optional background.jpg overlay"

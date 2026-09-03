@@ -93,10 +93,10 @@ run_resume() {
         "$cmd" "$user"
 }
 
-printf '2 1000 dieuwe seat0 1152 user tty2 no -\n' >"$state/list"
+printf '2 1000 king seat0 1152 user tty2 no -\n' >"$state/list"
 write_session 2 <<'EOF'
 Id=2
-Name=dieuwe
+Name=king
 Class=user
 Type=wayland
 Seat=seat0
@@ -104,13 +104,13 @@ State=online
 TimestampMonotonic=100
 VTNr=2
 EOF
-run_resume dieuwe || fail "did not resume dieuwe's open session"
+run_resume king || fail "did not resume king's open session"
 [ "$(cat "$state/activated")" = 2 ] || fail "did not activate session 2"
 
-printf '5 1000 dieuwe seat0 43623 user tty3 no -\n' >"$state/list"
+printf '5 1000 king seat0 43623 user tty3 no -\n' >"$state/list"
 write_session 5 <<'EOF'
 Id=5
-Name=dieuwe
+Name=king
 Class=user
 Type=wayland
 Seat=seat0
@@ -118,15 +118,15 @@ State=active
 TimestampMonotonic=900
 VTNr=3
 EOF
-if run_resume amie >/dev/null 2>&1; then
-    fail "amie with no session still resumed"
+if run_resume queen >/dev/null 2>&1; then
+    fail "queen with no session still resumed"
 fi
-[ ! -e "$state/activated" ] || fail "amie with no session called activate"
+[ ! -e "$state/activated" ] || fail "queen with no session called activate"
 
-printf '2 1000 dieuwe seat0 1152 user tty2 no -\n' >"$state/list"
+printf '2 1000 king seat0 1152 user tty2 no -\n' >"$state/list"
 write_session 2 <<'EOF'
 Id=2
-Name=dieuwe
+Name=king
 Class=user
 Type=wayland
 Seat=seat0
@@ -134,14 +134,14 @@ State=closing
 TimestampMonotonic=100
 VTNr=2
 EOF
-if run_resume dieuwe >/dev/null 2>&1; then
+if run_resume king >/dev/null 2>&1; then
     fail "closing session was resumed"
 fi
 
-printf '2 1001 amie seat0 2000 user tty2 no -\n' >"$state/list"
+printf '2 1001 queen seat0 2000 user tty2 no -\n' >"$state/list"
 write_session 2 <<'EOF'
 Id=2
-Name=amie
+Name=queen
 Class=user
 Type=wayland
 Seat=seat0
@@ -149,19 +149,19 @@ State=online
 TimestampMonotonic=100
 VTNr=2
 EOF
-if run_resume dieuwe >/dev/null 2>&1; then
+if run_resume king >/dev/null 2>&1; then
     fail "resumed another user's session"
 fi
 
-if run_resume 'dieuwe;rm -rf /' >/dev/null 2>&1; then
+if run_resume 'king;rm -rf /' >/dev/null 2>&1; then
     fail "accepted a junk username"
 fi
 
 # Oldest Wayland session wins when several exist.
-printf '2 1000 dieuwe seat0 1152 user tty2 no -\n8 1000 dieuwe seat0 9000 user tty4 no -\n' >"$state/list"
+printf '2 1000 king seat0 1152 user tty2 no -\n8 1000 king seat0 9000 user tty4 no -\n' >"$state/list"
 write_session 2 <<'EOF'
 Id=2
-Name=dieuwe
+Name=king
 Class=user
 Type=wayland
 Seat=seat0
@@ -171,7 +171,7 @@ VTNr=2
 EOF
 write_session 8 <<'EOF'
 Id=8
-Name=dieuwe
+Name=king
 Class=user
 Type=wayland
 Seat=seat0
@@ -179,14 +179,14 @@ State=online
 TimestampMonotonic=900
 VTNr=4
 EOF
-run_resume dieuwe || fail "did not resume when two sessions exist"
+run_resume king || fail "did not resume when two sessions exist"
 [ "$(cat "$state/activated")" = 2 ] || fail "did not pick the oldest session"
 
 if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
     cat >"$stub/monarchy-sddm-resume" <<'SH'
 #!/bin/bash
 state_dir="${MONARCHY_TEST_STATE:?}"
-if [ "$1" = dieuwe ]; then
+if [ "$1" = king ]; then
     echo ok >"$state_dir/http-activated"
     exit 0
 fi
@@ -204,18 +204,18 @@ SH
     trap 'kill $http_pid 2>/dev/null || true; rm -rf "$tmp"' EXIT
     ok=0
     for _ in 1 2 3 4 5 6 7 8 9 10; do
-        if curl -sS -o /dev/null --max-time 0.2 "http://127.0.0.1:$port/resume?user=dieuwe"; then
+        if curl -sS -o /dev/null --max-time 0.2 "http://127.0.0.1:$port/resume?user=king"; then
             ok=1
             break
         fi
         sleep 0.05
     done
     [ "$ok" = 1 ] || fail "httpd did not come up on $port"
-    code=$(curl -sS -o "$tmp/resume.png" -w '%{http_code}' "http://127.0.0.1:$port/resume?user=dieuwe")
-    [ "$code" = 200 ] || fail "resume httpd returned $code for dieuwe"
+    code=$(curl -sS -o "$tmp/resume.png" -w '%{http_code}' "http://127.0.0.1:$port/resume?user=king")
+    [ "$code" = 200 ] || fail "resume httpd returned $code for king"
     file "$tmp/resume.png" | grep -qi png || fail "resume httpd did not return a png"
     [ -f "$state/http-activated" ] || fail "resume httpd did not call the helper"
-    code=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/resume?user=amie")
+    code=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/resume?user=queen")
     [ "$code" = 404 ] || fail "resume httpd returned $code for a user with no session"
     kill $http_pid 2>/dev/null || true
     wait $http_pid 2>/dev/null || true
