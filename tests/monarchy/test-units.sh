@@ -42,8 +42,10 @@ for fn in monarchy_sync_omarchy_clone monarchy_link_working_prefix monarchy_rebu
     monarchy_reaches apply | grep -qx "$fn" || fail "apply no longer reaches $fn"
 done
 
-# Apply runs each unit's check before its apply, so a guard cannot be skipped
-# by using a bare apply instead of an update. One deliberate exception:
+# Apply runs each unit's apply and then its check, so a guard cannot be
+# skipped by using a bare apply instead of an update. The order is apply-then-
+# check because a unit's check is a postcondition: it asserts what that unit
+# just produced. Checking first aborts a fresh box. One deliberate exception:
 # monarchy_ensure_clone_for_check repoints MONARCHY_SRC at a user cache when no
 # clone exists, so that a dry run has something to read. During apply it would
 # make apply build from the cache instead of /usr/local/src.
@@ -63,5 +65,21 @@ if ( trap - EXIT; MONARCHY_ONLY=nosuchunit monarchy_assert_only_valid ) >/dev/nu
 fi
 MONARCHY_ONLY=sddm monarchy_assert_only_valid || fail "--only=sddm was rejected"
 grep -q -- '--only=' "$REPO/install.sh" || fail "install.sh does not accept --only"
+
+# A unit's check must run AFTER its own apply, not before.
+apply_body=$(awk '/^monarchy_apply\(\)/,/^}$/' "$LIB/update.sh")
+# shellcheck disable=SC2016  # grep patterns for literal ${u} in the source
+a_at=$(printf '%s\n' "$apply_body" | grep -n '"monarchy_${u}_apply"' | head -1 | cut -d: -f1 || true)
+# shellcheck disable=SC2016
+c_at=$(printf '%s\n' "$apply_body" | grep -n '"monarchy_${u}_check"' | head -1 | cut -d: -f1 || true)
+[ -n "$a_at" ] || fail "monarchy_apply does not call the unit apply verbs"
+[ -n "$c_at" ] || fail "monarchy_apply does not call the unit check verbs"
+[ "$a_at" -lt "$c_at" ] \
+    || fail "apply verifies before it acts; that aborts a fresh box on session and sddm"
+
+# The two checks that made this concrete: both assert on what their own unit
+# produces, so neither may be reachable before that unit's apply.
+grep -q 'NoDisplay=true' "$LIB/sessions.sh" \
+    || fail "monarchy_check_hidden_hyprland_sessions asserts NoDisplay but sessions.sh never writes it"
 
 echo "unit tests passed"

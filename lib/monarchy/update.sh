@@ -281,10 +281,19 @@ monarchy_apply() {
     monarchy_load_lock
     monarchy_load_inventories
     monarchy_snapshot_first
+    # Apply first, then verify. A unit's check is a postcondition: it asserts
+    # what that unit's apply is supposed to have produced. Checking first
+    # aborted every fresh box, because monarchy_check_hidden_hyprland_sessions
+    # requires the NoDisplay that monarchy_install_omarchy_session writes, and
+    # every converting box, because monarchy_assert_sddm_runtime refuses the
+    # plasma-login-manager that monarchy_keep_sddm removes.
+    #
+    # Host preconditions live in the guards unit, whose apply is a no-op, so
+    # they still run before anything is touched.
     for u in "${MONARCHY_UNITS[@]}"; do
         [ -z "${MONARCHY_ONLY:-}" ] || [ "$u" = "$MONARCHY_ONLY" ] || continue
-        "monarchy_${u}_check"
         "monarchy_${u}_apply"
+        "monarchy_${u}_check"
     done
     monarchy_log "apply complete${MONARCHY_ONLY:+ (only $MONARCHY_ONLY)}"
 }
