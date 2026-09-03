@@ -35,11 +35,68 @@ monarchy_seed_hypr_boot_color() {
     mkdir -p "$(dirname "$dest")"
     cp -a "$src" "$dest"
     [ -f "$hypr" ] || return 0
-    if grep -q 'hypr.boot-color' "$hypr"; then
-        return 0
-    fi
-    printf '\nrequire("hypr.boot-color")\n' >>"$hypr"
+    monarchy_seed_block "$hypr" boot-color 'hypr[.]boot-color' <<'EOF'
+require("hypr.boot-color")
+EOF
     monarchy_log "required hypr.boot-color from $hypr"
+}
+
+# Append a replaceable, marked block to a Lua config the user also edits.
+# Same shape as the [omarchy] block in pacman.sh: drop whatever sits between
+# the markers, then append the current text. Idempotent by construction, so
+# changing the body no longer needs a hand-written migration the way the
+# switch-user bind did when it gained locked = true.
+#
+# A block is also removable: step 5 hands these files to chezmoi, and a marked
+# block can be deleted from a box that an earlier apply wrote to.
+#
+#   monarchy_seed_block <file> <id> [legacy_regex] <<'EOF'
+#
+# legacy_regex, when given, drops matching unmarked lines left by an older
+# apply, so converting a box does not leave the line twice.
+monarchy_new_bindings_file() {
+    local dest=$1
+    mkdir -p "$(dirname "$dest")"
+    [ -f "$dest" ] \
+        || printf -- '-- Keep only your personal keybinding overrides here.\n' >"$dest"
+}
+
+monarchy_seed_block() {
+    local file=$1
+    local id=$2
+    local legacy=${3:-}
+    local begin="-- BEGIN monarchy: $id"
+    local end="-- END monarchy: $id"
+    local body tmp kept
+
+    body=$(cat)
+    mkdir -p "$(dirname "$file")"
+    [ -f "$file" ] || printf -- '-- Keep only your personal overrides here.\n' >"$file"
+
+    tmp=$(mktemp)
+    # Removing a block from the middle of the file leaves the blank line that
+    # preceded it, and the replacement is appended at the end. Without
+    # squeezing, every apply would add one blank line per block.
+    kept=$(awk -v b="$begin" -v e="$end" -v legacy="$legacy" '
+        $0 == b { skip = 1; next }
+        $0 == e { skip = 0; next }
+        skip { next }
+        legacy != "" && $0 ~ legacy { next }
+        /^[[:space:]]*$/ { blank++; next }
+        { if (blank && NR > blank) print ""; blank = 0; print }
+    ' "$file")
+    # $(...) drops trailing newlines, so the block cannot accrue blank lines
+    # ahead of it on every apply.
+    printf '%s\n\n%s\n%s\n%s\n' "$kept" "$begin" "$body" "$end" >"$tmp"
+    mv "$tmp" "$file"
+}
+
+# True when the file carries a monarchy block with this id.
+monarchy_has_block() {
+    local file=$1
+    local id=$2
+    [ -f "$file" ] || return 1
+    grep -Fqx -- "-- BEGIN monarchy: $id" "$file"
 }
 
 monarchy_seed_branding() {
@@ -223,29 +280,14 @@ monarchy_user_theme() {
 
 monarchy_seed_switch_user_bind() {
     local dest="$HOME/.config/hypr/bindings.lua"
-    local bind='o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user", { locked = true })'
-    mkdir -p "$(dirname "$dest")"
-    [ -f "$dest" ] || printf -- '-- Keep only your personal keybinding overrides here.\n' >"$dest"
-    if grep -Fq "$bind" "$dest" 2>/dev/null; then
-        return 0
-    fi
-    if grep -q 'monarchy-switch-user' "$dest" 2>/dev/null; then
-        # Prior seed omitted locked=true. Hyprland drops unlocked binds while
-        # ext-session-lock is held, so Super+Ctrl+U on the lock screen did nothing.
-        local tmp
-        tmp=$(mktemp)
-        awk -v bind="$bind" '
-            /monarchy-switch-user/ && /o\.bind\(/ { print bind; next }
-            { print }
-        ' "$dest" >"$tmp"
-        mv "$tmp" "$dest"
-        monarchy_log "upgraded Super+Ctrl+U switch-user bind to locked in $dest"
-        return 0
-    fi
-    cat >>"$dest" <<EOF
-
--- Switch user: lock, then SDDM greeter. locked=true so the chord works on the lock screen.
-$bind
+    monarchy_new_bindings_file "$dest"
+    # The legacy pattern also catches a pre-block seed that lacked
+    # locked = true, so the bind is replaced rather than duplicated.
+    monarchy_seed_block "$dest" switch-user \
+        'monarchy-switch-user|^-- Switch user: lock, then SDDM' <<'EOF'
+-- Lock, then the SDDM greeter. locked = true so the chord also works while
+-- ext-session-lock is held; Hyprland drops unlocked binds on the lock screen.
+o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user", { locked = true })
 EOF
     monarchy_log "seeded Super+Ctrl+U switch-user bind in $dest"
 }
@@ -272,28 +314,25 @@ monarchy_drop_webapps() {
 monarchy_seed_hypr_unbind() {
     local dest="$HOME/.config/hypr/bindings.lua"
     local chord=$1
-    local line="hl.unbind(\"$chord\")"
-    mkdir -p "$(dirname "$dest")"
-    [ -f "$dest" ] || printf -- '-- Keep only your personal keybinding overrides here.\n' >"$dest"
-    grep -Fq "$line" "$dest" 2>/dev/null && return 0
-    printf '\n%s\n' "$line" >>"$dest"
+    local slug chord_re
+    slug=$(printf '%s' "$chord" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//')
+    # A chord is full of + signs, which are quantifiers in an ERE.
+    chord_re=${chord//+/[+]}
+    monarchy_new_bindings_file "$dest"
+    monarchy_seed_block "$dest" "unbind-$slug" "^hl[.]unbind[(]\"$chord_re\"[)]\$" <<EOF
+hl.unbind("$chord")
+EOF
     monarchy_log "unbound $chord in $dest"
 }
 
 monarchy_seed_emacs_bind() {
     local dest="$HOME/.config/hypr/bindings.lua"
-    local unbind='hl.unbind("SUPER + SHIFT + E")'
-    local bind='o.bind("SUPER + SHIFT + E", "Emacs", "emacsclient -c --no-wait")'
-    mkdir -p "$(dirname "$dest")"
-    [ -f "$dest" ] || printf -- '-- Keep only your personal keybinding overrides here.\n' >"$dest"
-    if grep -Fq "$bind" "$dest" 2>/dev/null; then
-        return 0
-    fi
-    cat >>"$dest" <<EOF
-
--- Omarchy default is HEY email. Dieuwe uses emacsclient.
-$unbind
-$bind
+    monarchy_new_bindings_file "$dest"
+    monarchy_seed_block "$dest" emacs-bind \
+        'SUPER [+] SHIFT [+] E"|^-- Omarchy default is HEY email' <<'EOF'
+-- Omarchy binds this chord to HEY email. This box uses emacsclient.
+hl.unbind("SUPER + SHIFT + E")
+o.bind("SUPER + SHIFT + E", "Emacs", "emacsclient -c --no-wait")
 EOF
     monarchy_log "seeded Super+Shift+E emacsclient bind in $dest"
 }
@@ -302,9 +341,8 @@ monarchy_seed_kwallet_autostart() {
     local dest="$HOME/.config/hypr/autostart.lua"
     mkdir -p "$(dirname "$dest")"
     [ -f "$dest" ] || printf -- '-- Extra autostart processes.\n' >"$dest"
-    grep -q pam_kwallet_init "$dest" 2>/dev/null && return 0
-    cat >>"$dest" <<'EOF'
-
+    monarchy_seed_block "$dest" kwallet \
+        'pam_kwallet_init|^-- Unlock KWallet' <<'EOF'
 -- Unlock KWallet so NetworkManager can use Wi-Fi secrets saved under Plasma.
 o.launch_on_start("/usr/lib/pam_kwallet_init")
 EOF
@@ -327,8 +365,7 @@ monarchy_seed_capslock() {
         fi
     fi
 
-    cat >>"$dest" <<'EOF'
-
+    monarchy_seed_block "$dest" capslock <<'EOF'
 -- Caps Lock is Caps Lock. Omarchy's default (compose:caps) remaps it to Compose.
 hl.config({
   input = {

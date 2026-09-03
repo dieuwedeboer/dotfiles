@@ -131,4 +131,45 @@ monarchy_seed_hypr_boot_color
 n=$(grep -c 'hypr.boot-color' "$hypr")
 [ "$n" -eq 1 ] || fail "boot-color require is not idempotent ($n)"
 
+# Marked blocks must be idempotent by construction, and must migrate a box an
+# older apply already wrote to rather than duplicating the line. The switch-user
+# bind below is the pre-block form that lacked locked = true.
+blk=$HOME/.config/hypr/bindings.lua
+mkdir -p "$(dirname "$blk")"
+cat >"$blk" <<'LUA'
+-- Keep only your personal keybinding overrides here.
+o.bind("SUPER + F1", "Mine", "true")
+
+-- Switch user: lock, then SDDM greeter. locked=true so the chord works on the lock screen.
+o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user")
+
+-- Omarchy default is HEY email. Someone uses emacsclient.
+hl.unbind("SUPER + SHIFT + E")
+o.bind("SUPER + SHIFT + E", "Emacs", "emacsclient -c --no-wait")
+
+hl.unbind("SUPER + SHIFT + ALT + E")
+LUA
+
+seed_all() {
+    monarchy_seed_switch_user_bind >/dev/null
+    monarchy_seed_emacs_bind >/dev/null
+    monarchy_seed_hypr_unbind "SUPER + SHIFT + ALT + E" >/dev/null
+}
+seed_all
+first=$(md5sum <"$blk")
+seed_all
+seed_all
+[ "$(md5sum <"$blk")" = "$first" ] || fail "seeded blocks are not byte-stable across applies"
+
+grep -Fqx -- '-- BEGIN monarchy: switch-user' "$blk" || fail "no switch-user marker"
+grep -Fqx -- '-- END monarchy: switch-user' "$blk" || fail "unterminated switch-user marker"
+[ "$(grep -c 'monarchy-switch-user' "$blk")" -eq 1 ] \
+    || fail "legacy switch-user bind was duplicated instead of migrated"
+grep -q 'locked = true' "$blk" || fail "migrated bind lost locked = true"
+[ "$(grep -c 'emacsclient -c' "$blk")" -eq 1 ] \
+    || fail "legacy emacs bind was duplicated instead of migrated"
+[ "$(grep -c 'SUPER + SHIFT + ALT + E' "$blk")" -eq 1 ] \
+    || fail "legacy unbind was duplicated; chord + is being read as a quantifier"
+[ "$(grep -c 'SUPER + F1' "$blk")" -eq 1 ] || fail "seeding removed the user's own bind"
+
 echo "user tests passed"
