@@ -25,3 +25,17 @@ fail() {
     echo "$TEST_NAME: $*" >&2
     exit 1
 }
+
+
+# The clone is the thing most of these tests compare the overlay against.
+# test-overlay.sh has always required it; without this the lock and
+# switch-user tests skip their drift checks and still print "passed", which
+# is worse than not running them.
+require_clone() {
+    local clone=${1:-$MONARCHY_SRC_DEFAULT}
+    [ -d "$clone" ] \
+        || fail "no clone at $clone; run ./install.sh --check first, or pass one as \$1"
+    printf '%s\n' "$clone"
+}
+
+MONARCHY_SRC_DEFAULT="${MONARCHY_SRC:-/usr/local/src/monarchy/omarchy}"

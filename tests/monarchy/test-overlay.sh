@@ -12,8 +12,8 @@ source "$LIB/denylist.sh"
 # shellcheck source=../../lib/monarchy/overlay.sh
 source "$LIB/overlay.sh"
 
-CLONE=${1:-${MONARCHY_SRC:-/tmp/quattro-on-zfs}}
-[ -d "$CLONE/bin" ] || { echo "need a quattro-on-zfs checkout with bin/" >&2; exit 2; }
+CLONE=$(require_clone "${1:-}")
+[ -d "$CLONE/bin" ] || fail "clone at $CLONE has no bin/"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

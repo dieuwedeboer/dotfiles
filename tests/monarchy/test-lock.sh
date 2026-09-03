@@ -20,16 +20,16 @@ if grep -qx 'omarchy-apply-lock' "$MISC/bin.deny"; then
     fail "omarchy-apply-lock is denied"
 fi
 
-clone="${MONARCHY_SRC:-/usr/local/src/monarchy/omarchy}"
-if [ -f "$clone/bin/omarchy-apply-lock" ]; then
-    grep -q '/etc/pam.d/omarchy-lock-password' "$clone/bin/omarchy-apply-lock" \
-        || fail "omarchy-apply-lock does not write omarchy-lock-password"
-fi
-if [ -f "$clone/shell/plugins/lock/Service.qml" ]; then
-    grep -q 'config: "omarchy-lock-password"' "$clone/shell/plugins/lock/Service.qml" \
-        || fail "lock plugin PAM config name drifted"
-    grep -q 'path: "/etc/pam.d/omarchy-lock-password"' "$clone/shell/plugins/lock/Service.qml" \
-        || fail "lock plugin PAM path drifted"
-fi
+clone=$(require_clone)
+[ -f "$clone/bin/omarchy-apply-lock" ] || fail "clone has no bin/omarchy-apply-lock"
+grep -q '/etc/pam.d/omarchy-lock-password' "$clone/bin/omarchy-apply-lock" \
+    || fail "omarchy-apply-lock does not write omarchy-lock-password"
+
+service="$clone/shell/plugins/lock/Service.qml"
+[ -f "$service" ] || fail "clone has no lock plugin Service.qml"
+grep -q 'config: "omarchy-lock-password"' "$service" \
+    || fail "lock plugin PAM config name drifted"
+grep -q 'path: "/etc/pam.d/omarchy-lock-password"' "$service" \
+    || fail "lock plugin PAM path drifted"
 
 echo "lock tests passed"
