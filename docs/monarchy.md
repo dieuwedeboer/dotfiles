@@ -147,7 +147,28 @@ monarchy-update        # after that: snapshot, fetch, check, apply
 
 Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. That helper hard-codes `zpcachyos/ROOT/cos`. If it is missing or still has the varlog-only prune, apply installs the current copy from this repo, then asserts a `@pre-update-*` exists on `zpcachyos/ROOT/cos/root`. The pacman hook uses that installed helper.
 
-`monarchy_apply` order: snapshot, guards, clone, working prefix, overlay, lock/menu patch, switch-user helper, `/etc/omarchy.conf`, `[omarchy]` repo, leaf packages, settings files, a short list of clone `install/config/*.sh`, SDDM, lock PAM, session desktop, logind, UWSM env, portals, king user setup, mime assert, Plymouth.
+Both `monarchy_check` and `monarchy_apply` walk one ordered array:
+
+```bash
+MONARCHY_UNITS=(guards clone overlay pacman settings sddm session logind portals user splash)
+```
+
+Each unit has a `check` verb and an `apply` verb. Check runs every unit's check.
+Apply runs each unit's check and then its apply, so a guard cannot be skipped by
+using a bare apply instead of an update — which is exactly how the two
+inventory guards went missing when these were two hand-maintained lists.
+
+The array is the ordering constraint, and it is the one thing to read before
+editing: clone before overlay, overlay before pacman, user before splash.
+
+`--only=<unit>` runs a single unit, in check or apply. There is no canary box
+and `zfs-snapshot-pre-update` keeps three snapshots, so a full apply is an
+expensive way to iterate on one subsystem. An unknown name is an error, not a
+silent no-op.
+
+`monarchy_ensure_clone_for_check` is the one thing outside the units. It
+repoints `MONARCHY_SRC` at a user cache when no clone exists so a dry run has
+something to read, which must never happen during apply.
 
 King-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, Super+Ctrl+U bind, Super+Shift+E emacsclient (replaces HEY), unbind leftover HEY calendar/compose chords, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), drop `monarchy/applications.drop` (Basecamp, HEY), `omarchy-pkg-add` of spotify, signal-desktop, cursor-bin, cursor-cli, omakade, `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland` plus `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
 

@@ -10,9 +10,8 @@ source "$TEST_DIR/../helpers.sh"
 
 # The bug: monarchy_apply never ran install/config/lockscreen-pam.sh
 # (one line: omarchy-apply-lock). Service.qml then logs lock-denied: missing-pam.
-apply_body=$(awk '/^monarchy_apply\(\)/,/^monarchy_update\(\)/' "$LIB/update.sh")
-echo "$apply_body" | grep -q 'monarchy_apply_lock' \
-    || fail "monarchy_apply does not call monarchy_apply_lock"
+monarchy_reaches apply | grep -qx 'monarchy_apply_lock' \
+    || fail "apply does not reach monarchy_apply_lock"
 
 grep -qx 'omarchy-apply-lock' "$MISC/bin.allow" \
     || fail "omarchy-apply-lock missing from bin.allow"

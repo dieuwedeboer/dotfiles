@@ -18,6 +18,10 @@ for arg in "$@"; do
             fi
             ;;
         --splash-only) MODE=splash ;;
+        --only=*)
+            MONARCHY_ONLY=${arg#--only=}
+            export MONARCHY_ONLY
+            ;;
         -h|--help)
             cat <<'EOF'
 usage: install.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
@@ -31,6 +35,9 @@ usage: install.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
   --update        Monarchy snapshot, fetch, check, then apply.
   --no-packages   Monarchy apply without pacman leaf packages.
   --splash-only   Omarchy Plymouth theme, plymouth around zfs, retain-splash.
+  --only=<unit>   Run one unit only. Combines with --check and --update.
+                  Units: guards clone overlay pacman settings sddm session
+                  logind portals user splash
 
   After the first install, /usr/local/bin/monarchy-update is this file
   with --update. omarchy-update (Omarchy menu) wraps that.

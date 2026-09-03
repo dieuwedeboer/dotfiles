@@ -83,8 +83,8 @@ if grep -qx 'omarchy-refresh-sddm' "$MISC/bin.deny"; then
     fail "omarchy-refresh-sddm is still denied"
 fi
 
-apply_body=$(awk '/^monarchy_apply\(\)/,/^monarchy_update\(\)/' "$LIB/update.sh")
-echo "$apply_body" | grep -q 'monarchy_keep_sddm' \
+apply_body=$(monarchy_reaches apply)
+printf '%s\n' "$apply_body" | grep -qx 'monarchy_keep_sddm' \
     || fail "monarchy_apply does not call monarchy_keep_sddm"
 install_body=$(awk '/^monarchy_install_omarchy_session\(\)/,/^}$/' "$LIB/sessions.sh")
 echo "$install_body" | grep -q 'monarchy_hide_stock_hyprland_sessions' \
@@ -96,18 +96,18 @@ if grep -q 'print "Hidden=true"' "$LIB/sessions.sh"; then
 fi
 grep -q 'is Hidden=true' "$LIB/sessions.sh" \
     || fail "hide must refuse a Hidden=true hyprland.desktop"
-echo "$apply_body" | grep -q 'monarchy_splash_maybe_theme' \
+printf '%s\n' "$apply_body" | grep -qx 'monarchy_splash_maybe_theme' \
     || fail "monarchy_apply does not call monarchy_splash_maybe_theme"
-echo "$apply_body" | grep -q 'monarchy_keep_plasmalogin' \
+printf '%s\n' "$apply_body" | grep -qx 'monarchy_keep_plasmalogin' \
     && fail "monarchy_apply still calls monarchy_keep_plasmalogin"
 
-check_body=$(awk '/^monarchy_check\(\)/,/^monarchy_apply_lock\(\)/' "$LIB/update.sh")
-echo "$check_body" | grep -q 'monarchy_assert_sddm_runtime' \
-    || fail "monarchy_check does not call monarchy_assert_sddm_runtime"
-echo "$check_body" | grep -q 'monarchy_check_hidden_hyprland_sessions' \
-    || fail "monarchy_check does not assert stock Hyprland sessions are hidden"
-echo "$check_body" | grep -q 'monarchy_keep_plasmalogin' \
-    && fail "monarchy_check still calls monarchy_keep_plasmalogin"
+check_body=$(monarchy_reaches check)
+printf '%s\n' "$check_body" | grep -qx 'monarchy_assert_sddm_runtime' \
+    || fail "check does not reach monarchy_assert_sddm_runtime"
+printf '%s\n' "$check_body" | grep -qx 'monarchy_check_hidden_hyprland_sessions' \
+    || fail "check does not assert stock Hyprland sessions are hidden"
+printf '%s\n' "$check_body" | grep -qx 'monarchy_keep_plasmalogin' \
+    && fail "check still reaches monarchy_keep_plasmalogin"
 
 grep -q 'monarchy_sddm_sync_assets' "$LIB/splash.sh" \
     || fail "plymouth-set does not sync SDDM"

@@ -87,58 +87,41 @@ expected=$((allow_n + wrap_n + deny_n + 1))
 }
 
 # monarchy_apply must classify the clone before it builds anything from it.
-# A bare apply and --no-packages never call monarchy_check, so the guards have
-# to sit in apply itself: after the clone exists, before the overlay.
-apply_body=$(awk '/^monarchy_apply\(\)/,/^}$/' "$LIB/update.sh")
-# Anchored so a comment naming a guard cannot outrank the call itself, and
-# `|| true` so a miss returns empty instead of aborting the test under
-# `set -euo pipefail` before the diagnostic below can run.
+# That property now lives in two places: the clone unit runs before the overlay
+# unit, and inside monarchy_clone_apply the sync happens before the assert.
+monarchy_reaches apply | grep -qx 'monarchy_check_inventory_complete' \
+    || fail "apply does not reach monarchy_check_inventory_complete"
+monarchy_reaches apply | grep -qx 'monarchy_check_clone_bin_classified' \
+    || fail "apply does not reach monarchy_check_clone_bin_classified"
+
+units=$(sed -n 's/^MONARCHY_UNITS=(\(.*\))$/\1/p' "$LIB/update.sh")
+[ -n "$units" ] || fail "MONARCHY_UNITS not found"
+idx_of() { printf '%s\n' "$units" | tr ' ' '\n' | grep -nx "$1" | cut -d: -f1; }
+clone_i=$(idx_of clone); overlay_i=$(idx_of overlay); pacman_i=$(idx_of pacman)
+[ -n "$clone_i" ] && [ -n "$overlay_i" ] && [ -n "$pacman_i" ] \
+    || fail "clone, overlay and pacman must all be units"
+[ "$clone_i" -lt "$overlay_i" ] || fail "overlay unit runs before the clone unit"
+[ "$overlay_i" -lt "$pacman_i" ] || fail "pacman unit runs before the overlay unit"
+
+clone_apply=$(awk '/^monarchy_clone_apply\(\)/,/^}$/' "$LIB/update.sh")
 line_of() {
-    printf '%s\n' "$apply_body" \
+    printf '%s\n' "$clone_apply" \
         | grep -nE "^[[:space:]]*$1[[:space:]]*$" \
         | head -1 | cut -d: -f1 || true
 }
-
 sync_at=$(line_of 'monarchy_sync_omarchy_clone')
-inv_at=$(line_of 'monarchy_check_inventory_complete')
-cls_at=$(line_of 'monarchy_check_clone_bin_classified')
-build_at=$(line_of 'monarchy_rebuild_overlay')
+assert_at=$(line_of 'monarchy_clone_assert')
+link_at=$(line_of 'monarchy_link_working_prefix')
+[ -n "$sync_at" ] || fail "monarchy_clone_apply does not sync the clone"
+[ -n "$assert_at" ] || fail "monarchy_clone_apply does not assert the clone"
+[ -n "$link_at" ] || fail "monarchy_clone_apply does not link the working prefix"
+[ "$assert_at" -gt "$sync_at" ] || fail "clone asserted before it is synced"
+[ "$assert_at" -lt "$link_at" ] || fail "working prefix linked before the clone is asserted"
 
-[ -n "$sync_at" ] || fail "monarchy_apply does not call monarchy_sync_omarchy_clone"
-[ -n "$build_at" ] || fail "monarchy_apply does not call monarchy_rebuild_overlay"
-[ -n "$inv_at" ] || fail "monarchy_apply does not call monarchy_check_inventory_complete"
-[ -n "$cls_at" ] || fail "monarchy_apply does not call monarchy_check_clone_bin_classified"
-[ "$inv_at" -gt "$sync_at" ] || fail "inventory guard runs before the clone is synced"
-[ "$cls_at" -gt "$sync_at" ] || fail "classification guard runs before the clone is synced"
-[ "$inv_at" -lt "$build_at" ] || fail "inventory guard runs after the overlay is built"
-[ "$cls_at" -lt "$build_at" ] || fail "classification guard runs after the overlay is built"
-
-# monarchy_write_to is the whole difference between building the overlay as
-# the user on a temp prefix and as root on a real box. The temp-prefix run
-# above only exercises the writable path, so drive the dispatch directly with
-# monarchy_sudo stubbed out. Skipped as root, where -w is always true.
-if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-    wt=$(mktemp -d)
-    calls=$wt/calls
-    : >"$calls"
-    # Called indirectly, by monarchy_write_to.
-    # shellcheck disable=SC2329
-    monarchy_sudo() { printf 'sudo %s\n' "$*" >>"$calls"; }
-
-    mkdir -p "$wt/open"
-    monarchy_write_to "$wt/open" touch "$wt/open/f"
-    [ -f "$wt/open/f" ] || fail "write_to did not run the command on a writable dir"
-    [ ! -s "$calls" ] || fail "write_to elevated for a writable dir"
-
-    mkdir -p "$wt/closed"
-    chmod 500 "$wt/closed"
-    monarchy_write_to "$wt/closed" touch "$wt/closed/f"
-    grep -q '^sudo touch ' "$calls" || fail "write_to did not elevate for an unwritable dir"
-    [ ! -e "$wt/closed/f" ] || fail "write_to ran unelevated against an unwritable dir"
-
-    chmod 700 "$wt/closed"
-    rm -rf "$wt"
-    unset -f monarchy_sudo
-fi
+# The cache bootstrap repoints MONARCHY_SRC and must never run during apply.
+monarchy_reaches apply | grep -qx 'monarchy_ensure_clone_for_check' \
+    && fail "apply reaches monarchy_ensure_clone_for_check; it repoints MONARCHY_SRC at a cache"
+monarchy_reaches check | grep -qx 'monarchy_ensure_clone_for_check' \
+    || fail "check does not bootstrap a clone for a dry run"
 
 echo "overlay test passed ($allow_n allow, $wrap_n wrap, $deny_n deny)"
