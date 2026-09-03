@@ -90,13 +90,22 @@ expected=$((allow_n + wrap_n + deny_n + 1))
 # A bare apply and --no-packages never call monarchy_check, so the guards have
 # to sit in apply itself: after the clone exists, before the overlay.
 apply_body=$(awk '/^monarchy_apply\(\)/,/^}$/' "$LIB/update.sh")
-line_of() { printf '%s\n' "$apply_body" | grep -n "$1" | head -1 | cut -d: -f1; }
+# Anchored so a comment naming a guard cannot outrank the call itself, and
+# `|| true` so a miss returns empty instead of aborting the test under
+# `set -euo pipefail` before the diagnostic below can run.
+line_of() {
+    printf '%s\n' "$apply_body" \
+        | grep -nE "^[[:space:]]*$1[[:space:]]*$" \
+        | head -1 | cut -d: -f1 || true
+}
 
 sync_at=$(line_of 'monarchy_sync_omarchy_clone')
 inv_at=$(line_of 'monarchy_check_inventory_complete')
 cls_at=$(line_of 'monarchy_check_clone_bin_classified')
 build_at=$(line_of 'monarchy_rebuild_overlay')
 
+[ -n "$sync_at" ] || fail "monarchy_apply does not call monarchy_sync_omarchy_clone"
+[ -n "$build_at" ] || fail "monarchy_apply does not call monarchy_rebuild_overlay"
 [ -n "$inv_at" ] || fail "monarchy_apply does not call monarchy_check_inventory_complete"
 [ -n "$cls_at" ] || fail "monarchy_apply does not call monarchy_check_clone_bin_classified"
 [ "$inv_at" -gt "$sync_at" ] || fail "inventory guard runs before the clone is synced"
