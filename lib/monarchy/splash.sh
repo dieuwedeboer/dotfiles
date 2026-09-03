@@ -182,7 +182,7 @@ monarchy_plymouth_set() {
         "$staging_dir/omarchy.script"
     local asset
     for asset in bullet.png entry.png lock.png progress_bar.png; do
-        magick "$staging_dir/$asset" -channel RGB +level-colors "#$text_hex","#$text_hex" "$staging_dir/$asset"
+        magick "$staging_dir/$asset" -channel RGB +level-colors "#$text_hex,#$text_hex" "$staging_dir/$asset"
     done
     monarchy_sudo mkdir -p "$dest"
     monarchy_sudo cp -a --no-preserve=mode,ownership "$staging_dir/." "$dest/"
@@ -190,7 +190,7 @@ monarchy_plymouth_set() {
     monarchy_splash_rebuild
     local fail_asset
     for fail_asset in entry lock; do
-        magick "$staging_dir/${fail_asset}.png" -channel RGB +level-colors "#f7768e","#f7768e" \
+        magick "$staging_dir/${fail_asset}.png" -channel RGB +level-colors "#f7768e,#f7768e" \
             "$staging_dir/${fail_asset}-failed.png"
     done
     monarchy_sddm_sync_assets "$staging_dir" "$bg_hex" "$text_hex"

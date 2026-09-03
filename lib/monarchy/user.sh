@@ -1,4 +1,6 @@
 # shellcheck shell=bash
+# Sourced into one shell by lib/monarchy.sh; common.sh state is in scope.
+# shellcheck disable=SC2153
 
 monarchy_copy_if_missing() {
     local src=$1
@@ -99,9 +101,10 @@ monarchy_sync_emacs_theme_repo() {
     export GIT_TERMINAL_PROMPT=0
     mkdir -p "$(dirname "$dest")"
     if [ -d "$dest/.git" ]; then
-        git -C "$dest" fetch --quiet origin \
-            && git -C "$dest" pull --ff-only --quiet \
-            || monarchy_log "warning: could not update $dest"
+        if ! { git -C "$dest" fetch --quiet origin \
+            && git -C "$dest" pull --ff-only --quiet; }; then
+            monarchy_log "warning: could not update $dest"
+        fi
         return 0
     fi
     if [ -e "$dest" ]; then

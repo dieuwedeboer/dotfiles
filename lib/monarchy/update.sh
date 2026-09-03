@@ -1,4 +1,6 @@
 # shellcheck shell=bash
+# Sourced into one shell by lib/monarchy.sh; common.sh state is in scope.
+# shellcheck disable=SC2154,SC2153
 
 monarchy_check_migrations() {
     local dir="$MONARCHY_SRC/migrations"

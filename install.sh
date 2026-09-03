@@ -10,6 +10,8 @@ for arg in "$@"; do
         --check) MODE=check ;;
         --update) MODE=update ;;
         --no-packages)
+            # read by monarchy_install_packages and monarchy_keep_sddm
+            # shellcheck disable=SC2034
             MONARCHY_NO_PACKAGES=1
             if [ "$MODE" = full ]; then
                 MODE=apply

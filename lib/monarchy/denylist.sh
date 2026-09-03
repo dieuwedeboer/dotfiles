@@ -1,4 +1,6 @@
 # shellcheck shell=bash
+# The arrays below are read by overlay.sh, packages.sh and update.sh.
+# shellcheck disable=SC2034
 
 monarchy_load_list() {
     local file=$1

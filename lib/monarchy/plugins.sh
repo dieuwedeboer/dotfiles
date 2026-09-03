@@ -1,4 +1,6 @@
 # shellcheck shell=bash
+# Sourced into one shell by lib/monarchy.sh; common.sh state is in scope.
+# shellcheck disable=SC2153
 
 monarchy_plugin_user_dir() {
     printf '%s\n' "$HOME/.config/omarchy/plugins"

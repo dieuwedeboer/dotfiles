@@ -1,4 +1,6 @@
 # shellcheck shell=bash
+# Sourced into one shell by lib/monarchy.sh; common.sh state is in scope.
+# shellcheck disable=SC2154
 # SDDM as the household greeter. Stock Omarchy theme + Unlock, Monarchy Main.qml
 # overlay for multi-user. Never autologin. Never leave plasma-login-manager
 # installed next to sddm. The session theme does not restyle the greeter.
@@ -317,12 +319,12 @@ monarchy_sddm_apply_theme() {
     if command -v magick >/dev/null 2>&1 && [ -f "$src_ply/bullet.png" ]; then
         for asset in bullet.png entry.png lock.png; do
             [ -f "$src_ply/$asset" ] || continue
-            magick "$src_ply/$asset" -channel RGB +level-colors "#$text_hex","#$text_hex" \
+            magick "$src_ply/$asset" -channel RGB +level-colors "#$text_hex,#$text_hex" \
                 "$staging_dir/$asset"
         done
         for asset in entry lock; do
             [ -f "$staging_dir/${asset}.png" ] || continue
-            magick "$staging_dir/${asset}.png" -channel RGB +level-colors "#f7768e","#f7768e" \
+            magick "$staging_dir/${asset}.png" -channel RGB +level-colors "#f7768e,#f7768e" \
                 "$staging_dir/${asset}-failed.png"
         done
     fi

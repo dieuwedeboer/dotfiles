@@ -49,7 +49,10 @@ monarchy_load_lock() {
     MONARCHY_LOCK_REMOTE=$(awk -F= '$1=="remote"{print substr($0,index($0,"=")+1)}' "$lock")
     MONARCHY_LOCK_BRANCH=$(awk -F= '$1=="branch"{print substr($0,index($0,"=")+1)}' "$lock")
     MONARCHY_LOCK_COMMIT=$(awk -F= '$1=="commit"{print substr($0,index($0,"=")+1)}' "$lock")
+    # Recorded in the lock for operators to read; no code consumes them yet.
+    # shellcheck disable=SC2034
     MONARCHY_LOCK_HYPRLAND=$(awk -F= '$1=="hyprland"{print substr($0,index($0,"=")+1)}' "$lock")
+    # shellcheck disable=SC2034
     MONARCHY_LOCK_QUICKSHELL=$(awk -F= '$1=="quickshell"{print substr($0,index($0,"=")+1)}' "$lock")
     [ -n "$MONARCHY_LOCK_REMOTE" ] || monarchy_die "omarchy.lock missing remote"
     [ -n "$MONARCHY_LOCK_BRANCH" ] || monarchy_die "omarchy.lock missing branch"

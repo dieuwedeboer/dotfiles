@@ -59,7 +59,7 @@ while read -r sid _ name _; do
     [ -n "$sid" ] || continue
     [ "$name" = "$user" ] || continue
     dump=$($LOGINCTL show-session "$sid" 2>/dev/null) || continue
-    class= type= seat= state= ts=
+    class='' type='' seat='' state='' ts=''
     while IFS= read -r line; do
         case "$line" in
             Class=*) class=${line#Class=} ;;
