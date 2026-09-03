@@ -1,6 +1,6 @@
 # Monarchy install
 
-Omarchy Quattro as a second Wayland session on a CachyOS+ZFS+KDE box. `./install.sh` is the one-shot path: packages, chezmoi, hardware, ZFS, then Monarchy apply. Plasma stays the family default. Dieuwe picks Omarchy at the greeter.
+Omarchy Quattro as a second Wayland session on a CachyOS+ZFS+KDE box. `./install.sh` is the one-shot path: packages, chezmoi, hardware, ZFS, then Monarchy apply. Plasma stays the family default. The king picks Omarchy at the greeter.
 
 ## Where to run it
 
@@ -22,7 +22,7 @@ Any machine that followed the README Calamares path (CachyOS, encrypted ZFS, KDE
 
 `--check` is Monarchy only (dry-run). Bare `./install.sh` is the full setup, including Monarchy apply. Prompts once to locally sign the Omarchy packaging key unless `MONARCHY_TRUST_OMARCHY_KEY=1`. If pacman asks for a `totem-plparser` provider, take the default (`cachyos-extra-v3`).
 
-5. Reboot. SDDM is now the greeter (Omarchy theme). Tab cycles users, Up/Down cycles sessions. Family accounts default to Plasma. Dieuwe defaults to Omarchy.
+5. Reboot. SDDM is now the greeter (Omarchy theme). Tab cycles users, Up/Down cycles sessions. Queen and kid accounts default to Plasma. The king defaults to Omarchy.
 
 ## Existing machine
 
@@ -39,7 +39,7 @@ Optional dry-run first:
 
 What changes:
 
-- SDDM replaces plasma-login-manager. Family picker defaults to Plasma. Dieuwe defaults to Omarchy.
+- SDDM replaces plasma-login-manager. Family picker defaults to Plasma. The king defaults to Omarchy.
 - The power key is ignored. A Bluetooth headset KEY_POWER has shut a host down. Shutdown is the System menu.
 - Plymouth sits before zfs when `/etc/zfs/zroot.key` is in FILES. The ZBM passphrase is untouched.
 - Hardware modules self-gate. kingfisher's Gigabyte B550 gets OpenRGB, it87, CoolerControl, GPP0 wakeup. An HP ZBook gets the battery helper. bonw9 gets tccd.
@@ -91,7 +91,7 @@ If the host has no `/etc/zfs/zroot.key`, plymouth stays after zfs and the mkinit
 
 ## Family greeter
 
-SDDM runs the Omarchy theme with a Monarchy overlay. Tab cycles users. Up/Down cycles sessions. amie and olivier default to Plasma. Dieuwe defaults to Omarchy. Do not enable autologin. Do not write `/var/lib/sddm/state.conf`. SDDM does not remember last session per user. Those static defaults are the picker.
+SDDM runs the Omarchy theme with a Monarchy overlay. Tab cycles users. Up/Down cycles sessions. Queen and kid accounts default to Plasma. The king defaults to Omarchy. Do not enable autologin. Do not write `/var/lib/sddm/state.conf`. SDDM does not remember last session per user. Those static defaults are the picker.
 
 ## After apply
 

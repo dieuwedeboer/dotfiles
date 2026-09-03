@@ -1,21 +1,5 @@
 # shellcheck shell=bash
 
-monarchy_migration_denied() {
-    local file=$1
-    local base
-    base=$(basename "$file")
-    monarchy_in_list "$base" "${MONARCHY_MIGRATE_DENY[@]}" && return 0
-    if grep -Eq 'limine-mkinitcpio|omarchy-refresh-pacman|use_omarchy_pacman_config|/etc/os-release|nvidia-dkms' "$file" 2>/dev/null; then
-        if grep -Eq 'systemctl enable sddm|sddm\.conf' "$file" 2>/dev/null; then
-            return 0
-        fi
-        if grep -Eq 'limine-mkinitcpio|omarchy-refresh-pacman|use_omarchy_pacman_config' "$file" 2>/dev/null; then
-            return 0
-        fi
-    fi
-    return 1
-}
-
 monarchy_check_migrations() {
     local dir="$MONARCHY_SRC/migrations"
     [ -d "$dir" ] || return 0

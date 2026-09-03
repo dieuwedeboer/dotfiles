@@ -1,6 +1,6 @@
 # ZBook 14u G6 fingerprint reader
 
-- **Author:** Dieuwe
+- **Author:** the king
 - **Date:** 2026-08-29
 - **Status:** plan. Not scheduled. Not a Monarchy feature.
 - **Audience:** anyone about to wire `fprintd` or Omarchy fingerprint setup on zbook
@@ -74,7 +74,7 @@ Omarchy lock already has a separate fingerprint PAM flow (`shell/plugins/lock/Se
 
 ---
 
-## If Dieuwe still wants it
+## If the king still wants it
 
 Gate every later step on the USB ID. Wrong ID means stop; that is a different chip and a different plan.
 

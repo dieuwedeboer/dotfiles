@@ -1,6 +1,6 @@
 # Monarchy
 
-Omarchy Quattro as a second Wayland session on CachyOS+ZFS+KDE. Plasma stays the family default. Dieuwe's user defaults to Omarchy at SDDM.
+Omarchy Quattro as a second Wayland session on CachyOS+ZFS+KDE. Plasma stays the family default. The king's user defaults to Omarchy at SDDM.
 
 `install.sh` is the one-shot entry: packages, chezmoi, hardware, ZFS, then Monarchy apply. The library is `lib/monarchy/`. Policy files live in `monarchy/`.
 
@@ -36,7 +36,7 @@ flowchart TB
   subgraph dm [Display manager: SDDM]
     Kernel --> SDDM[sddm.service]
     SDDM --> PlasmaSession["wayland-sessions/plasma.desktop<br/>family: default Plasma"]
-    SDDM --> OmarchySession["wayland-sessions/omarchy.desktop<br/>Dieuwe: default Omarchy"]
+    SDDM --> OmarchySession["wayland-sessions/omarchy.desktop<br/>king: default Omarchy"]
   end
 
   subgraph overlay [Monarchy overlay]
@@ -147,9 +147,9 @@ monarchy-update        # after that: snapshot, fetch, check, apply
 
 Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. That helper hard-codes `zpcachyos/ROOT/cos`. If it is missing or still has the varlog-only prune, apply installs the current copy from this repo, then asserts a `@pre-update-*` exists on `zpcachyos/ROOT/cos/root`. The pacman hook uses that installed helper.
 
-`monarchy_apply` order: snapshot, guards, clone, working prefix, overlay, lock/menu patch, switch-user helper, `/etc/omarchy.conf`, `[omarchy]` repo, leaf packages, settings files, a short list of clone `install/config/*.sh`, SDDM, lock PAM, session desktop, logind, UWSM env, portals, Dieuwe user setup, mime assert, Plymouth.
+`monarchy_apply` order: snapshot, guards, clone, working prefix, overlay, lock/menu patch, switch-user helper, `/etc/omarchy.conf`, `[omarchy]` repo, leaf packages, settings files, a short list of clone `install/config/*.sh`, SDDM, lock PAM, session desktop, logind, UWSM env, portals, king user setup, mime assert, Plymouth.
 
-Dieuwe-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, Super+Ctrl+U bind, Super+Shift+E emacsclient (replaces HEY), unbind leftover HEY calendar/compose chords, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), drop `monarchy/applications.drop` (Basecamp, HEY), `omarchy-pkg-add` of spotify, signal-desktop, cursor-bin, cursor-cli, omakade, `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland` plus `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
+King-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, Super+Ctrl+U bind, Super+Shift+E emacsclient (replaces HEY), unbind leftover HEY calendar/compose chords, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), drop `monarchy/applications.drop` (Basecamp, HEY), `omarchy-pkg-add` of spotify, signal-desktop, cursor-bin, cursor-cli, omakade, `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland` plus `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
 
 `lib/packages.sh` installs the shared set before apply. After apply or `--update` it strips competing copies (pacman emacs/bun/gh, Spotify/Discord flatpaks, curl-pipe cursor-agent, python-pipx, omarchy-emacs, AUR zoom) once `/etc/omarchy.conf` exists, so a box that has not finished apply is still usable. Zoom is the Omarchy webapp (`zoommtg://`), not AUR `zoom`.
 
@@ -230,7 +230,7 @@ Install scripts the bridge never invokes, even when a binary of the same name is
 
 SDDM runs the Omarchy theme with a Monarchy overlay. plasma-login-manager cannot load that QML, so it is removed. Two display managers on one seat is a brick.
 
-Stock Omarchy `Main.qml` is a last-user password box that auto-picks the first `uwsm` session. That logs Amie into Dieuwe's account. `monarchy/sddm/Main.qml` keeps the logo/lock/entry and `#1a1b26` / `#ffffff` tokens, and adds Tab (users) and Up/Down (sessions). amie and olivier default to Plasma. Everyone else defaults to Omarchy.
+Stock Omarchy `Main.qml` is a last-user password box that auto-picks the first `uwsm` session. That logs one household member into another's account. `monarchy/sddm/Main.qml` keeps the logo/lock/entry and `#1a1b26` / `#ffffff` tokens, and adds Tab (users) and Up/Down (sessions). Queen and kid accounts default to Plasma. Everyone else defaults to Omarchy.
 
 Do not write `/var/lib/sddm/state.conf`. Do not enable Autologin. SDDM's `RememberLastSession` is one slot for the whole machine, not per user. The overlay's static defaults are the picker.
 
@@ -244,7 +244,7 @@ CachyOS leftover `/etc/sddm.conf.d/kde_settings.conf` has `Current=breeze`. SDDM
 | `/etc/sddm.conf.d/zz-omarchy-sddm.conf` | `Current=omarchy`. Wayland greeter. `CompositorCommand=start-hyprland -- --config /usr/share/sddm/hyprland.lua`. Autologin User empty. |
 | `/usr/share/sddm/themes/omarchy/Main.qml` | Clone theme, then Monarchy overlay. Wrapped `omarchy-refresh-sddm` cannot land stock last-user QML. Fresh apply is Unlock default (`#1a1b26`). Style > Unlock restyles plymouth and the greeter together. Session theme does not. |
 | `/usr/share/sddm/hyprland.lua` | Overlay `monarchy/sddm/hyprland.lua` (`background_color` `#1a1b26`) |
-| `/var/lib/AccountsService/users/{dieuwe,amie,olivier}` | `Session=` written. The QML overlay is the picker default that matters. |
+| `/var/lib/AccountsService/users/<user>` | `Session=` written. The QML overlay is the picker default that matters. |
 | leftover `/etc/sddm.conf.d/kde_settings.conf` | Assert Autologin User empty. Do not delete. `zz-` sorts after it. |
 
 ```mermaid
@@ -257,7 +257,7 @@ sequenceDiagram
   alt family user, Plasma
     SDDM->>Plasma: plasma.desktop
     Plasma->>Plasma: XDG_CURRENT_DESKTOP=KDE, portal=kde
-  else Dieuwe, Omarchy
+  else king, Omarchy
     SDDM->>Omarchy: omarchy.desktop
     Omarchy->>Omarchy: XDG_CURRENT_DESKTOP=Hyprland, portal=hyprland;gtk
   end
@@ -289,7 +289,7 @@ Details and remaining ZBM UI work: `docs/boot-flow.md`.
 | SDDM theme | clone `default/sddm/omarchy/` plus `monarchy/sddm/Main.qml` | `/usr/share/sddm/themes/omarchy/` | `monarchy_refresh_sddm` |
 | SDDM conf | `monarchy/sddm/zz-omarchy-sddm.conf` | `/etc/sddm.conf.d/zz-omarchy-sddm.conf` | `monarchy_keep_sddm` |
 | Session desktop | `monarchy/omarchy.desktop` | `/usr/share/wayland-sessions/omarchy.desktop` | `monarchy_install_omarchy_session` |
-| Dieuwe branding | clone `logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt` | `~/.config/omarchy/branding/` | `monarchy_setup_user` |
+| King branding | clone `logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt` | `~/.config/omarchy/branding/` | `monarchy_setup_user` |
 
 ## On disk after apply
 
@@ -310,7 +310,7 @@ ZFS datasets do not change: `zpcachyos/ROOT/cos/{root,home,varcache,varlog}`. Po
 | `/etc/systemd/logind.conf.d/10-monarchy-ignore-power-button.conf` | `HandlePowerKey=ignore`. A Bluetooth headset KEY_POWER has shut a host down. Shutdown is the System menu. |
 | `/usr/share/uwsm/env.d/10-monarchy` | working-prefix bootstrap + mise |
 | `/usr/share/plymouth/themes/omarchy/` | Omarchy Plymouth theme |
-| `~/.config/omarchy/plugins/<id>/` | User plugin checkouts. Not chezmoi. Dieuwe only. |
+| `~/.config/omarchy/plugins/<id>/` | User plugin checkouts. Not chezmoi. King only. |
 | `/root/.local/bin/zfs-snapshot-pre-update.sh` | snapshot helper. Required. |
 | `/var/log/monarchy-setup.log` | setup + stub invocations |
 
@@ -339,4 +339,4 @@ Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZFSBootMenu, or clone
 
 The fork still hardcodes `zroot/ROOT/default` and Limine. That is why the denylist exists. The ask is https://github.com/berenddeboer/omarchy-zfs-pkgs/issues/1 (`berenddeboer/omarchy` has issues disabled). PAM homes, a plymouth-before-zfs mkinitcpio rewrite, and archzfs stay refused even if that lands.
 
-NVIDIA and Tuxedo/Clevo quirks stay in `hardware/system76-bonw9/apply.sh` / `chwd`. Dieuwe's fish, paru, tealdeer, chezmoi nvim, ghostty, docker group, and per-box ufw enable/disable stay.
+NVIDIA and Tuxedo/Clevo quirks stay in `hardware/system76-bonw9/apply.sh` / `chwd`. The king's fish, paru, tealdeer, chezmoi nvim, ghostty, docker group, and per-box ufw enable/disable stay.

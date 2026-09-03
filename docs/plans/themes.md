@@ -1,10 +1,10 @@
 # Plan: extra themes as a URL list
 
 - **Status:** plan. Not scheduled. Kingfisher is still a local directory, not a git extra.
-- **Audience:** anyone about to ship Dieuwe's Omarchy themes through this overlay
+- **Audience:** anyone about to ship the king's Omarchy themes through this overlay
 - **Live wallpaper split is already done on kingfisher.** Theme pack holds `pexels-shilpnirmit-20579688.jpg`. The other 60 JPEGs are in `~/.config/omarchy/backgrounds/kingfisher/`. `~/Pictures/Wallpapers` is the same dump and is obsolete.
 
-One extra-theme git repo per theme. The overlay installs them the way it installs plugins: a URL list, clone if missing, leave an existing checkout alone. Every listed theme is installed on every box that runs Dieuwe user setup. Palette and 3–6 shipped wallpapers live in the theme repo. The rest of a machine's photos stay in that theme's user overlay.
+One extra-theme git repo per theme. The overlay installs them the way it installs plugins: a URL list, clone if missing, leave an existing checkout alone. Every listed theme is installed on every box that runs king user setup. Palette and 3–6 shipped wallpapers live in the theme repo. The rest of a machine's photos stay in that theme's user overlay.
 
 ## What this is not
 
@@ -37,7 +37,7 @@ Do not ship `*.lua`, terminal configs, or `vscode.json`. Extra-theme staging dro
 
 `omarchy-theme-install` names the theme from the URL: basename, strip `.git`, strip leading `omarchy-` and trailing `-theme`, lowercase. Use that same derivation here so `omarchy theme remove` and `omarchy theme update` see the same extra.
 
-A cloned extra has a `.git` directory. A symlink is the author's working copy and is not pulled. A plain directory is treated as something Dieuwe wrote.
+A cloned extra has a `.git` directory. A symlink is the author's working copy and is not pulled. A plain directory is treated as something the king wrote.
 
 ## Overlay list
 
@@ -59,7 +59,7 @@ Third-party extras are more rows. No hostname flags. The list is the collection,
 
 ## Install, skip, update
 
-Dieuwe user setup, next to `monarchy_install_plugins`. All boxes that run that setup get the whole list.
+King user setup, next to `monarchy_install_plugins`. All boxes that run that setup get the whole list.
 
 Do not call `omarchy-theme-install`. It deletes the dest first.
 
@@ -70,7 +70,7 @@ Mirror plugins:
 3. Theme name from the URL, dest `~/.config/omarchy/themes/<name>/`.
 4. If dest exists (directory or symlink), leave it and drop the staging clone.
 5. Else `mv` staging into dest.
-6. After the list, if `--default` is set and `~/.local/state/omarchy/current/theme.name` is empty, `omarchy-theme-set` that name. Re-apply must not override a theme Dieuwe already picked.
+6. After the list, if `--default` is set and `~/.local/state/omarchy/current/theme.name` is empty, `omarchy-theme-set` that name. Re-apply must not override a theme the king already picked.
 
 `--update` / later user setup does not `git pull`. `omarchy theme update` is the updater for extras that already exist, same as `omarchy plugin update`. Call it from user setup after the clones so a box that already had kingfisher picks up palette tweaks. Skip dests that are symlinks; those are working copies.
 
@@ -86,11 +86,11 @@ Before the first extras apply that lists kingfisher:
 - Move the hand-written theme dir aside (`kingfisher.bak` or delete once the extra clone is verified).
 - Leave the live wallpaper file available so the session does not go blank: either it is one of the 3–6 images in the new repo, or it stays in the overlay.
 
-A symlink from dest to a local working copy is left alone, on purpose. That is how Dieuwe authors on one box without apply fighting git.
+A symlink from dest to a local working copy is left alone, on purpose. That is how the king authors on one box without apply fighting git.
 
 ## What belongs in the theme repo
 
-One palette. Aether can extract it from the active wallpaper (`aether --generate <jpg> --extract-mode … --no-apply --output /tmp/…`, then copy `colors.toml`). GUI Apply writes the `aether` theme and switches to it. After a session Dieuwe likes, copy `colors.toml` / `icons.theme` / `preview.png` into the theme repo and `omarchy theme set kingfisher`. Save the Aether blueprint as `kingfisher` so it can be reopened.
+One palette. Aether can extract it from the active wallpaper (`aether --generate <jpg> --extract-mode … --no-apply --output /tmp/…`, then copy `colors.toml`). GUI Apply writes the `aether` theme and switches to it. After a session the king likes, copy `colors.toml` / `icons.theme` / `preview.png` into the theme repo and `omarchy theme set kingfisher`. Save the Aether blueprint as `kingfisher` so it can be reopened.
 
 3–6 wallpapers in `backgrounds/`, converted to webp, sized like Omarchy's own packs (those are 2–9MB total, not 84MB of 4K JPEG). Pexels is fine to ship if CREDITS names photographer and photo id. Anything whose license is unclear stays in the overlay and never in git.
 

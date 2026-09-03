@@ -45,10 +45,7 @@ monarchy_sudo() {
 monarchy_load_lock() {
     local lock="$MONARCHY_MISC/omarchy.lock"
     [ -f "$lock" ] || monarchy_die "missing $lock"
-    # shellcheck disable=SC1090
-    set -a
     # lock is key=value, not shell. Parse it.
-    set +a
     MONARCHY_LOCK_REMOTE=$(awk -F= '$1=="remote"{print substr($0,index($0,"=")+1)}' "$lock")
     MONARCHY_LOCK_BRANCH=$(awk -F= '$1=="branch"{print substr($0,index($0,"=")+1)}' "$lock")
     MONARCHY_LOCK_COMMIT=$(awk -F= '$1=="commit"{print substr($0,index($0,"=")+1)}' "$lock")

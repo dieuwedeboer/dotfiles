@@ -11,10 +11,10 @@ Pin: `berenddeboer/omarchy` `quattro-on-zfs` `bfcaa06f5cfa5c8cb89412503f615868c0
 | `omarchy-refresh-pacman` replaces `/etc/pacman.conf` and CachyOS mirrorlists | CachyOS | Never call it. Marker-block `[omarchy]` only. Stub the command | `monarchy_preserve_pacman_conf`, `monarchy_add_omarchy_repo` |
 | `linux` vs `linux-cachyos` + `linux-cachyos-zfs` | CachyOS | Deny stock `linux` | `monarchy_refuse_kernel_swap` |
 | archzfs vs CachyOS ZFS (`linux-cachyos-zfs` and `zfs-dkms` both from Calamares) | CachyOS | Keep both CachyOS packages. No `[archzfs]` | `monarchy_refuse_archzfs` |
-| Limine vs rEFInd + ZFSBootMenu | Dieuwe | Never install limine. Stub `omarchy-refresh-limine` | `monarchy_refuse_bootloader` |
-| Snapper vs sanoid + pacman ZFS hook | Dieuwe | Never install snapper | `monarchy_refuse_snapper` |
+| Limine vs rEFInd + ZFSBootMenu | King | Never install limine. Stub `omarchy-refresh-limine` | `monarchy_refuse_bootloader` |
+| Snapper vs sanoid + pacman ZFS hook | King | Never install snapper | `monarchy_refuse_snapper` |
 | Omarchy ALPM update guard | would be Omarchy | Never install `omarchy` / `omarchy-dev` | `monarchy_disable_omarchy_update_guard` |
-| `zroot/ROOT/default` vs `zpcachyos/ROOT/cos/root` | Dieuwe | Never run `zfs.sh` / zfs-check | `monarchy_refuse_dataset_rename` |
+| `zroot/ROOT/default` vs `zpcachyos/ROOT/cos/root` | King | Never run `zfs.sh` / zfs-check | `monarchy_refuse_dataset_rename` |
 | `omarchy-settings*` overwrites `/etc/os-release` | CachyOS | Never install those packages | `monarchy_skip_os_release_clobber` |
 | Two DMs: CachyOS PLM vs Omarchy `sddm` | CachyOS | Install `sddm`, remove PLM | `monarchy_keep_sddm` |
 
