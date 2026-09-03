@@ -142,6 +142,11 @@ monarchy_apply() {
     monarchy_refuse_dataset_rename
     monarchy_disable_omarchy_update_guard
     monarchy_sync_omarchy_clone
+    # After the clone exists, before anything is built from it. A bare apply
+    # or --no-packages does not run monarchy_check, so without these the
+    # overlay is rebuilt from a clone whose bin/ names were never classified.
+    monarchy_check_inventory_complete
+    monarchy_check_clone_bin_classified
     monarchy_link_working_prefix
     monarchy_rebuild_overlay
     monarchy_overlay_session_lock

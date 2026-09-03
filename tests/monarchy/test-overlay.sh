@@ -86,4 +86,22 @@ expected=$((allow_n + wrap_n + deny_n + 1))
     exit 1
 }
 
+# monarchy_apply must classify the clone before it builds anything from it.
+# A bare apply and --no-packages never call monarchy_check, so the guards have
+# to sit in apply itself: after the clone exists, before the overlay.
+apply_body=$(awk '/^monarchy_apply\(\)/,/^}$/' "$LIB/update.sh")
+line_of() { printf '%s\n' "$apply_body" | grep -n "$1" | head -1 | cut -d: -f1; }
+
+sync_at=$(line_of 'monarchy_sync_omarchy_clone')
+inv_at=$(line_of 'monarchy_check_inventory_complete')
+cls_at=$(line_of 'monarchy_check_clone_bin_classified')
+build_at=$(line_of 'monarchy_rebuild_overlay')
+
+[ -n "$inv_at" ] || fail "monarchy_apply does not call monarchy_check_inventory_complete"
+[ -n "$cls_at" ] || fail "monarchy_apply does not call monarchy_check_clone_bin_classified"
+[ "$inv_at" -gt "$sync_at" ] || fail "inventory guard runs before the clone is synced"
+[ "$cls_at" -gt "$sync_at" ] || fail "classification guard runs before the clone is synced"
+[ "$inv_at" -lt "$build_at" ] || fail "inventory guard runs after the overlay is built"
+[ "$cls_at" -lt "$build_at" ] || fail "classification guard runs after the overlay is built"
+
 echo "overlay test passed ($allow_n allow, $wrap_n wrap, $deny_n deny)"
