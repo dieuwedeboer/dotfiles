@@ -119,8 +119,9 @@ monarchy_explode_symlink_dir() {
     monarchy_write_to "$parent" rm -f "$dest"
     monarchy_write_to "$parent" mkdir -p "$dest"
     monarchy_write_to "$parent" mv "$tmp"/* "$dest"/
-    # $tmp is ours either way: mktemp -d ran as the calling user.
-    rmdir "$tmp" 2>/dev/null || true
+    # $tmp is ours either way: mktemp -d ran as the calling user, and the
+    # move above emptied it. Strict, so a partial move is not swallowed.
+    rmdir "$tmp"
 }
 
 monarchy_overlay_replace_dir() {

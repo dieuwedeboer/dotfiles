@@ -35,7 +35,7 @@ monarchy_seed_hypr_boot_color() {
     mkdir -p "$(dirname "$dest")"
     cp -a "$src" "$dest"
     [ -f "$hypr" ] || return 0
-    monarchy_seed_block "$hypr" boot-color 'hypr[.]boot-color' <<'EOF'
+    monarchy_seed_block "$hypr" boot-color '^require[(]"hypr[.]boot-color"[)]$' <<'EOF'
 require("hypr.boot-color")
 EOF
     monarchy_log "required hypr.boot-color from $hypr"
@@ -53,7 +53,11 @@ EOF
 #   monarchy_seed_block <file> <id> [legacy_regex] <<'EOF'
 #
 # legacy_regex, when given, drops matching unmarked lines left by an older
-# apply, so converting a box does not leave the line twice.
+# apply, so converting a box does not leave the line twice. Anchor it: an
+# unanchored pattern will also eat a line the user wrote that merely mentions
+# the same string. Escape metacharacters as [+] and [.] rather than \\+ and
+# \\., because awk -v does its own backslash processing before the regex
+# is compiled.
 monarchy_new_bindings_file() {
     local dest=$1
     mkdir -p "$(dirname "$dest")"
@@ -70,6 +74,11 @@ monarchy_seed_block() {
     local body tmp kept
 
     body=$(cat)
+    # A body line equal to a marker would end the block early on the next
+    # reseed, leaking the rest of it out into the file for good.
+    if printf '%s\n' "$body" | grep -Fqx -e "$begin" -e "$end"; then
+        monarchy_die "block body for '$id' contains a monarchy marker line"
+    fi
     mkdir -p "$(dirname "$file")"
     [ -f "$file" ] || printf -- '-- Keep only your personal overrides here.\n' >"$file"
 
@@ -88,7 +97,11 @@ monarchy_seed_block() {
     # $(...) drops trailing newlines, so the block cannot accrue blank lines
     # ahead of it on every apply.
     printf '%s\n\n%s\n%s\n%s\n' "$kept" "$begin" "$body" "$end" >"$tmp"
-    mv "$tmp" "$file"
+    # install, not mv: mktemp lands in /tmp, and a cross-filesystem mv copies
+    # the source's 600 rather than keeping the config file readable. This is
+    # what pacman.sh does for the [omarchy] block.
+    install -m 644 "$tmp" "$file"
+    rm -f "$tmp"
 }
 
 # True when the file carries a monarchy block with this id.
@@ -284,7 +297,7 @@ monarchy_seed_switch_user_bind() {
     # The legacy pattern also catches a pre-block seed that lacked
     # locked = true, so the bind is replaced rather than duplicated.
     monarchy_seed_block "$dest" switch-user \
-        'monarchy-switch-user|^-- Switch user: lock, then SDDM' <<'EOF'
+        '^o[.]bind[(]"SUPER [+] CTRL [+] U".*monarchy-switch-user|^-- Switch user: lock, then SDDM' <<'EOF'
 -- Lock, then the SDDM greeter. locked = true so the chord also works while
 -- ext-session-lock is held; Hyprland drops unlocked binds on the lock screen.
 o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user", { locked = true })
@@ -329,7 +342,7 @@ monarchy_seed_emacs_bind() {
     local dest="$HOME/.config/hypr/bindings.lua"
     monarchy_new_bindings_file "$dest"
     monarchy_seed_block "$dest" emacs-bind \
-        'SUPER [+] SHIFT [+] E"|^-- Omarchy default is HEY email' <<'EOF'
+        '^hl[.]unbind[(]"SUPER [+] SHIFT [+] E"[)]$|^o[.]bind[(]"SUPER [+] SHIFT [+] E"|^-- Omarchy default is HEY email' <<'EOF'
 -- Omarchy binds this chord to HEY email. This box uses emacsclient.
 hl.unbind("SUPER + SHIFT + E")
 o.bind("SUPER + SHIFT + E", "Emacs", "emacsclient -c --no-wait")
@@ -342,7 +355,7 @@ monarchy_seed_kwallet_autostart() {
     mkdir -p "$(dirname "$dest")"
     [ -f "$dest" ] || printf -- '-- Extra autostart processes.\n' >"$dest"
     monarchy_seed_block "$dest" kwallet \
-        'pam_kwallet_init|^-- Unlock KWallet' <<'EOF'
+        '^o[.]launch_on_start[(]"/usr/lib/pam_kwallet_init"[)]$|^-- Unlock KWallet' <<'EOF'
 -- Unlock KWallet so NetworkManager can use Wi-Fi secrets saved under Plasma.
 o.launch_on_start("/usr/lib/pam_kwallet_init")
 EOF

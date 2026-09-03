@@ -172,4 +172,45 @@ grep -q 'locked = true' "$blk" || fail "migrated bind lost locked = true"
     || fail "legacy unbind was duplicated; chord + is being read as a quantifier"
 [ "$(grep -c 'SUPER + F1' "$blk")" -eq 1 ] || fail "seeding removed the user's own bind"
 
+# mktemp lands in /tmp, which is a different filesystem from $HOME here, so a
+# cross-filesystem mv would copy mktemp's 600 over the config file's 644.
+chmod 644 "$blk"
+monarchy_seed_switch_user_bind >/dev/null
+mode=$(stat -c %a "$blk")
+[ "$mode" = 644 ] || fail "seeding changed the file mode to $mode, expected 644"
+
+# An anchored legacy pattern must not eat a line the user wrote that merely
+# mentions the same string.
+cat >"$blk" <<'LUA'
+-- Keep only your personal keybinding overrides here.
+-- reminder: monarchy-switch-user is bound below, do not rebind it
+o.bind("SUPER + F2", "Mine", "true")
+LUA
+monarchy_seed_switch_user_bind >/dev/null
+grep -q 'reminder: monarchy-switch-user is bound below' "$blk" \
+    || fail "legacy pattern deleted a user comment that only mentions the command"
+monarchy_seed_kwallet_autostart >/dev/null 2>&1 || true
+
+kw=$HOME/.config/hypr/autostart.lua
+cat >"$kw" <<'LUA'
+-- Extra autostart processes.
+-- note: pam_kwallet_init is handled by monarchy, do not add it here
+LUA
+monarchy_seed_kwallet_autostart >/dev/null
+grep -q 'note: pam_kwallet_init is handled by monarchy' "$kw" \
+    || fail "kwallet legacy pattern deleted a user comment"
+[ "$(grep -c 'launch_on_start' "$kw")" -eq 1 ] || fail "kwallet block not seeded exactly once"
+
+# A body line equal to a marker would end the block early on the next reseed.
+# monarchy_die exits, so run it in a subshell with this test's EXIT trap
+# cleared, and check the exit status rather than letting it take the test down.
+if (
+    trap - EXIT
+    monarchy_seed_block "$blk" collide <<'LUA'
+-- END monarchy: collide
+LUA
+) >/dev/null 2>&1; then
+    fail "seed_block accepted a body containing its own end marker"
+fi
+
 echo "user tests passed"
