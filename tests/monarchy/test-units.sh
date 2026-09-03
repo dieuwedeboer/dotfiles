@@ -82,4 +82,26 @@ c_at=$(printf '%s\n' "$apply_body" | grep -n '"monarchy_${u}_check"' | head -1 |
 grep -q 'NoDisplay=true' "$LIB/sessions.sh" \
     || fail "monarchy_check_hidden_hyprland_sessions asserts NoDisplay but sessions.sh never writes it"
 
+# --only shrinks blast radius; it must not remove the host guards. Both check
+# and apply call monarchy_guards_check unconditionally, outside the loop.
+for fn in monarchy_check monarchy_apply; do
+    body=$(awk -v f="$fn" '$0 ~ "^" f "\\(\\) \\{" {i=1} i {print} i && /^}/ && NR>1 {exit}' "$LIB/update.sh")
+    g_at=$(printf '%s\n' "$body" | grep -n '^[[:space:]]*monarchy_guards_check$' | head -1 | cut -d: -f1 || true)
+    loop_at=$(printf '%s\n' "$body" | grep -n 'MONARCHY_UNITS\[@\]' | head -1 | cut -d: -f1 || true)
+    [ -n "$g_at" ] || fail "$fn does not call monarchy_guards_check outside the unit loop"
+    [ -n "$loop_at" ] || fail "$fn has no unit loop"
+    [ "$g_at" -lt "$loop_at" ] || fail "$fn runs the guards inside the loop, so --only can skip them"
+done
+
+# Every host guard must be reachable from monarchy_guards_check specifically,
+# not merely from some unit that --only might skip.
+guards_body=$(awk '/^monarchy_guards_check\(\)/,/^}$/' "$LIB/update.sh")
+for fn in monarchy_assert_zfs_layout monarchy_assert_os_release \
+    monarchy_refuse_bootloader monarchy_refuse_snapper monarchy_refuse_kernel_swap \
+    monarchy_skip_os_release_clobber monarchy_skip_plymouth_zfs \
+    monarchy_refuse_dataset_rename monarchy_disable_omarchy_update_guard; do
+    printf '%s\n' "$guards_body" | grep -qE "^[[:space:]]*$fn\$" \
+        || fail "$fn is not in monarchy_guards_check, so --only can skip it"
+done
+
 echo "unit tests passed"

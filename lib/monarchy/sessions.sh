@@ -75,8 +75,9 @@ monarchy_install_omarchy_session() {
         monarchy_accountsservice_session "$u" "$(monarchy_role_session "$r")"
     done < <(monarchy_users)
     # An account absent from users.conf is a serf and takes the default.
-    if [ "$USER" != root ] && [ -z "$(monarchy_users | awk -v u="$USER" '$1==u{print}')" ]; then
-        monarchy_accountsservice_session "$USER" "$(monarchy_role_session serf)"
+    if [ "$USER" != root ]; then
+        monarchy_accountsservice_session "$USER" \
+            "$(monarchy_role_session "$(monarchy_user_role "$USER")")"
     fi
 
     monarchy_hide_stock_hyprland_sessions

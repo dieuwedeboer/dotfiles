@@ -383,4 +383,22 @@ grep -q 'someking' "$gen/Main.qml" && fail "king reached the Plasma list"
 grep -q 'nosuchuser' "$gen/Main.qml" && fail "an account with no passwd entry reached the greeter list"
 rm -rf "$gen"
 
+# users.conf is hand-edited. A CRLF file must not demote every account to serf,
+# and a name that would break the generated QML must never reach it.
+hard=$(mktemp -d)
+printf 'aking king\r\naqueen queen\r\n' >"$hard/crlf.conf"
+roles=$(MONARCHY_USERS_CONF="$hard/crlf.conf" monarchy_users | awk '{print $2}' | paste -sd, -)
+[ "$roles" = "king,queen" ] || fail "CRLF users.conf parsed roles as: $roles"
+
+printf '%s queen\n' 'bad"name' >"$hard/quote.conf"
+(
+    # shellcheck disable=SC2034
+    MONARCHY_USERS_CONF="$hard/quote.conf"
+    # shellcheck disable=SC2329
+    getent() { return 0; }
+    out=$(monarchy_plasma_users 2>/dev/null)
+    [ -z "$out" ] || { echo "quoted name reached the greeter list: $out" >&2; exit 1; }
+) || fail "a username containing a quote reached the generated QML"
+rm -rf "$hard"
+
 echo "sddm tests passed"

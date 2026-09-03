@@ -255,7 +255,11 @@ monarchy_check() {
     # user cache so a dry run has something to read. Doing that during apply
     # would make apply build from the cache instead of /usr/local/src.
     monarchy_ensure_clone_for_check
+    # Guards refuse a host this overlay must never touch, so --only cannot
+    # skip them. It exists to shrink blast radius, not to remove the floor.
+    monarchy_guards_check
     for u in "${MONARCHY_UNITS[@]}"; do
+        [ "$u" = guards ] && continue
         [ -z "${MONARCHY_ONLY:-}" ] || [ "$u" = "$MONARCHY_ONLY" ] || continue
         "monarchy_${u}_check"
     done
@@ -291,7 +295,10 @@ monarchy_apply() {
     #
     # Host preconditions live in the guards unit, whose apply is a no-op, so
     # they still run before anything is touched.
+    # Same floor for apply: the guards run whatever --only says.
+    monarchy_guards_check
     for u in "${MONARCHY_UNITS[@]}"; do
+        [ "$u" = guards ] && continue
         [ -z "${MONARCHY_ONLY:-}" ] || [ "$u" = "$MONARCHY_ONLY" ] || continue
         "monarchy_${u}_apply"
         "monarchy_${u}_check"

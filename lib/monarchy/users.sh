@@ -20,19 +20,24 @@ monarchy_valid_role() {
     esac
 }
 
-# Emit "<username> <role>" per configured account. Missing file is not an
+# Emit "<username> <role>" per configured account. stdout is data: warnings
+# go to stderr, because callers read this through $( ) and <( ). Missing file is not an
 # error: every account is then a serf, which is the documented default.
 monarchy_users() {
     local conf=${1:-$MONARCHY_USERS_CONF}
     [ -f "$conf" ] || return 0
     local user role
     while read -r user role _; do
+        # Hand-edited file: a CR would make every role invalid and silently
+        # demote everyone to serf.
+        user=${user%$'\r'}
+        role=${role%$'\r'}
         case "$user" in
             '' | \#*) continue ;;
         esac
         [ -n "$role" ] || continue
         if ! monarchy_valid_role "$role"; then
-            monarchy_log "warning: unknown role '$role' for an account in $conf; treating as serf"
+            monarchy_log "warning: unknown role '$role' for an account in $conf; treating as serf" >&2
             role=serf
         fi
         printf '%s %s\n' "$user" "$role"
@@ -63,6 +68,14 @@ monarchy_plasma_users() {
     while read -r user role; do
         [ "$(monarchy_role_session "$role")" = plasma.desktop ] || continue
         getent passwd "$user" >/dev/null 2>&1 || continue
+        # This name is interpolated into Main.qml. A quote or a backslash
+        # would produce a greeter that cannot parse, which is a brick.
+        case "$user" in
+            *[\"\\]*)
+                monarchy_log "warning: refusing account name with a quote or backslash; it cannot go in the greeter list" >&2
+                continue
+                ;;
+        esac
         printf '%s\n' "$user"
     done < <(monarchy_users) | sort -u
 }
