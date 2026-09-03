@@ -41,30 +41,6 @@ EOF
     monarchy_log "required hypr.boot-color from $hypr"
 }
 
-# Append a replaceable, marked block to a Lua config the user also edits.
-# Same shape as the [omarchy] block in pacman.sh: drop whatever sits between
-# the markers, then append the current text. Idempotent by construction, so
-# changing the body no longer needs a hand-written migration the way the
-# switch-user bind did when it gained locked = true.
-#
-# A block is also removable: step 5 hands these files to chezmoi, and a marked
-# block can be deleted from a box that an earlier apply wrote to.
-#
-#   monarchy_seed_block <file> <id> [legacy_regex] <<'EOF'
-#
-# legacy_regex, when given, drops matching unmarked lines left by an older
-# apply, so converting a box does not leave the line twice. Anchor it: an
-# unanchored pattern will also eat a line the user wrote that merely mentions
-# the same string. Escape metacharacters as [+] and [.] rather than \\+ and
-# \\., because awk -v does its own backslash processing before the regex
-# is compiled.
-monarchy_new_bindings_file() {
-    local dest=$1
-    mkdir -p "$(dirname "$dest")"
-    [ -f "$dest" ] \
-        || printf -- '-- Keep only your personal keybinding overrides here.\n' >"$dest"
-}
-
 monarchy_seed_block() {
     local file=$1
     local id=$2
@@ -291,20 +267,6 @@ monarchy_user_theme() {
     monarchy_log "theme $(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null)"
 }
 
-monarchy_seed_switch_user_bind() {
-    local dest="$HOME/.config/hypr/bindings.lua"
-    monarchy_new_bindings_file "$dest"
-    # The legacy pattern also catches a pre-block seed that lacked
-    # locked = true, so the bind is replaced rather than duplicated.
-    monarchy_seed_block "$dest" switch-user \
-        '^o[.]bind[(]"SUPER [+] CTRL [+] U".*monarchy-switch-user|^-- Switch user: lock, then SDDM' <<'EOF'
--- Lock, then the SDDM greeter. locked = true so the chord also works while
--- ext-session-lock is held; Hyprland drops unlocked binds on the lock screen.
-o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user", { locked = true })
-EOF
-    monarchy_log "seeded Super+Ctrl+U switch-user bind in $dest"
-}
-
 monarchy_drop_webapps() {
     local name desktop icon_slug
     local app_dir="$HOME/.local/share/applications"
@@ -324,69 +286,69 @@ monarchy_drop_webapps() {
     fi
 }
 
-monarchy_seed_hypr_unbind() {
-    local dest="$HOME/.config/hypr/bindings.lua"
-    local chord=$1
-    local slug chord_re
-    slug=$(printf '%s' "$chord" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//')
-    # A chord is full of + signs, which are quantifiers in an ERE.
-    chord_re=${chord//+/[+]}
-    monarchy_new_bindings_file "$dest"
-    monarchy_seed_block "$dest" "unbind-$slug" "^hl[.]unbind[(]\"$chord_re\"[)]\$" <<EOF
-hl.unbind("$chord")
-EOF
-    monarchy_log "unbound $chord in $dest"
+# chezmoi owns the personal override files under ~/.config/hypr. Monarchy used
+# to append to them too, and the two only agreed because the literals matched
+# character for character. See docs/adr/0001-chezmoi-owns-user-config.md.
+MONARCHY_CHEZMOI_HYPR="bindings.lua looknfeel.lua input.lua autostart.lua"
+
+# Remove a block an earlier apply wrote, now that chezmoi carries the same
+# content. This is what the markers added in step 4 were for.
+monarchy_release_block() {
+    local file=$1
+    local id=$2
+    local begin="-- BEGIN monarchy: $id"
+    local end="-- END monarchy: $id"
+    local tmp kept
+    [ -f "$file" ] || return 0
+    monarchy_has_block "$file" "$id" || return 0
+    kept=$(awk -v b="$begin" -v e="$end" '
+        $0 == b { skip = 1; next }
+        $0 == e { skip = 0; next }
+        skip { next }
+        /^[[:space:]]*$/ { blank++; next }
+        { if (blank && NR > blank) print ""; blank = 0; print }
+    ' "$file")
+    tmp=$(mktemp)
+    printf '%s\n' "$kept" >"$tmp"
+    install -m 644 "$tmp" "$file"
+    rm -f "$tmp"
+    monarchy_log "released $id block in $file to chezmoi"
 }
 
-monarchy_seed_emacs_bind() {
-    local dest="$HOME/.config/hypr/bindings.lua"
-    monarchy_new_bindings_file "$dest"
-    monarchy_seed_block "$dest" emacs-bind \
-        '^hl[.]unbind[(]"SUPER [+] SHIFT [+] E"[)]$|^o[.]bind[(]"SUPER [+] SHIFT [+] E"|^-- Omarchy default is HEY email' <<'EOF'
--- Omarchy binds this chord to HEY email. This box uses emacsclient.
-hl.unbind("SUPER + SHIFT + E")
-o.bind("SUPER + SHIFT + E", "Emacs", "emacsclient -c --no-wait")
-EOF
-    monarchy_log "seeded Super+Shift+E emacsclient bind in $dest"
+# Hand back everything monarchy used to append to a chezmoi-owned file.
+monarchy_release_user_config() {
+    local bindings="$HOME/.config/hypr/bindings.lua"
+    local chord
+    monarchy_release_block "$bindings" switch-user
+    monarchy_release_block "$bindings" emacs-bind
+    for chord in unbind-super-shift-c unbind-super-shift-alt-e; do
+        monarchy_release_block "$bindings" "$chord"
+    done
+    monarchy_release_block "$HOME/.config/hypr/autostart.lua" kwallet
+    monarchy_release_block "$HOME/.config/hypr/input.lua" capslock
 }
 
-monarchy_seed_kwallet_autostart() {
-    local dest="$HOME/.config/hypr/autostart.lua"
-    mkdir -p "$(dirname "$dest")"
-    [ -f "$dest" ] || printf -- '-- Extra autostart processes.\n' >"$dest"
-    monarchy_seed_block "$dest" kwallet \
-        '^o[.]launch_on_start[(]"/usr/lib/pam_kwallet_init"[)]$|^-- Unlock KWallet' <<'EOF'
--- Unlock KWallet so NetworkManager can use Wi-Fi secrets saved under Plasma.
-o.launch_on_start("/usr/lib/pam_kwallet_init")
-EOF
-    monarchy_log "seeded pam_kwallet_init in $dest"
-}
-
-# Omarchy's default input.lua sets compose:caps (Caps Lock becomes Compose).
-# User kb_options replaces that. caps:capslock is the stock Caps Lock behavior.
-monarchy_seed_capslock() {
-    local dest="$HOME/.config/hypr/input.lua"
-    mkdir -p "$(dirname "$dest")"
-    [ -f "$dest" ] || printf -- '-- Keep only your personal input overrides here.\n' >"$dest"
-
-    if grep -Eq '^[[:space:]]*kb_options' "$dest"; then
-        if grep -Eq '^[[:space:]]*kb_options[[:space:]]*=[[:space:]]*"caps:capslock"' "$dest"; then
-            return 0
-        fi
-        if ! grep -Eq '^[[:space:]]*kb_options.*compose:caps' "$dest"; then
-            return 0
-        fi
+# Never run chezmoi apply from here: it prompts when a target has been
+# modified, and omarchy-update reaches this through the Omarchy menu with no
+# terminal to answer on. Report, name the command, stop.
+monarchy_assert_chezmoi_hypr() {
+    local dir="$HOME/.config/hypr"
+    local name missing="" status
+    if ! command -v chezmoi >/dev/null 2>&1; then
+        monarchy_die "chezmoi is not installed; ~/.config/hypr is chezmoi-managed"
     fi
-
-    monarchy_seed_block "$dest" capslock <<'EOF'
--- Caps Lock is Caps Lock. Omarchy's default (compose:caps) remaps it to Compose.
-hl.config({
-  input = {
-    kb_options = "caps:capslock",
-  },
-})
-EOF
-    monarchy_log "restored Caps Lock in $dest"
+    for name in $MONARCHY_CHEZMOI_HYPR; do
+        [ -f "$dir/$name" ] || missing="$missing $name"
+    done
+    if [ -n "$missing" ]; then
+        monarchy_die "missing in $dir:$missing. Run: chezmoi apply ~/.config/hypr"
+    fi
+    status=$(chezmoi status "$dir" 2>/dev/null || true)
+    if [ -n "$status" ]; then
+        printf '%s\n' "$status" >&2
+        monarchy_die "$dir has drifted from chezmoi. Run: chezmoi apply ~/.config/hypr"
+    fi
+    monarchy_log "chezmoi owns $dir; monarchy asserted only"
 }
 
 monarchy_user_git() {
@@ -398,12 +360,8 @@ monarchy_user_git() {
 monarchy_setup_user() {
     [ "$USER" != "root" ] || monarchy_die "user setup must not run as root"
     monarchy_seed_hyprland_config
-    monarchy_seed_switch_user_bind
-    monarchy_seed_emacs_bind
-    monarchy_seed_hypr_unbind "SUPER + SHIFT + C"
-    monarchy_seed_hypr_unbind "SUPER + SHIFT + ALT + E"
-    monarchy_seed_kwallet_autostart
-    monarchy_seed_capslock
+    monarchy_release_user_config
+    monarchy_assert_chezmoi_hypr
     monarchy_seed_branding
     monarchy_clear_terminal_override
     monarchy_user_omarchy_defaults

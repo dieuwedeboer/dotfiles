@@ -39,8 +39,16 @@ echo "$setup_body" | grep -q 'monarchy_seed_hyprland_config' \
     || fail "monarchy_setup_user does not seed Hyprland config"
 grep -q 'monarchy_seed_hypr_boot_color' "$LIB/user.sh" \
     || fail "user.sh missing monarchy_seed_hypr_boot_color"
-echo "$setup_body" | grep -q 'monarchy_seed_capslock' \
-    || fail "monarchy_setup_user does not restore Caps Lock"
+echo "$setup_body" | grep -q 'monarchy_assert_chezmoi_hypr' \
+    || fail "monarchy_setup_user does not assert chezmoi owns ~/.config/hypr"
+echo "$setup_body" | grep -q 'monarchy_release_user_config' \
+    || fail "monarchy_setup_user does not release its old blocks"
+grep -q 'chezmoi apply' "$LIB/user.sh" \
+    || fail "user.sh does not name the command to run when hypr has drifted"
+# The die messages name the command, so match an actual invocation: a line
+# that starts with it, rather than one that merely contains it in a string.
+grep -qE '^[[:space:]]*chezmoi[[:space:]]+apply' "$LIB/user.sh" \
+    && fail "user.sh must never invoke chezmoi apply itself; it prompts, and omarchy-update has no terminal"
 echo "$setup_body" | grep -q 'monarchy_user_omarchy_defaults' \
     || fail "monarchy_setup_user does not install Omarchy user defaults"
 grep -q 'monarchy_user_emacs' "$LIB/user.sh" \
@@ -96,31 +104,6 @@ monarchy_prefer_xdg_emacs
 monarchy_prefer_xdg_emacs
 [ -L "$HOME/.emacs.d.bak" ] || fail "idempotent prefer_xdg clobbered the backup"
 
-input=$HOME/.config/hypr/input.lua
-mkdir -p "$(dirname "$input")"
-printf -- '-- Keep only your personal input overrides here.\n' >"$input"
-monarchy_seed_capslock
-grep -Eq '^[[:space:]]*kb_options[[:space:]]*=[[:space:]]*"caps:capslock"' "$input" \
-    || fail "capslock seed missing caps:capslock"
-grep -Eq '^[[:space:]]*kb_options.*compose:caps' "$input" \
-    && fail "capslock seed left compose:caps active"
-monarchy_seed_capslock
-n=$(grep -c 'caps:capslock' "$input")
-[ "$n" -eq 1 ] || fail "capslock seed is not idempotent ($n)"
-
-printf -- '-- Keep only your personal input overrides here.\n\nhl.config({\n  input = {\n    kb_options = "compose:caps,shift:both_capslock_cancel",\n  },\n})\n' >"$input"
-monarchy_seed_capslock
-grep -Eq '^[[:space:]]*kb_options[[:space:]]*=[[:space:]]*"caps:capslock"' "$input" \
-    || fail "capslock seed did not override compose:caps"
-monarchy_seed_capslock
-n=$(grep -c 'caps:capslock' "$input")
-[ "$n" -eq 1 ] || fail "capslock override is not idempotent ($n)"
-
-printf -- '-- Keep only your personal input overrides here.\n\nhl.config({\n  input = {\n    kb_options = "compose:ralt",\n  },\n})\n' >"$input"
-monarchy_seed_capslock
-grep -q 'compose:ralt' "$input" || fail "capslock seed clobbered a custom kb_options"
-grep -q 'caps:capslock' "$input" && fail "capslock seed appended over a custom kb_options"
-
 hypr=$HOME/.config/hypr/hyprland.lua
 mkdir -p "$(dirname "$hypr")"
 printf 'require("hypr.looknfeel")\n' >"$hypr"
@@ -131,75 +114,47 @@ monarchy_seed_hypr_boot_color
 n=$(grep -c 'hypr.boot-color' "$hypr")
 [ "$n" -eq 1 ] || fail "boot-color require is not idempotent ($n)"
 
-# Marked blocks must be idempotent by construction, and must migrate a box an
-# older apply already wrote to rather than duplicating the line. The switch-user
-# bind below is the pre-block form that lacked locked = true.
-blk=$HOME/.config/hypr/bindings.lua
+# monarchy_seed_block is still live for the boot-color require in
+# hyprland.lua, which is an overlay asset rather than chezmoi's. These cover
+# the mechanism itself.
+blk=$HOME/.config/hypr/scratch.lua
 mkdir -p "$(dirname "$blk")"
-cat >"$blk" <<'LUA'
--- Keep only your personal keybinding overrides here.
-o.bind("SUPER + F1", "Mine", "true")
-
--- Switch user: lock, then SDDM greeter. locked=true so the chord works on the lock screen.
-o.bind("SUPER + CTRL + U", "Switch user", "monarchy-switch-user")
-
--- Omarchy default is HEY email. Someone uses emacsclient.
-hl.unbind("SUPER + SHIFT + E")
-o.bind("SUPER + SHIFT + E", "Emacs", "emacsclient -c --no-wait")
-
-hl.unbind("SUPER + SHIFT + ALT + E")
-LUA
-
-seed_all() {
-    monarchy_seed_switch_user_bind >/dev/null
-    monarchy_seed_emacs_bind >/dev/null
-    monarchy_seed_hypr_unbind "SUPER + SHIFT + ALT + E" >/dev/null
-}
-seed_all
-first=$(md5sum <"$blk")
-seed_all
-seed_all
-[ "$(md5sum <"$blk")" = "$first" ] || fail "seeded blocks are not byte-stable across applies"
-
-grep -Fqx -- '-- BEGIN monarchy: switch-user' "$blk" || fail "no switch-user marker"
-grep -Fqx -- '-- END monarchy: switch-user' "$blk" || fail "unterminated switch-user marker"
-[ "$(grep -c 'monarchy-switch-user' "$blk")" -eq 1 ] \
-    || fail "legacy switch-user bind was duplicated instead of migrated"
-grep -q 'locked = true' "$blk" || fail "migrated bind lost locked = true"
-[ "$(grep -c 'emacsclient -c' "$blk")" -eq 1 ] \
-    || fail "legacy emacs bind was duplicated instead of migrated"
-[ "$(grep -c 'SUPER + SHIFT + ALT + E' "$blk")" -eq 1 ] \
-    || fail "legacy unbind was duplicated; chord + is being read as a quantifier"
-[ "$(grep -c 'SUPER + F1' "$blk")" -eq 1 ] || fail "seeding removed the user's own bind"
-
-# mktemp lands in /tmp, which is a different filesystem from $HOME here, so a
-# cross-filesystem mv would copy mktemp's 600 over the config file's 644.
+printf -- '-- scratch\n' >"$blk"
 chmod 644 "$blk"
-monarchy_seed_switch_user_bind >/dev/null
+
+# mktemp lands in /tmp, a different filesystem from $HOME here, so a
+# cross-filesystem mv would copy mktemp's 600 over the file's 644.
+monarchy_seed_block "$blk" modecheck <<'LUA'
+-- body
+LUA
 mode=$(stat -c %a "$blk")
 [ "$mode" = 644 ] || fail "seeding changed the file mode to $mode, expected 644"
+
+# Byte-stable across repeated applies.
+first=$(md5sum <"$blk")
+monarchy_seed_block "$blk" modecheck <<'LUA'
+-- body
+LUA
+monarchy_seed_block "$blk" modecheck <<'LUA'
+-- body
+LUA
+[ "$(md5sum <"$blk")" = "$first" ] || fail "seed_block is not byte-stable across applies"
 
 # An anchored legacy pattern must not eat a line the user wrote that merely
 # mentions the same string.
 cat >"$blk" <<'LUA'
--- Keep only your personal keybinding overrides here.
--- reminder: monarchy-switch-user is bound below, do not rebind it
-o.bind("SUPER + F2", "Mine", "true")
+-- scratch
+-- reminder: pam_kwallet_init is handled elsewhere, do not add it here
+o.launch_on_start("/usr/lib/pam_kwallet_init")
 LUA
-monarchy_seed_switch_user_bind >/dev/null
-grep -q 'reminder: monarchy-switch-user is bound below' "$blk" \
-    || fail "legacy pattern deleted a user comment that only mentions the command"
-monarchy_seed_kwallet_autostart >/dev/null 2>&1 || true
-
-kw=$HOME/.config/hypr/autostart.lua
-cat >"$kw" <<'LUA'
--- Extra autostart processes.
--- note: pam_kwallet_init is handled by monarchy, do not add it here
+monarchy_seed_block "$blk" kwallet \
+    '^o[.]launch_on_start[(]"/usr/lib/pam_kwallet_init"[)]$' <<'LUA'
+o.launch_on_start("/usr/lib/pam_kwallet_init")
 LUA
-monarchy_seed_kwallet_autostart >/dev/null
-grep -q 'note: pam_kwallet_init is handled by monarchy' "$kw" \
-    || fail "kwallet legacy pattern deleted a user comment"
-[ "$(grep -c 'launch_on_start' "$kw")" -eq 1 ] || fail "kwallet block not seeded exactly once"
+grep -q 'reminder: pam_kwallet_init is handled elsewhere' "$blk" \
+    || fail "anchored legacy pattern deleted a user comment"
+[ "$(grep -c 'launch_on_start' "$blk")" -eq 1 ] \
+    || fail "legacy line was duplicated instead of migrated"
 
 # A body line equal to a marker would end the block early on the next reseed.
 # monarchy_die exits, so run it in a subshell with this test's EXIT trap
@@ -212,5 +167,11 @@ LUA
 ) >/dev/null 2>&1; then
     fail "seed_block accepted a body containing its own end marker"
 fi
+
+# chezmoi owns the personal override files; monarchy asserts and never applies.
+for f in bindings.lua looknfeel.lua input.lua autostart.lua; do
+    [ -f "$REPO/chezmoi/dot_config/hypr/$f" ] \
+        || fail "chezmoi does not carry hypr/$f"
+done
 
 echo "user tests passed"
