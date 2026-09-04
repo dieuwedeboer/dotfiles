@@ -147,3 +147,8 @@ o.window("\\.exe$", { idle_inhibit = "fullscreen" })
 
 -- Local video players. Browsers hold their own inhibitor during playback.
 o.window("^(mpv|vlc)$", { idle_inhibit = "fullscreen" })
+
+-- AUR stremio (dbermond, Qt5 stremio-shell). Wayland app id is the desktop
+-- file name the PKGBUILD installs; it embeds libmpv and never takes an inhibitor.
+-- Not stremio-enhanced, stremio-linux-shell, or the Flatpak.
+o.window("^com\\.stremio\\.stremio$", { idle_inhibit = "fullscreen" })
