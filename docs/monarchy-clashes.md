@@ -86,3 +86,24 @@ Regenerate after a lock bump:
 ```bash
 python3 lib/monarchy/generate-inventories.py /usr/local/src/monarchy/omarchy
 ```
+
+`--dest <dir>` writes the three lists elsewhere, which is how `--repin-check`
+compares a candidate checkout without touching the tree.
+
+## Bumping the pin
+
+`./install.sh --repin-check` reports what moving the lock to the branch head
+would bring in: position and whether the fork rebased away from the pin, both
+classification guards, the `bin/` and `packages.installed` diffs, every new
+migration with its summary line, and added or deleted privileged drop-ins. It
+writes nothing.
+
+The bump itself stays a human-reviewed step. `monarchy_check_migrations` and
+`monarchy_check_packages_deny` halt an apply on anything unclassified, and that
+is the judgement the guards exist to force. `.claude/skills/repin` is the
+procedure. `monarchy-update` is what then fetches the commit onto a box.
+
+Deleted rows are the ones to act on. Apply installs files and never reconciles
+them, so a `sudoers.d` rule upstream removed for security stays on the box, and
+a package dropped from `omarchy-base.packages` stays installed, until a person
+takes it out.

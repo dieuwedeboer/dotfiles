@@ -18,13 +18,15 @@ for arg in "$@"; do
             fi
             ;;
         --splash-only) MODE=splash ;;
+        --repin-check) MODE=repin ;;
         --only=*)
             MONARCHY_ONLY=${arg#--only=}
             export MONARCHY_ONLY
             ;;
         -h|--help)
             cat <<'EOF'
-usage: install.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
+usage: install.sh [--check] [--update] [--no-packages] [--splash-only]
+       [--repin-check] [-v]
        monarchy-update [same flags]
 
   (none)          Full setup from a CachyOS+ZFS+KDE base: packages,
@@ -35,6 +37,8 @@ usage: install.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
   --update        Monarchy snapshot, fetch, check, then apply.
   --no-packages   Monarchy apply without pacman leaf packages.
   --splash-only   Omarchy Plymouth theme, plymouth around zfs, retain-splash.
+  --repin-check   Report what bumping omarchy.lock to the branch head would
+                  bring in. Writes nothing. The bump itself is a human call.
   --only=<unit>   Run one unit only. Combines with --check and --update.
                   Units: guards clone overlay pacman settings sddm session
                   logind portals user splash
@@ -82,6 +86,7 @@ monarchy_cli() {
             packages_install_omarchy_aur
             ;;
         splash) monarchy_splash_only ;;
+        repin) monarchy_repin_check ;;
         *)
             echo "unknown monarchy mode: $1" >&2
             exit 2

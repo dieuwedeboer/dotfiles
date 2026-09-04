@@ -16,6 +16,8 @@ source "$_monarchy_dir/overlay.sh"
 source "$_monarchy_dir/pacman.sh"
 # shellcheck source=monarchy/update.sh
 source "$_monarchy_dir/update.sh"
+# shellcheck source=monarchy/repin.sh
+source "$_monarchy_dir/repin.sh"
 # shellcheck source=monarchy/packages.sh
 source "$_monarchy_dir/packages.sh"
 # shellcheck source=monarchy/sessions.sh

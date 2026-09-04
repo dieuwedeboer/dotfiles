@@ -8,6 +8,9 @@ dataset contract, or the ISO provisioner.
 Re-run after bumping monarchy/omarchy.lock:
 
     python3 lib/monarchy/generate-inventories.py /usr/local/src/monarchy/omarchy
+
+--dest writes the three lists somewhere else, which is how --repin-check
+compares a candidate checkout without touching the tree.
 """
 
 from __future__ import annotations
@@ -68,17 +71,31 @@ def write_list(path: Path, items: list[str]) -> None:
 
 
 def main() -> int:
-    if len(sys.argv) < 2:
-        print("usage: generate-inventories.py <omarchy-clone>", file=sys.stderr)
+    args = sys.argv[1:]
+    dest_override = None
+    if args and args[0] == "--dest":
+        if len(args) < 2:
+            print("--dest needs a directory", file=sys.stderr)
+            return 2
+        dest_override = Path(args[1])
+        args = args[2:]
+    if not args:
+        print(
+            "usage: generate-inventories.py [--dest <dir>] <omarchy-clone>",
+            file=sys.stderr,
+        )
         return 2
-    clone = Path(sys.argv[1])
+    clone = Path(args[0])
     bin_dir = clone / "bin"
     if not bin_dir.is_dir():
         print(f"no bin/ under {clone}", file=sys.stderr)
         return 2
 
-    repo = Path(__file__).resolve().parents[2]
-    dest = repo / "monarchy"
+    if dest_override is not None:
+        dest = dest_override
+    else:
+        repo = Path(__file__).resolve().parents[2]
+        dest = repo / "monarchy"
     dest.mkdir(parents=True, exist_ok=True)
 
     names = sorted(p.name for p in bin_dir.iterdir() if p.is_file())

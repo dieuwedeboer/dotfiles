@@ -36,3 +36,8 @@ See `docs/agents/triage-labels.md`.
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root.
 See `docs/agents/domain.md`.
+
+### Re-pinning the overlay
+
+`./install.sh --repin-check` reports what a lock bump would bring in, and
+writes nothing. The steps after that are `.claude/skills/repin`.
