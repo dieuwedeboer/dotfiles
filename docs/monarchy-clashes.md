@@ -100,7 +100,7 @@ writes nothing.
 
 The bump itself stays a human-reviewed step. `monarchy_check_migrations` and
 `monarchy_check_packages_deny` halt an apply on anything unclassified, and that
-is the judgement the guards exist to force. `.claude/skills/repin` is the
+is the judgement the guards exist to force. `.agents/skills/repin` is the
 procedure. `monarchy-update` is what then fetches the commit onto a box.
 
 Deleted rows are the ones to act on. Apply installs files and never reconciles

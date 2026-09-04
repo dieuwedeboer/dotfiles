@@ -40,4 +40,4 @@ See `docs/agents/domain.md`.
 ### Re-pinning the overlay
 
 `./install.sh --repin-check` reports what a lock bump would bring in, and
-writes nothing. The steps after that are `.claude/skills/repin`.
+writes nothing. The steps after that are `.agents/skills/repin`.

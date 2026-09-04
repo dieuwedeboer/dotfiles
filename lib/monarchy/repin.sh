@@ -210,7 +210,7 @@ monarchy_repin_check() {
     monarchy_repin_privileged "$repo" "$head"
 
     monarchy_repin_section "To bump"
-    echo "Nothing above has been written. The .claude/skills/repin procedure"
+    echo "Nothing above has been written. The .agents/skills/repin procedure"
     echo "is the steps; it ends at a commit, and monarchy-update applies it."
     return 0
 }
