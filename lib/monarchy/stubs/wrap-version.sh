@@ -5,28 +5,31 @@ set -euo pipefail
 
 omarchy_path=${OMARCHY_PATH:-/usr/local/share/omarchy}
 omarchy_path=${omarchy_path%/}
-pin=${MONARCHY_PIN:-/etc/omarchy.lock}
 pacman_conf=${PACMAN_CONF:-/etc/pacman.conf}
 name=$(basename -- "$0")
 
 case "$name" in
     omarchy-version)
-        # No longer a git checkout, so no -git suffix: this is the version
-        # file out of the omarchy package.
-        [ -f "$omarchy_path/version" ] || exit 1
-        version=$(tr -d '[:space:]' <"$omarchy_path/version")
+        # Stock reads the pacman version, but only when OMARCHY_PATH is
+        # /usr/share/omarchy; against a working prefix it decides it is a
+        # dev-link and prints "dev". Monarchy always runs from a prefix, so do
+        # the package lookup here. $OMARCHY_PATH/version is not the answer: the
+        # 4.0.2 package still ships a version file reading 4.0.0.alpha.
+        version=$(pacman -Q omarchy 2>/dev/null | awk '{print $2}')
+        if [ -z "$version" ]; then
+            [ -f "$omarchy_path/version" ] || exit 1
+            version=$(tr -d '[:space:]' <"$omarchy_path/version")
+        fi
         [ -n "$version" ] || exit 1
         printf '%s\n' "$version"
         ;;
     omarchy-version-branch)
-        # Was "branch @ commit" of the pinned fork. Monarchy tracks a package
-        # now, so the honest answer is the package and its installed version.
-        [ -f "$pin" ] || exit 1
-        package=$(awk -F= '$1=="package"{print substr($0,index($0,"=")+1)}' "$pin")
-        [ -n "$package" ] || exit 1
-        installed=$(pacman -Q "$package" 2>/dev/null | awk '{print $2}')
-        [ -n "$installed" ] || installed=not-installed
-        printf '%s %s\n' "$package" "$installed"
+        # Was "branch @ commit" of the pinned fork. There is no branch now:
+        # Monarchy tracks a package, and the version is already
+        # omarchy-version. Stock exits 1 when there is no dev-link git branch
+        # and Fastfetch simply omits the line; do the same rather than invent
+        # a value.
+        exit 1
         ;;
     omarchy-version-channel)
         if grep -q 'https://pkgs.omarchy.org/stable/' "$pacman_conf" 2>/dev/null; then

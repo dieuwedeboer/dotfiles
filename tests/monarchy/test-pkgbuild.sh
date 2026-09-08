@@ -270,4 +270,22 @@ printf 'pkgname=fakepkg\npkgver=1\n' >"$bp/pkgbuilds/fakepkg/PKGBUILD"
 ) || fail "monarchy_build_pkg does not return a bare package path on stdout"
 rm -rf "$bp"
 
+# ---- the override lists against the REAL package ------------------------
+
+# test-overlay builds its tree from bin.deny and bin.wrap, so by construction
+# every name in them exists there and a stale entry can never fail. Check the
+# lists against the tree the packages actually install.
+# omarchy-upgrade-to-quattro-zfs-check survived the move off the fork this
+# way: it only ever existed in berenddeboer/omarchy, and the first thing to
+# notice was a failed apply on the box.
+tree=$(require_omarchy_tree)
+[ -d "$tree/bin" ] || fail "$tree has no bin/"
+stale=0
+for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}"; do
+    [ -e "$tree/bin/$name" ] && continue
+    echo "  overridden name not in the omarchy package: $name" >&2
+    stale=1
+done
+[ "$stale" = 0 ] || fail "monarchy/bin.deny or bin.wrap names a binary the package does not ship"
+
 echo "pkgbuild tests passed"
