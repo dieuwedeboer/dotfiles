@@ -9,7 +9,6 @@ monarchy_load_list() {
 }
 
 monarchy_load_inventories() {
-    mapfile -t MONARCHY_BIN_ALLOW < <(monarchy_load_list "$MONARCHY_MISC/bin.allow")
     mapfile -t MONARCHY_BIN_WRAP < <(monarchy_load_list "$MONARCHY_MISC/bin.wrap")
     mapfile -t MONARCHY_BIN_DENY < <(monarchy_load_list "$MONARCHY_MISC/bin.deny")
     mapfile -t MONARCHY_PKG_DENY < <(monarchy_load_list "$MONARCHY_MISC/packages.deny")
@@ -27,9 +26,11 @@ monarchy_in_list() {
     return 1
 }
 
-monarchy_inventory_has() {
+# There is no allow list any more: an unlisted name is simply not overridden,
+# and resolves from /usr/bin like any other packaged binary. "Do we override
+# this?" is the only question left to ask.
+monarchy_overrides() {
     local name=$1
-    monarchy_in_list "$name" "${MONARCHY_BIN_ALLOW[@]}" \
-        || monarchy_in_list "$name" "${MONARCHY_BIN_WRAP[@]}" \
+    monarchy_in_list "$name" "${MONARCHY_BIN_WRAP[@]}" \
         || monarchy_in_list "$name" "${MONARCHY_BIN_DENY[@]}"
 }

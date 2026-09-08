@@ -27,19 +27,26 @@ fail() {
 }
 
 
-# The clone is the thing most of these tests compare the overlay against.
-# test-overlay.sh has always required it; without this the lock and
-# switch-user tests skip their drift checks and still print "passed", which
-# is worse than not running them.
-require_clone() {
-    local clone=${1:-$MONARCHY_SRC_DEFAULT}
-    [ -d "$clone" ] \
-        || fail "no clone at $clone; run ./install.sh --check first, or pass one as \$1"
-    printf '%s\n' "$clone"
+# The Omarchy tree is what the drift checks compare the overlay against.
+# It used to be a git clone; it is now the pacman-owned package tree.
+# Failing loudly matters: without this the lock and switch-user tests skip
+# their drift checks and still print "passed", which is worse than not
+# running them.
+require_omarchy_tree() {
+    local tree=${1:-${MONARCHY_TEST_TREE:-$MONARCHY_SRC_DEFAULT}}
+    [ -d "$tree" ] \
+        || fail "no Omarchy tree at $tree; install the omarchy package (./install.sh --update), or pass one as \$1"
+    # Same rule monarchy_assert_source_tree applies at apply time. A symlink
+    # here is the pre-migration bridge pointing at the working prefix, whose
+    # lock QML and menu are already patched -- comparing the overlay against
+    # its own output would pass for the wrong reason.
+    [ ! -L "$tree" ] \
+        || fail "$tree is a symlink to the working prefix, not the package tree; run ./install.sh --update, or pass a tree as \$1"
+    [ -d "$tree/bin" ] || fail "$tree has no bin/"
+    printf '%s\n' "$tree"
 }
 
-MONARCHY_SRC_DEFAULT="${MONARCHY_SRC:-/usr/local/src/monarchy/omarchy}"
-
+MONARCHY_SRC_DEFAULT="${MONARCHY_SRC:-/usr/share/omarchy}"
 # Every monarchy_* name that check or apply reaches, following the unit verbs
 # in MONARCHY_UNITS. Tests assert against this rather than against the literal
 # body of monarchy_apply, which is now a loop.

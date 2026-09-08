@@ -1,7 +1,19 @@
 # shellcheck shell=bash
-# Install the omarchy-settings file tree without the package.
-# Skip list is monarchy/settings.skip (Limine, plymouth-before-zfs,
-# os-release is never in this tree, mimeapps, stock SDDM conf, nsswitch).
+# MONARCHY_PATH comes from common.sh; shellcheck reads this file alone.
+# shellcheck disable=SC2153
+# What is left of "install the omarchy-settings tree by hand".
+#
+# omarchy-settings-monarchy now owns that tree: it is the official package
+# rebuilt without upstream's post_install (the `rm -f /etc/os-release` block)
+# and without the paths in monarchy/settings.skip. Everything this file used
+# to copy -- the etc/ tree, systemd user units, system-sleep hooks,
+# fontconfig, the Omarchy font, xdg-terminal-exec, environment.d, icons -- is
+# shipped by that package, so pacman owns it, `pacman -Qkk` verifies it, and
+# removing the package removes it.
+#
+# The one thing a package cannot do is point at the working prefix, because
+# upstream's /etc/profile.d/omarchy.sh hardcodes /usr/share/omarchy and the
+# session has to read /usr/local/share/omarchy.
 
 MONARCHY_ROOT="${MONARCHY_ROOT:-}"
 
@@ -22,168 +34,47 @@ monarchy_settings_dest() {
     printf '%s/%s\n' "${MONARCHY_ROOT}" "${rel#/}"
 }
 
-monarchy_install_file() {
-    local src=$1 dest=$2 mode=${3:-644}
-    [ -f "$src" ] || return 0
-    monarchy_sudo mkdir -p "$(dirname "$dest")"
-    monarchy_sudo install -m "$mode" "$src" "$dest"
-}
-
-monarchy_install_etc_tree() {
-    local src="$MONARCHY_SRC/etc"
-    local f rel dest mode
-    [ -d "$src" ] || monarchy_die "missing $src"
-    while IFS= read -r -d '' f; do
-        rel=${f#"$MONARCHY_SRC/"}
-        if monarchy_settings_skipped "$rel"; then
-            continue
-        fi
-        dest=$(monarchy_settings_dest "$rel")
-        mode=644
-        case "$rel" in
-            etc/sudoers.d/*) mode=440 ;;
-        esac
-        monarchy_install_file "$f" "$dest" "$mode"
-    done < <(find "$src" -type f -print0)
-}
-
 monarchy_install_profile_d() {
-    local dest
+    local dest parent
     dest=$(monarchy_settings_dest etc/profile.d/omarchy.sh)
-    monarchy_sudo mkdir -p "$(dirname "$dest")"
-    monarchy_sudo tee "$dest" >/dev/null <<EOF
-# Monarchy: bootstrap from the working prefix. Stock hardcodes /usr/share/omarchy.
-[ -r /usr/local/share/omarchy/default/bash/env-bootstrap ] && . /usr/local/share/omarchy/default/bash/env-bootstrap
-EOF
-    monarchy_sudo chmod 644 "$dest"
+    parent=$(dirname "$dest")
+    monarchy_write_to "$parent" mkdir -p "$parent"
+    monarchy_write_to "$parent" tee "$dest" >/dev/null <<PROFILE
+# Monarchy: bootstrap from the working prefix. Stock hardcodes
+# /usr/share/omarchy, which is the package tree, not the overlay.
+[ -r ${MONARCHY_PATH}/default/bash/env-bootstrap ] && . ${MONARCHY_PATH}/default/bash/env-bootstrap
+PROFILE
+    monarchy_write_to "$parent" chmod 644 "$dest"
 }
 
-monarchy_install_user_units() {
-    local src="$MONARCHY_SRC/default/systemd/user"
-    local dest_dir f dest name tmp
-    [ -d "$src" ] || return 0
-    dest_dir=$(monarchy_settings_dest usr/lib/systemd/user)
-    monarchy_sudo mkdir -p "$dest_dir"
-    for f in "$src"/*.service; do
-        [ -f "$f" ] || continue
-        name=$(basename "$f")
-        dest="$dest_dir/$name"
-        tmp=$(mktemp)
-        sed 's|/usr/bin/omarchy-|/usr/local/bin/omarchy-|g' "$f" >"$tmp"
-        monarchy_sudo install -m 644 "$tmp" "$dest"
-        rm -f "$tmp"
-    done
-    if [ -d "$src/app.slice.d" ]; then
-        monarchy_sudo mkdir -p "$dest_dir/app.slice.d"
-        for f in "$src/app.slice.d"/*; do
-            [ -f "$f" ] || continue
-            monarchy_install_file "$f" "$dest_dir/app.slice.d/$(basename "$f")"
-        done
-    fi
-}
-
-monarchy_install_system_sleep() {
-    local src="$MONARCHY_SRC/default/systemd/system-sleep"
-    local dest_dir f
-    [ -d "$src" ] || return 0
-    dest_dir=$(monarchy_settings_dest usr/lib/systemd/system-sleep)
-    monarchy_sudo mkdir -p "$dest_dir"
-    for f in "$src"/*; do
-        [ -f "$f" ] || continue
-        monarchy_install_file "$f" "$dest_dir/$(basename "$f")" 755
-    done
-}
-
-monarchy_install_fontconfig() {
-    local src="$MONARCHY_SRC/default/fontconfig/conf.avail/50-omarchy.conf"
-    local avail dconf
-    [ -f "$src" ] || return 0
-    avail=$(monarchy_settings_dest usr/share/fontconfig/conf.avail/50-omarchy.conf)
-    dconf=$(monarchy_settings_dest etc/fonts/conf.d/50-omarchy.conf)
-    monarchy_install_file "$src" "$avail"
-    monarchy_sudo mkdir -p "$(dirname "$dconf")"
-    monarchy_sudo ln -sfn "$avail" "$dconf"
-}
-
-monarchy_install_omarchy_font() {
-    local src="$MONARCHY_SRC/default/fonts/omarchy/omarchy.ttf"
-    local dest
-    [ -f "$src" ] || return 0
-    dest=$(monarchy_settings_dest usr/share/fonts/omarchy/omarchy.ttf)
-    monarchy_install_file "$src" "$dest"
-}
-
-monarchy_install_xdg_terminals() {
-    local src="$MONARCHY_SRC/default/xdg-terminal-exec/hyprland-xdg-terminals.list"
-    local dest
-    [ -f "$src" ] || return 0
-    dest=$(monarchy_settings_dest usr/share/xdg-terminal-exec/hyprland-xdg-terminals.list)
-    monarchy_install_file "$src" "$dest"
-}
-
-monarchy_install_environment_d() {
-    local src="$MONARCHY_SRC/default/environment.d"
-    local dest_dir f
-    [ -d "$src" ] || return 0
-    dest_dir=$(monarchy_settings_dest usr/lib/environment.d)
-    monarchy_sudo mkdir -p "$dest_dir"
-    for f in "$src"/*; do
-        [ -f "$f" ] || continue
-        monarchy_install_file "$f" "$dest_dir/$(basename "$f")"
-    done
-}
-
-monarchy_install_icons() {
-    local src="$MONARCHY_SRC/applications/icons"
-    local dest_dir f name
-    [ -d "$src" ] || return 0
-    dest_dir=$(monarchy_settings_dest usr/share/icons/hicolor/256x256/apps)
-    monarchy_sudo mkdir -p "$dest_dir"
-    for f in "$src"/*; do
-        [ -f "$f" ] || continue
-        name=$(basename "$f")
-        monarchy_install_file "$f" "$dest_dir/$name"
-    done
-    if [ -f "$MONARCHY_SRC/icon.png" ]; then
-        monarchy_install_file "$MONARCHY_SRC/icon.png" \
-            "$(monarchy_settings_dest usr/share/pixmaps/omarchy.png)"
-        monarchy_install_file "$MONARCHY_SRC/icon.png" \
-            "$(monarchy_settings_dest usr/share/icons/hicolor/256x256/apps/omarchy.png)"
-    fi
-}
-
+# The skip list is now a package build input, so these assertions are about
+# what omarchy-settings-monarchy must have excluded, not about what a copy
+# loop must have avoided.
 monarchy_assert_settings_assets() {
-    local skip
+    local skip rel
     skip=$(monarchy_settings_skip_file)
     [ -f "$skip" ] || monarchy_die "missing $skip"
-    grep -qx 'etc/mkinitcpio.conf.d/omarchy_hooks.conf' "$skip" \
-        || monarchy_die "$skip must skip plymouth-before-zfs hooks"
-    grep -qx 'etc/limine-entry-tool.d/omarchy-defaults.conf' "$skip" \
-        || monarchy_die "$skip must skip Limine drop-ins"
-    grep -qx 'default/applications/mimeapps.list' "$skip" \
-        || monarchy_die "$skip must skip system mimeapps"
-    grep -qx 'etc/docker/daemon.json' "$skip" \
-        || monarchy_die "$skip must skip Omarchy docker daemon.json"
-    grep -qx 'etc/skel/.bashrc' "$skip" \
-        || monarchy_die "$skip must skip Omarchy skel bashrc"
-    monarchy_in_list omarchy-install-app "${MONARCHY_BIN_ALLOW[@]}" \
-        || monarchy_die "omarchy-install-app must be allowed"
+    for rel in \
+        etc/limine-entry-tool.d \
+        etc/snapper \
+        etc/mkinitcpio.conf.d/omarchy_hooks.conf \
+        usr/share/omarchy/default/applications/mimeapps.list \
+        etc/docker/daemon.json \
+        etc/profile.d/omarchy.sh; do
+        grep -qx "$rel" "$skip" || monarchy_die "$skip must skip $rel"
+    done
+    # These are not files in the package; upstream copies them from
+    # etc-overrides in the scriptlet the rebuild drops. If they ever become
+    # real package files, the skip list has to grow and this will say so.
     monarchy_in_list omarchy-refresh-pacman "${MONARCHY_BIN_DENY[@]}" \
         || monarchy_die "omarchy-refresh-pacman must stay denied"
+    return 0
 }
 
 monarchy_install_settings() {
     monarchy_assert_settings_assets
-    monarchy_install_etc_tree
     monarchy_install_profile_d
-    monarchy_install_user_units
-    monarchy_install_system_sleep
-    monarchy_install_fontconfig
-    monarchy_install_omarchy_font
-    monarchy_install_xdg_terminals
-    monarchy_install_environment_d
-    monarchy_install_icons
-    monarchy_log "omarchy-settings files installed (skip list applied)"
+    monarchy_log "settings owned by omarchy-settings-monarchy; profile.d repointed at $MONARCHY_PATH"
 }
 
 monarchy_enable_omarchy_services() {
@@ -201,7 +92,7 @@ monarchy_enable_omarchy_services() {
     fi
 }
 
-# $2=1 runs as root. Clone install/config/*.sh write under /etc and /usr.
+# $2=1 runs as root. install/config/*.sh write under /etc and /usr.
 monarchy_run_install_script() {
     local script=$1
     local as_root=${2:-0}

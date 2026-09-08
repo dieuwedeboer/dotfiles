@@ -39,7 +39,8 @@ monarchy_install_packages() {
     [ "${#pkgs[@]}" -gt 0 ] || monarchy_die "filtered package list is empty"
 
     local denied
-    for denied in plasma-login-manager tldr snapper limine omarchy omarchy-dev \
+    for denied in plasma-login-manager tldr snapper limine \
+        limine-mkinitcpio-hook limine-snapper-sync omarchy-dev \
         omarchy-settings omarchy-settings-dev ufw-docker; do
         if monarchy_in_list "$denied" "${pkgs[@]}"; then
             monarchy_die "denied package $denied leaked into install set"

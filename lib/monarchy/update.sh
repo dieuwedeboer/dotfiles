@@ -24,7 +24,8 @@ monarchy_check_packages_deny() {
     local list="$MONARCHY_SRC/install/omarchy-base.packages"
     [ -f "$list" ] || return 0
     local required
-    for required in plasma-login-manager tldr snapper limine omarchy omarchy-dev \
+    for required in plasma-login-manager tldr snapper limine \
+        limine-mkinitcpio-hook limine-snapper-sync omarchy-dev \
         omarchy-settings omarchy-settings-dev ufw-docker; do
         monarchy_in_list "$required" "${MONARCHY_PKG_DENY[@]}" \
             || monarchy_die "$required missing from packages.deny"
@@ -59,7 +60,7 @@ monarchy_check_applications_drop() {
     [ -f "$MONARCHY_MISC/applications.drop" ] || monarchy_die "missing applications.drop"
     for name in "${MONARCHY_APP_DROP[@]}"; do
         [ -f "$MONARCHY_SRC/applications/${name}.desktop" ] \
-            || monarchy_die "applications.drop $name missing from clone applications/"
+            || monarchy_die "applications.drop $name missing from the omarchy package applications/"
     done
     return 0
 }
@@ -70,10 +71,19 @@ monarchy_check_applications_drop() {
 # both walk this array. The order is the constraint that used to live only in
 # prose, so it is the one thing to read carefully before editing.
 #
+# The order changed when the clone went away. It now has to be:
+#   pacman     [omarchy] has to exist before anything can be downloaded
+#   packaging  builds the two local packages, then installs `omarchy`
+#   prefix     links the working prefix out of the tree `omarchy` just landed
+#   overlay    stubs and wraps, which need that prefix
+#   leaves     reads install/omarchy-base.packages, which only exists after
+#              `omarchy` is installed
+# Everything from settings onward is unchanged.
+#
 # --only=<unit> runs a single unit. There is no canary box here and
 # zfs-snapshot-pre-update keeps three snapshots, so a full apply is an
 # expensive way to iterate on one subsystem.
-MONARCHY_UNITS=(guards clone overlay pacman settings sddm session logind portals user splash)
+MONARCHY_UNITS=(guards pacman packaging prefix overlay leaves settings sddm session logind portals user splash)
 
 monarchy_unit_exists() {
     local u
@@ -100,29 +110,49 @@ monarchy_guards_check() {
 
 monarchy_guards_apply() { :; }
 
-# ---- clone: the pinned tree and the working prefix -----------------------
+# ---- pacman: CachyOS first, [omarchy] after ------------------------------
 
-# Everything that must hold about the pinned tree once it is on disk.
-monarchy_clone_assert() {
-    monarchy_check_inventory_complete
-    monarchy_check_clone_bin_classified
+monarchy_pacman_check() {
+    monarchy_preserve_pacman_conf
+    monarchy_refuse_archzfs
+    monarchy_refuse_omarchy_zfs_repo
+    monarchy_refuse_partial_upgrade
+}
+
+monarchy_pacman_apply() {
+    monarchy_add_omarchy_repo
+}
+
+# ---- packaging: the two local packages, then the real omarchy ------------
+
+monarchy_packaging_check() {
+    monarchy_check_pkgbuilds
+}
+
+monarchy_packaging_apply() {
+    monarchy_build_packages
+}
+
+# ---- prefix: the working prefix out of the package tree ------------------
+
+# Everything that must hold about the package tree once it is on disk.
+monarchy_prefix_assert() {
+    monarchy_assert_source_tree
+    monarchy_check_overrides_exist
+    monarchy_check_bin_hazards
     monarchy_check_migrations
 }
 
 # Apply runs every unit's check before its apply, and on a first install the
-# clone does not exist yet at this point. monarchy_clone_apply asserts again
-# once it does, so skipping here loses nothing. monarchy_check calls
-# monarchy_ensure_clone_for_check before the loop, so in check mode there is
-# always a tree and this never silently passes.
-monarchy_clone_check() {
+# omarchy package is not there yet at this point. monarchy_prefix_apply
+# asserts again once it is, so skipping here loses nothing.
+monarchy_prefix_check() {
     [ -d "$MONARCHY_SRC/bin" ] || return 0
-    monarchy_clone_assert
+    monarchy_prefix_assert
 }
 
-monarchy_clone_apply() {
-    monarchy_sync_omarchy_clone
-    # After the clone exists, before anything is built from it.
-    monarchy_clone_assert
+monarchy_prefix_apply() {
+    monarchy_prefix_assert
     monarchy_link_working_prefix
     monarchy_write_omarchy_conf
     export OMARCHY_PATH
@@ -144,13 +174,10 @@ monarchy_overlay_apply() {
     monarchy_install_user_setup
 }
 
-# ---- pacman: CachyOS first, [omarchy] after, filtered leaves -------------
+# ---- leaves: the filtered omarchy-base.packages set ----------------------
 
-monarchy_pacman_check() {
-    monarchy_preserve_pacman_conf
-    monarchy_refuse_archzfs
-    monarchy_refuse_omarchy_zfs_repo
-    monarchy_refuse_partial_upgrade
+monarchy_leaves_check() {
+    [ -f "$MONARCHY_SRC/install/omarchy-base.packages" ] || return 0
     monarchy_check_packages_deny
     monarchy_filtered_packages | grep -qx sddm \
         || monarchy_die "sddm missing from filtered package list"
@@ -159,12 +186,11 @@ monarchy_pacman_check() {
     fi
 }
 
-monarchy_pacman_apply() {
-    monarchy_add_omarchy_repo
+monarchy_leaves_apply() {
     monarchy_install_packages
 }
 
-# ---- settings: omarchy-settings files minus settings.skip ----------------
+# ---- settings: the profile.d repoint; the package owns the rest ----------
 
 monarchy_settings_check() { monarchy_assert_settings_assets; }
 
@@ -251,10 +277,9 @@ monarchy_check() {
     monarchy_assert_only_valid
     monarchy_load_lock
     monarchy_load_inventories
-    # Check-mode only. On a box with no clone this repoints MONARCHY_SRC at a
-    # user cache so a dry run has something to read. Doing that during apply
-    # would make apply build from the cache instead of /usr/local/src.
-    monarchy_ensure_clone_for_check
+    # There is no clone to fall back on any more: MONARCHY_SRC is a
+    # pacman-owned path, so a dry run either has the omarchy package or the
+    # units that need it return early.
     # Guards refuse a host this overlay must never touch, so --only cannot
     # skip them. It exists to shrink blast radius, not to remove the floor.
     monarchy_guards_check
@@ -269,7 +294,9 @@ monarchy_check() {
 # Quickshell lock refuses without /etc/pam.d/omarchy-lock-password.
 # Omarchy install/config/lockscreen-pam.sh is this one command.
 monarchy_apply_lock() {
-    local bin="$MONARCHY_PATH/bin/omarchy-apply-lock"
+    # Not overridden, so it is not in the overlay: it comes from /usr/bin with
+    # the rest of the package.
+    local bin="$MONARCHY_SRC/bin/omarchy-apply-lock"
     [ -x "$bin" ] || monarchy_die "missing $bin"
     export OMARCHY_PATH
     export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
@@ -310,10 +337,10 @@ monarchy_update() {
     monarchy_load_lock
     monarchy_load_inventories
     monarchy_snapshot_first
-    # Root-owned clone. Fetch+checkout the lock commit as root before
-    # check so a lock bump is classified against the new tree, not the
-    # previous checkout. User git hits "dubious ownership" on this dest.
-    monarchy_sync_omarchy_clone
+    # Build and install the packages before check, so a new upstream version
+    # is classified against the tree that is about to be applied rather than
+    # the one already on disk.
+    monarchy_build_packages
     monarchy_check
     monarchy_apply
 }

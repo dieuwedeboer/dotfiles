@@ -1,15 +1,53 @@
-# Clone-relative paths that brick CachyOS+ZFS+KDE. Same idea as
-# omarchy-on-cachyos deleting installer steps. Everything else under etc/
-# and the selected default/ trees is installed.
+# Paths dropped from the official omarchy-settings package when
+# pkgbuilds/omarchy-settings-monarchy rebuilds it. Package-relative, so they
+# read the same way as `bsdtar tf` output and as the installed paths.
+#
+# Everything not listed here is kept byte-identical to upstream. A path here
+# that upstream no longer ships is a build error, not a no-op: a hazard that
+# reappears under a new name must be reclassified, not silently skipped.
+#
+# /etc/os-release, /etc/nsswitch.conf, /etc/security/faillock.conf,
+# /etc/plymouth/plymouthd.conf and /etc/skel/.bashrc are NOT in this list
+# because they are not files in the package. Upstream stages them under
+# usr/share/omarchy/etc-overrides/ and copies them into /etc from its
+# post_install/post_upgrade scriptlet. Dropping the scriptlet and the
+# etc-overrides tree is what protects them; see the PKGBUILD.
+
+# Limine. This host boots rEFInd -> ZFSBootMenu.
+etc/limine-entry-tool.d
+usr/share/omarchy/default/limine
+etc/skel/.config/autostart/limine-snapper-notify.desktop
+usr/share/omarchy/config/autostart/limine-snapper-notify.desktop
+
+# Snapper. Snapshots are sanoid plus zfs-snapshot-pre-update.
+etc/snapper
+usr/share/omarchy/default/snapper
+
+# plymouth-before-zfs. lib/monarchy/splash.sh owns the HOOKS rewrite and only
+# moves plymouth ahead of zfs when the keyfile is in mkinitcpio FILES.
 etc/mkinitcpio.conf.d/omarchy_hooks.conf
-etc/limine-entry-tool.d/omarchy-defaults.conf
-etc/limine-entry-tool.d/omarchy-uki.conf
+
+# SDDM. zz-omarchy-sddm.conf has to sort after CachyOS's kde_settings.conf,
+# and these two drop-ins do not.
 etc/sddm.conf.d/10-theme.conf
 etc/sddm.conf.d/10-wayland.conf
-etc/nsswitch.conf
+
+# Stock hardcodes /usr/share/omarchy; monarchy_install_profile_d writes a
+# replacement pointing at the working prefix.
 etc/profile.d/omarchy.sh
+
+# Family box: Plasma keeps Dolphin as inode/directory.
+usr/share/omarchy/default/applications/mimeapps.list
+
+# CachyOS owns zram and the session desktop file is monarchy/omarchy.desktop.
+usr/share/omarchy/default/systemd/zram-generator.conf.d/90-omarchy.conf
+usr/share/omarchy/default/wayland-sessions/omarchy.desktop
+
+# CachyOS owns the docker daemon config.
 etc/docker/daemon.json
-etc/skel/.bashrc
-default/applications/mimeapps.list
-default/systemd/zram-generator.conf.d/90-omarchy.conf
-default/wayland-sessions/omarchy.desktop
+
+# cachyos-alacritty-config owns this. /etc/skel only seeds new accounts, and
+# the family's Plasma look is not Monarchy's to change. This is the only path
+# in the upstream package that collides with another package rather than with
+# an unowned file.
+etc/skel/.config/alacritty/alacritty.toml

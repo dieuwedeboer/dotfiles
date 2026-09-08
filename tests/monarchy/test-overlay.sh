@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Rebuild the overlay into a temp prefix. No sudo. No /etc edits.
+#
+# This used to need the real tree on disk, because the overlay was a symlink
+# farm over a git clone and the test had to compare against it. The overlay is
+# now only the names Monarchy overrides, so the tree can be synthetic and the
+# test is deterministic.
 set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,117 +17,132 @@ source "$LIB/denylist.sh"
 # shellcheck source=../../lib/monarchy/overlay.sh
 source "$LIB/overlay.sh"
 
-CLONE=$(require_clone "${1:-}")
-[ -d "$CLONE/bin" ] || fail "clone at $CLONE has no bin/"
-
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-export MONARCHY_SRC=$CLONE
+monarchy_load_inventories
+
+# A stand-in for /usr/share/omarchy: every name we override, plus a few plain
+# ones that must end up NOT in the overlay.
+PLAIN=(omarchy omarchy-install-app omarchy-pkg-add omarchy-apply-lock omarchy-plymouth-set-by-theme)
+mkdir -p "$tmp/src/bin"
+for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}" "${PLAIN[@]}"; do
+    printf '#!/bin/sh\necho %s\n' "$name" >"$tmp/src/bin/$name"
+    chmod +x "$tmp/src/bin/$name"
+done
+
+export MONARCHY_SRC=$tmp/src
 export MONARCHY_PATH=$tmp/prefix
 export MONARCHY_INSTALL_SUDO_STUBS=0
 export MONARCHY_LOG=$tmp/log
 mkdir -p "$MONARCHY_PATH"
 
-monarchy_load_inventories
-monarchy_check_inventory_complete
-monarchy_check_clone_bin_classified
+monarchy_check_overrides_exist
+monarchy_check_bin_hazards
 monarchy_rebuild_overlay
 
 dest=$MONARCHY_PATH/bin
-[ -L "$dest/omarchy" ] || { echo "omarchy is not a symlink" >&2; exit 1; }
-[ "$(readlink "$dest/omarchy")" = "$CLONE/bin/omarchy" ] || {
-    echo "omarchy symlink target wrong" >&2
-    exit 1
-}
-[ -x "$dest/omarchy-refresh-pacman" ] || { echo "deny stub missing" >&2; exit 1; }
-[ ! -L "$dest/omarchy-refresh-pacman" ] || { echo "deny name is a symlink" >&2; exit 1; }
+
+# Deny stubs: real files, exit 2.
+[ -x "$dest/omarchy-refresh-pacman" ] || fail "deny stub missing"
+[ ! -L "$dest/omarchy-refresh-pacman" ] || fail "deny name is a symlink"
 set +e
 "$dest/omarchy-refresh-pacman" >/dev/null 2>&1
 st=$?
 set -e
-[ "$st" -eq 2 ] || { echo "deny stub exit is $st, expected 2" >&2; exit 1; }
-[ -x "$dest/omarchy-update" ] || { echo "wrap missing" >&2; exit 1; }
-grep -q 'monarchy-update' "$dest/omarchy-update" || { echo "update wrap is not wrap-update" >&2; exit 1; }
-[ -x "$dest/omarchy-refresh-plymouth" ] || { echo "plymouth wrap missing" >&2; exit 1; }
-grep -q 'wrap-plymouth does not handle' "$dest/omarchy-refresh-plymouth" || {
-    echo "refresh-plymouth is not wrap-plymouth" >&2
-    exit 1
-}
-[ -x "$dest/omarchy-refresh-sddm" ] || { echo "sddm wrap missing" >&2; exit 1; }
-[ ! -L "$dest/omarchy-refresh-sddm" ] || { echo "refresh-sddm wrap is a symlink" >&2; exit 1; }
-grep -q 'monarchy_refresh_sddm' "$dest/omarchy-refresh-sddm" || {
-    echo "refresh-sddm is not wrap-sddm" >&2
-    exit 1
-}
-[ -L "$dest/omarchy-plymouth-set-by-theme" ] || { echo "set-by-theme should be allowlisted" >&2; exit 1; }
-[ -L "$dest/omarchy-install-app" ] || { echo "omarchy-install-app should be allowlisted" >&2; exit 1; }
-[ -L "$dest/omarchy-pkg-add" ] || { echo "omarchy-pkg-add should be allowlisted" >&2; exit 1; }
-[ ! -L "$dest/omarchy-apply-system" ] || { echo "omarchy-apply-system must stay a deny stub" >&2; exit 1; }
-[ -x "$dest/omarchy-screensaver" ] || { echo "screensaver wrap missing" >&2; exit 1; }
-[ ! -L "$dest/omarchy-screensaver" ] || { echo "screensaver wrap is a symlink" >&2; exit 1; }
-grep -q 'monarchy_seed_branding' "$dest/omarchy-screensaver" || {
-    echo "screensaver wrap does not seed branding" >&2
-    exit 1
-}
-[ -x "$dest/omarchy-version" ] || { echo "version wrap missing" >&2; exit 1; }
-[ ! -L "$dest/omarchy-version" ] || { echo "omarchy-version wrap is a symlink" >&2; exit 1; }
-[ ! -L "$dest/omarchy-version-branch" ] || { echo "omarchy-version-branch wrap is a symlink" >&2; exit 1; }
-[ ! -L "$dest/omarchy-version-channel" ] || { echo "omarchy-version-channel wrap is a symlink" >&2; exit 1; }
-grep -q 'wrap-version does not handle' "$dest/omarchy-version" || {
-    echo "omarchy-version is not wrap-version" >&2
-    exit 1
-}
-[ -x "$dest/yay" ] || { echo "yay wrapper missing" >&2; exit 1; }
+[ "$st" -eq 2 ] || fail "deny stub exit is $st, expected 2"
+[ ! -L "$dest/omarchy-apply-system" ] || fail "omarchy-apply-system must stay a deny stub"
 
-allow_n=${#MONARCHY_BIN_ALLOW[@]}
+# Wraps: real files, the right stub behind each name.
+[ -x "$dest/omarchy-update" ] || fail "wrap missing"
+grep -q 'monarchy-update' "$dest/omarchy-update" || fail "update wrap is not wrap-update"
+[ -x "$dest/omarchy-refresh-plymouth" ] || fail "plymouth wrap missing"
+grep -q 'wrap-plymouth does not handle' "$dest/omarchy-refresh-plymouth" \
+    || fail "refresh-plymouth is not wrap-plymouth"
+[ -x "$dest/omarchy-refresh-sddm" ] || fail "sddm wrap missing"
+[ ! -L "$dest/omarchy-refresh-sddm" ] || fail "refresh-sddm wrap is a symlink"
+grep -q 'monarchy_refresh_sddm' "$dest/omarchy-refresh-sddm" || fail "refresh-sddm is not wrap-sddm"
+[ -x "$dest/omarchy-screensaver" ] || fail "screensaver wrap missing"
+grep -q 'monarchy_seed_branding' "$dest/omarchy-screensaver" \
+    || fail "screensaver wrap does not seed branding"
+[ -x "$dest/omarchy-disk-speedtest" ] || fail "disk-speedtest wrap missing"
+grep -q 'zpool list' "$dest/omarchy-disk-speedtest" \
+    || fail "disk-speedtest wrap does not resolve the pool"
+[ -x "$dest/omarchy-version" ] || fail "version wrap missing"
+grep -q 'wrap-version does not handle' "$dest/omarchy-version" || fail "omarchy-version is not wrap-version"
+# The one script the ZFS fork actually improved, kept without the fork.
+[ -x "$dest/omarchy-snapshot" ] || fail "snapshot wrap missing"
+grep -q 'ZFSBootMenu' "$dest/omarchy-snapshot" || fail "snapshot wrap is not the ZFS one"
+[ -x "$dest/yay" ] || fail "yay wrapper missing"
+
+# The point of dropping bin.allow: a name we do not override gets no overlay
+# entry at all and resolves from /usr/bin.
+for name in "${PLAIN[@]}"; do
+    [ ! -e "$dest/$name" ] || fail "$name is not overridden and must not be in the overlay"
+done
+
 wrap_n=${#MONARCHY_BIN_WRAP[@]}
 deny_n=${#MONARCHY_BIN_DENY[@]}
 overlay_n=$(find "$dest" -maxdepth 1 \( -type f -o -type l \) | wc -l)
-# overlay also has yay
-expected=$((allow_n + wrap_n + deny_n + 1))
-[ "$overlay_n" -eq "$expected" ] || {
-    echo "overlay has $overlay_n entries, expected $expected" >&2
-    exit 1
-}
+expected=$((wrap_n + deny_n + 1)) # + yay
+[ "$overlay_n" -eq "$expected" ] || fail "overlay has $overlay_n entries, expected $expected"
 
-# monarchy_apply must classify the clone before it builds anything from it.
-# That property now lives in two places: the clone unit runs before the overlay
-# unit, and inside monarchy_clone_apply the sync happens before the assert.
-monarchy_reaches apply | grep -qx 'monarchy_check_inventory_complete' \
-    || fail "apply does not reach monarchy_check_inventory_complete"
-monarchy_reaches apply | grep -qx 'monarchy_check_clone_bin_classified' \
-    || fail "apply does not reach monarchy_check_clone_bin_classified"
+# The hazard scan is what replaced "every name must be in an inventory". It
+# has to fail on an unclassified binary that drives limine, snapper or
+# pacman.conf, and it is the only thing standing between a renamed brick and
+# the overlay now.
+printf '#!/bin/sh\nlimine-entry-tool --add-kernel "$@"\n' >"$tmp/src/bin/omarchy-something-new"
+chmod +x "$tmp/src/bin/omarchy-something-new"
+if ( monarchy_check_bin_hazards ) >/dev/null 2>&1; then
+    fail "hazard scan passed an unclassified binary that calls limine-entry-tool"
+fi
+rm -f "$tmp/src/bin/omarchy-something-new"
+monarchy_check_bin_hazards || fail "hazard scan failed on a clean tree"
+
+# A wrap or deny for a name upstream dropped is dead weight that hides a rename.
+rm -f "$tmp/src/bin/omarchy-refresh-pacman"
+if ( monarchy_check_overrides_exist ) >/dev/null 2>&1; then
+    fail "override check passed a denied name that is no longer in the package"
+fi
+printf '#!/bin/sh\n' >"$tmp/src/bin/omarchy-refresh-pacman"
+
+# ---- ordering, read statically out of update.sh -------------------------
 
 units=$(sed -n 's/^MONARCHY_UNITS=(\(.*\))$/\1/p' "$LIB/update.sh")
 [ -n "$units" ] || fail "MONARCHY_UNITS not found"
 idx_of() { printf '%s\n' "$units" | tr ' ' '\n' | grep -nx "$1" | cut -d: -f1; }
-clone_i=$(idx_of clone); overlay_i=$(idx_of overlay); pacman_i=$(idx_of pacman)
-[ -n "$clone_i" ] && [ -n "$overlay_i" ] && [ -n "$pacman_i" ] \
-    || fail "clone, overlay and pacman must all be units"
-[ "$clone_i" -lt "$overlay_i" ] || fail "overlay unit runs before the clone unit"
-[ "$overlay_i" -lt "$pacman_i" ] || fail "pacman unit runs before the overlay unit"
+pacman_i=$(idx_of pacman); packaging_i=$(idx_of packaging)
+prefix_i=$(idx_of prefix); overlay_i=$(idx_of overlay); leaves_i=$(idx_of leaves)
+for n in pacman_i packaging_i prefix_i overlay_i leaves_i; do
+    [ -n "${!n}" ] || fail "${n%_i} must be a unit"
+done
+# [omarchy] before anything is downloaded; the package before the prefix that
+# is linked out of it; the prefix before the overlay that sits on it; and
+# install/omarchy-base.packages only exists once omarchy is installed.
+[ "$pacman_i" -lt "$packaging_i" ] || fail "packaging runs before the [omarchy] repo is added"
+[ "$packaging_i" -lt "$prefix_i" ] || fail "prefix runs before the omarchy package is installed"
+[ "$prefix_i" -lt "$overlay_i" ] || fail "overlay runs before the working prefix exists"
+[ "$packaging_i" -lt "$leaves_i" ] || fail "leaves runs before omarchy-base.packages exists"
 
-clone_apply=$(awk '/^monarchy_clone_apply\(\)/,/^}$/' "$LIB/update.sh")
+prefix_apply=$(awk '/^monarchy_prefix_apply\(\)/,/^}$/' "$LIB/update.sh")
 line_of() {
-    printf '%s\n' "$clone_apply" \
+    printf '%s\n' "$prefix_apply" \
         | grep -nE "^[[:space:]]*$1[[:space:]]*$" \
         | head -1 | cut -d: -f1 || true
 }
-sync_at=$(line_of 'monarchy_sync_omarchy_clone')
-assert_at=$(line_of 'monarchy_clone_assert')
+assert_at=$(line_of 'monarchy_prefix_assert')
 link_at=$(line_of 'monarchy_link_working_prefix')
-[ -n "$sync_at" ] || fail "monarchy_clone_apply does not sync the clone"
-[ -n "$assert_at" ] || fail "monarchy_clone_apply does not assert the clone"
-[ -n "$link_at" ] || fail "monarchy_clone_apply does not link the working prefix"
-[ "$assert_at" -gt "$sync_at" ] || fail "clone asserted before it is synced"
-[ "$assert_at" -lt "$link_at" ] || fail "working prefix linked before the clone is asserted"
+[ -n "$assert_at" ] || fail "monarchy_prefix_apply does not assert the package tree"
+[ -n "$link_at" ] || fail "monarchy_prefix_apply does not link the working prefix"
+[ "$assert_at" -lt "$link_at" ] || fail "working prefix linked before the tree is asserted"
 
-# The cache bootstrap repoints MONARCHY_SRC and must never run during apply.
-monarchy_reaches apply | grep -qx 'monarchy_ensure_clone_for_check' \
-    && fail "apply reaches monarchy_ensure_clone_for_check; it repoints MONARCHY_SRC at a cache"
-monarchy_reaches check | grep -qx 'monarchy_ensure_clone_for_check' \
-    || fail "check does not bootstrap a clone for a dry run"
+# apply must classify the tree before it builds anything from it.
+monarchy_reaches apply | grep -qx 'monarchy_check_bin_hazards' \
+    || fail "apply does not reach monarchy_check_bin_hazards"
+monarchy_reaches apply | grep -qx 'monarchy_check_overrides_exist' \
+    || fail "apply does not reach monarchy_check_overrides_exist"
+
+# ---- write_to dispatch --------------------------------------------------
 
 # monarchy_write_to is the whole difference between building the overlay as
 # the user on a temp prefix and as root on a real box. The temp-prefix run
@@ -152,4 +172,4 @@ if [ "${EUID:-$(id -u)}" -ne 0 ]; then
     unset -f monarchy_sudo
 fi
 
-echo "overlay test passed ($allow_n allow, $wrap_n wrap, $deny_n deny)"
+echo "overlay test passed ($wrap_n wrap, $deny_n deny, no allow list)"

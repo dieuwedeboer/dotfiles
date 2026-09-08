@@ -1,0 +1,82 @@
+# Monarchy: a CachyOS-safe replacement for the official omarchy-settings.
+#
+# Upstream omarchy-settings carries a post_install/post_upgrade scriptlet that
+# is destructive by design (upstream says so in its own comment). On every
+# install *and* every upgrade it runs:
+#
+#   rm -f /etc/os-release
+#   cp -f .../os-release              /etc/os-release
+#   cp -f .../security-faillock.conf  /etc/security/faillock.conf
+#   cp -f .../nsswitch.conf           /etc/nsswitch.conf
+#   cp -f .../plymouth-plymouthd.conf /etc/plymouth/plymouthd.conf
+#   cp -f .../dot.bashrc              /etc/skel/.bashrc
+#
+# On this host that clobbers the CachyOS identity, nsswitch (nss-mdns) and the
+# Plymouth theme Monarchy manages itself. berenddeboer/omarchy-zfs-pkgs keeps
+# this block byte-for-byte, because on his machines Omarchy *is* the OS and the
+# clobber is correct. Here it is not.
+#
+# So: take the official package as-is, drop the scriptlet, drop the paths in
+# monarchy/settings.skip, and keep everything else byte-identical to upstream.
+# Nothing is rewritten, so there is no fork to re-pin -- only an exclude list.
+#
+# Built by lib/monarchy/pkgbuild.sh, which stages three files into a build dir:
+#   upstream.pkg.tar.zst  the official package, downloaded and verified by pacman
+#   settings.skip         monarchy/settings.skip
+#   PKGBUILD              this file
+# and exports MONARCHY_SETTINGS_PKGVER. Not a standalone PKGBUILD by design:
+# the version has to track whatever `omarchy` currently depends on.
+
+pkgname=omarchy-settings-monarchy
+pkgver=${MONARCHY_SETTINGS_PKGVER:?set by lib/monarchy/pkgbuild.sh}
+pkgrel=1
+pkgdesc="Omarchy settings without the /etc clobber (CachyOS+ZFS host)"
+arch=('any')
+url='https://github.com/dieuwedeboer/dotfiles'
+license=('MIT')
+
+depends=('bash' 'curl' 'gum' 'hicolor-icon-theme' 'plymouth')
+
+provides=("omarchy-settings=$pkgver")
+conflicts=('omarchy-settings' 'omarchy-settings-dev')
+replaces=('omarchy-settings')
+
+source=('upstream.pkg.tar.zst' 'settings.skip')
+sha256sums=('SKIP' 'SKIP')
+
+package() {
+  cd "$srcdir"
+
+  # bsdtar, not tar: upstream ships the package metadata as leading dot-files
+  # and tar's --exclude would need them named individually.
+  bsdtar -xpf upstream.pkg.tar.zst -C "$pkgdir"
+
+  # makepkg writes its own. Carrying upstream's .INSTALL is the entire bug
+  # this package exists to avoid, so removing it is not optional cleanup.
+  rm -f "$pkgdir/.PKGINFO" "$pkgdir/.MTREE" "$pkgdir/.BUILDINFO" "$pkgdir/.INSTALL"
+
+  local rel target
+  while read -r rel; do
+    case "$rel" in
+      ''|\#*) continue ;;
+    esac
+    target="$pkgdir/$rel"
+    if [[ -e $target || -L $target ]]; then
+      rm -rf "$target"
+    else
+      # settings.skip naming a path upstream no longer ships is a silent
+      # no-op that would let a hazard back in under a new name.
+      echo "settings.skip lists a path not in the upstream package: $rel" >&2
+      return 1
+    fi
+  done <settings.skip
+
+  # etc-overrides only exists to feed the scriptlet that was just dropped.
+  # Leaving a staged /etc/os-release on disk is a footgun, not a resource.
+  rm -rf "$pkgdir/usr/share/omarchy/etc-overrides"
+
+  # Nothing below /etc should survive that the skip list did not explicitly
+  # keep; assert the two that would be worst to get wrong.
+  [[ ! -e $pkgdir/etc/os-release ]] || return 1
+  [[ ! -e $pkgdir/etc/nsswitch.conf ]] || return 1
+}

@@ -262,7 +262,10 @@ fi
 unset MONARCHY_WAYLAND_SESSIONS_DIR
 rm -rf "$merge_tmp"
 
-CLONE="${MONARCHY_SRC:-/usr/local/src/monarchy/omarchy}"
+# require_omarchy_tree, not $MONARCHY_SRC: common.sh defaults that to
+# /usr/share/omarchy, so on a box where the omarchy package is not installed
+# yet this block silently skipped and the test still printed "passed".
+CLONE=$(require_omarchy_tree)
 if [ -d "$CLONE/default/sddm/omarchy" ] && [ -f "$CLONE/themes/osaka-jade/unlock.png" ]; then
     tmp=$(mktemp -d)
     cleanup_tmp() { rm -rf "$tmp"; }

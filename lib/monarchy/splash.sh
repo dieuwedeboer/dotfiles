@@ -239,7 +239,7 @@ monarchy_splash_only() {
     monarchy_assert_os_release
     monarchy_refuse_bootloader
     monarchy_skip_plymouth_zfs
-    monarchy_sync_omarchy_clone
+    monarchy_assert_source_tree
     monarchy_link_working_prefix
     monarchy_rebuild_overlay
     monarchy_overlay_session_lock

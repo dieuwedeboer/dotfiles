@@ -22,8 +22,9 @@ for fn in monarchy_assert_zfs_layout monarchy_assert_os_release \
     monarchy_skip_os_release_clobber monarchy_skip_autologin monarchy_skip_plymouth_zfs \
     monarchy_refuse_dataset_rename monarchy_disable_omarchy_update_guard \
     monarchy_preserve_pacman_conf monarchy_refuse_archzfs monarchy_refuse_omarchy_zfs_repo \
-    monarchy_refuse_partial_upgrade monarchy_check_inventory_complete \
-    monarchy_check_clone_bin_classified monarchy_check_migrations \
+    monarchy_refuse_partial_upgrade monarchy_check_pkgbuilds \
+    monarchy_assert_source_tree monarchy_check_overrides_exist \
+    monarchy_check_bin_hazards monarchy_check_migrations \
     monarchy_check_packages_deny monarchy_check_applications_drop monarchy_check_plugins \
     monarchy_check_session_lock_overlay monarchy_check_logind \
     monarchy_check_hidden_hyprland_sessions monarchy_assert_settings_assets \
@@ -32,7 +33,7 @@ for fn in monarchy_assert_zfs_layout monarchy_assert_os_release \
 done
 
 # Every action the old linear apply performed must still be reached.
-for fn in monarchy_sync_omarchy_clone monarchy_link_working_prefix monarchy_rebuild_overlay \
+for fn in monarchy_build_packages monarchy_link_working_prefix monarchy_rebuild_overlay \
     monarchy_overlay_session_lock monarchy_install_switch_user monarchy_install_user_setup \
     monarchy_write_omarchy_conf monarchy_add_omarchy_repo monarchy_install_packages \
     monarchy_install_settings monarchy_run_omarchy_config monarchy_keep_sddm \
@@ -45,19 +46,17 @@ done
 # Apply runs each unit's apply and then its check, so a guard cannot be
 # skipped by using a bare apply instead of an update. The order is apply-then-
 # check because a unit's check is a postcondition: it asserts what that unit
-# just produced. Checking first aborts a fresh box. One deliberate exception:
-# monarchy_ensure_clone_for_check repoints MONARCHY_SRC at a user cache when no
-# clone exists, so that a dry run has something to read. During apply it would
-# make apply build from the cache instead of /usr/local/src.
-check_only='monarchy_ensure_clone_for_check'
+# just produced. Checking first aborts a fresh box.
+#
+# There is no longer a check-only escape hatch. monarchy_ensure_clone_for_check
+# existed because a dry run needed a git clone from somewhere; MONARCHY_SRC is
+# a pacman-owned path now, so check and apply read exactly the same tree and
+# every function check reaches must also run during apply.
 apply_reaches=$(monarchy_reaches apply)
 for fn in $(monarchy_reaches check); do
-    [ "$fn" = "$check_only" ] && continue
     printf '%s\n' "$apply_reaches" | grep -qx "$fn" \
         || fail "apply does not run $fn, which check does"
 done
-printf '%s\n' "$apply_reaches" | grep -qx "$check_only" \
-    && fail "$check_only must not run during apply"
 
 # --only must reject a name that is not a unit rather than doing nothing.
 if ( trap - EXIT; MONARCHY_ONLY=nosuchunit monarchy_assert_only_valid ) >/dev/null 2>&1; then
