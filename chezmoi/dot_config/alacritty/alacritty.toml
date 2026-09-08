@@ -163,7 +163,19 @@ action = "ResetFontSize"
 live_config_reload = true
 working_directory = "None"
 
+# Send Shift+Return as CSI-u so TUIs can distinguish it from Return.
+# Omarchy migration 1780057136 meant to write these, but its grep patterns
+# assume the inline `{ key = ... }` array form and this file uses the
+# [[keyboard.bindings]] section form, so it appended a bare inline table and
+# broke the parse. Written here in the form this file actually uses.
 [[keyboard.bindings]]
 key = "Return"
 mods = "Shift"
-chars = "\u001B\r"
+chars = "\u001B[13;2u"
+
+# Legacy encoding sends Alt+Shift+Return the same as Alt+Return; send CSI-u so
+# tmux can match M-S-Enter, matching foot and ghostty.
+[[keyboard.bindings]]
+key = "Return"
+mods = "Alt|Shift"
+chars = "\u001B[13;4u"

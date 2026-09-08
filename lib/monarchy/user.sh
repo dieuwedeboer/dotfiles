@@ -27,7 +27,7 @@ monarchy_seed_hyprland_config() {
     for f in "$src"/*; do
         [ -e "$f" ] || continue
         base=$(basename "$f")
-        # chezmoi owns these. Copying the clone's stock version over a missing
+        # chezmoi owns these. Copying the package's stock version over a missing
         # one would turn "run chezmoi apply" into a silent content mismatch.
         case " $MONARCHY_CHEZMOI_HYPR " in
             *" $base "*) continue ;;
@@ -299,6 +299,61 @@ monarchy_drop_webapps() {
 }
 
 
+# Plugins keep their own marked blocks in these files -- the screens plugin
+# writes `-- BEGIN im0001gt.screens` ... `-- END im0001gt.screens` into
+# bindings.lua, the same shape monarchy_seed_block uses. Those lines belong to
+# whoever wrote them, not to chezmoi, so they are not drift. Without stripping
+# them the assert below saw drift on every update, ran chezmoi apply, and took
+# the plugin's scale bindings with it.
+monarchy_strip_marked_blocks() {
+    awk '
+        /^-- BEGIN ./ { id = substr($0, 10); skip = 1; next }
+        skip && $0 == "-- END " id { skip = 0; next }
+        skip { next }
+        { print }
+        # An unterminated block would swallow the rest of the file and make
+        # genuine drift below it invisible. Fail instead, so the caller
+        # reports the file rather than trusting a truncated comparison.
+        END { if (skip) exit 1 }
+    '
+}
+
+# One chezmoi status line, minus its two status characters and the space.
+# True when the difference it reports survives stripping marked blocks, or
+# when it is not a content difference at all (a mode change reports clean
+# content and still needs an apply).
+monarchy_hypr_line_is_real_drift() {
+    local rel=${1:3}
+    local target="$HOME/$rel"
+    local want
+    [ -f "$target" ] || return 0
+    grep -Eq '^-- BEGIN .' "$target" || return 0
+    local stripped_want stripped_got
+    want=$(chezmoi cat "$target" 2>/dev/null) || return 0
+    stripped_want=$(printf '%s\n' "$want" | monarchy_strip_marked_blocks) || return 0
+    stripped_got=$(monarchy_strip_marked_blocks <"$target") || return 0
+    [ "$stripped_want" != "$stripped_got" ]
+}
+
+# Drop the chezmoi status lines whose only difference is a marked block.
+monarchy_hypr_drop_block_drift() {
+    local line kept=""
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        if monarchy_hypr_line_is_real_drift "$line"; then
+            kept="$kept$line
+"
+        else
+            # monarchy_log echoes to stdout, and stdout here is the return
+            # value. To stderr, so the log file still gets the line.
+            monarchy_log "ignoring marked-block drift in ${line:3}" >&2
+        fi
+    done <<EOF
+$1
+EOF
+    printf '%s' "$kept"
+}
+
 # Never run chezmoi apply from here: it prompts when a target has been
 # modified, and omarchy-update reaches this through the Omarchy menu with no
 # terminal to answer on. Report, name the command, stop.
@@ -339,9 +394,13 @@ monarchy_assert_chezmoi_hypr() {
         monarchy_die "chezmoi status failed for $dir; is chezmoi linked? Run: chezmoi apply ~/.config/hypr"
     fi
     if [ -n "$status" ]; then
+        status=$(monarchy_hypr_drop_block_drift "$status")
+    fi
+    if [ -n "$status" ]; then
         printf '%s\n' "$status" >&2
         monarchy_chezmoi_apply_hypr "$dir has drifted from chezmoi" || return 1
         status=$(chezmoi status "$dir" 2>&1) || true
+        status=$(monarchy_hypr_drop_block_drift "$status")
         [ -z "$status" ] || monarchy_die "$dir still differs after chezmoi apply"
     fi
     monarchy_log "chezmoi owns $dir"

@@ -193,4 +193,69 @@ for f in bindings.lua looknfeel.lua input.lua autostart.lua; do
         || fail "chezmoi does not carry hypr/$f"
 done
 
+# Plugins keep their own marked blocks in the files they extend: the screens
+# plugin writes `-- BEGIN im0001gt.screens` into bindings.lua. Those lines are
+# not chezmoi's, so the assert must not read them as drift -- it used to, and
+# then ran chezmoi apply and deleted the plugin's scale bindings on every
+# update.
+stripped=$(monarchy_strip_marked_blocks <<'LUA'
+-- mine
+-- BEGIN im0001gt.screens
+o.bind("SUPER + SLASH", "up", "display-ctl scale up")
+-- END im0001gt.screens
+-- also mine
+LUA
+)
+[ "$stripped" = "-- mine
+-- also mine" ] || fail "strip_marked_blocks did not remove exactly the block: [$stripped]"
+
+# Two blocks from different owners, and a nested-looking BEGIN inside one.
+stripped=$(monarchy_strip_marked_blocks <<'LUA'
+-- keep 1
+-- BEGIN monarchy: boot-color
+require("hypr.boot-color")
+-- END monarchy: boot-color
+-- keep 2
+-- BEGIN im0001gt.screens
+-- END im0001gt.screens
+-- keep 3
+LUA
+)
+[ "$stripped" = "-- keep 1
+-- keep 2
+-- keep 3" ] || fail "strip_marked_blocks mishandled multiple blocks: [$stripped]"
+
+# A block whose END never arrives would swallow every line below it and make
+# real drift invisible. It must fail rather than return a truncated file.
+if monarchy_strip_marked_blocks >/dev/null 2>&1 <<'LUA'
+-- keep
+-- BEGIN im0001gt.screens
+o.bind("SUPER + SLASH", "up", "x")
+LUA
+then
+    fail "strip_marked_blocks accepted an unterminated block instead of failing"
+fi
+
+# The assert must route drift through the filter, in both places it checks.
+assert_fn=$(awk '/^monarchy_assert_chezmoi_hypr\(\)/,/^}$/' "$LIB/user.sh")
+[ "$(printf '%s\n' "$assert_fn" | grep -c 'monarchy_hypr_drop_block_drift')" -eq 2 ] \
+    || fail "assert does not filter marked-block drift both before and after applying"
+
+# monarchy_log echoes to stdout, and the filter's stdout is its return value.
+printf '%s\n' "$(awk '/^monarchy_hypr_drop_block_drift\(\)/,/^}$/' "$LIB/user.sh")" \
+    | grep -q 'monarchy_log .* >&2' \
+    || fail "filter logs to stdout, which corrupts the status lines it returns"
+
+# The post-update drift hook is what surfaces a migration's edits before the
+# next apply reverts them.
+hook="$REPO/chezmoi/dot_config/omarchy/hooks/post-update.d/executable_chezmoi-drift"
+[ -x "$hook" ] || fail "chezmoi-drift hook missing or not executable"
+grep -q 'chezmoi status' "$hook" || fail "drift hook does not check chezmoi status"
+grep -q 'strip_marked_blocks' "$hook" \
+    || fail "drift hook would report plugin blocks as drift on every update"
+# Only report. Naming the command in advice text is fine; running it is not,
+# so match an invocation in command position rather than the words anywhere.
+grep -Eq '^[[:space:]]*(chezmoi apply|[^#]*\$\(chezmoi apply)' "$hook" \
+    && fail "drift hook runs chezmoi apply; repairing is a judgement call"
+
 echo "user tests passed"

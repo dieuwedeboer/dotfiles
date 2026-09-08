@@ -1,0 +1,102 @@
+#!/bin/bash
+# omarchy-update runs `omarchy-hook post-update` on the line straight after
+# omarchy-migrate, so this sees exactly what the migrations just did.
+#
+# Migrations edit files chezmoi owns, by design and without knowing it. The
+# next `chezmoi apply` then silently reverts them -- that is how foot dropped
+# from 12pt back to 9pt, and how a migration left alacritty.toml unparseable
+# for days. Neither showed up until someone went looking.
+#
+# So: report drift while the cause is still on screen. This never repairs
+# anything. Deciding whether a migration's change is wanted is the point, and
+# that is a judgement call, not a merge.
+set -uo pipefail
+
+command -v chezmoi >/dev/null 2>&1 || exit 0
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy"
+report="$state_dir/chezmoi-drift.diff"
+mkdir -p "$state_dir"
+
+# Files that drift by design, and would otherwise make this hook cry wolf on
+# every single update -- at which point it stops being a signal and nobody
+# reads it. Keep this list short and justified.
+#   .claude/settings.json  Claude Code rewrites autoMode.environment at
+#                          runtime; chezmoi holds the baseline on purpose.
+IGNORE=(
+  ".claude/settings.json"
+)
+
+ignored() {
+  local candidate=$1 entry
+  for entry in "${IGNORE[@]}"; do
+    [[ $candidate == "$entry" ]] && return 0
+  done
+  return 1
+}
+
+# Plugins keep marked blocks in the files they extend -- the screens plugin
+# owns `-- BEGIN im0001gt.screens` ... `-- END` inside hypr/bindings.lua. Those
+# lines are not chezmoi's and are not drift. Deliberately duplicated from
+# monarchy_strip_marked_blocks in ~/dotfiles/lib/monarchy/user.sh: this hook is
+# deployed by chezmoi into ~/.config and must not depend on the repo being
+# checked out at a particular path. Keep the two in step.
+strip_marked_blocks() {
+  awk '
+    /^-- BEGIN ./ { id = substr($0, 10); skip = 1; next }
+    skip && $0 == "-- END " id { skip = 0; next }
+    skip { next }
+    { print }
+    # An unterminated block would swallow the rest of the file and hide real
+    # drift below it. Fail instead; the caller then reports the file.
+    END { if (skip) exit 1 }
+  '
+}
+
+# True when a difference survives stripping marked blocks. A file with no
+# marked block, or one chezmoi cannot render, is always taken at face value --
+# a mode-only change reports identical content and still needs reporting.
+real_drift() {
+  local target=$1 want
+  [[ -f $target ]] || return 0
+  grep -Eq '^-- BEGIN .' "$target" || return 0
+  local stripped_want stripped_got
+  want=$(chezmoi cat "$target" 2>/dev/null) || return 0
+  stripped_want=$(printf '%s\n' "$want" | strip_marked_blocks) || return 0
+  stripped_got=$(strip_marked_blocks <"$target") || return 0
+  [[ $stripped_want != "$stripped_got" ]]
+}
+
+# chezmoi status is cheap and names the files; the diff is only worth
+# generating when there is something to look at.
+status=$(chezmoi status 2>/dev/null) || exit 0
+
+files=""
+while IFS= read -r line; do
+  [[ -n $line ]] || continue
+  # Two status characters and a space, then the path relative to $HOME.
+  rel=${line:3}
+  ignored "$rel" && continue
+  real_drift "$HOME/$rel" || continue
+  files+="$rel"$'\n'
+done <<<"$status"
+files=${files%$'\n'}
+
+if [[ -z $files ]]; then
+  rm -f "$report"
+  exit 0
+fi
+chezmoi diff >"$report" 2>&1 || true
+
+echo "chezmoi-managed files have drifted since the last apply:"
+printf '%s\n' "$files" | sed 's/^/  /'
+echo "  Review: chezmoi diff   (saved to $report)"
+echo "  Fold what you want to keep into ~/dotfiles/chezmoi, then chezmoi apply."
+
+# The terminal line above scrolls past once. The notification outlives it.
+if command -v omarchy-notification-send >/dev/null 2>&1; then
+  omarchy-notification-send -u critical -g 󰇮 \
+    "Omarchy changed chezmoi-managed files" \
+    "$(printf '%s' "$files" | paste -sd', ' -) — run chezmoi diff before the next apply" \
+    2>/dev/null || true
+fi

@@ -1,1 +1,9 @@
 background-opacity = 0.8
+
+# From Omarchy migration 1780057136. Unlike foot.ini this file does not import
+# Omarchy's default config, so these have to be held locally.
+# Send Shift+Enter as CSI-u so TUIs can distinguish it from Enter.
+keybind = shift+enter=csi:13;2u
+
+# Legacy encoding sends Alt+Shift+Enter the same as Alt+Enter; send CSI-u so tmux can match M-S-Enter.
+keybind = alt+shift+enter=csi:13;4u
