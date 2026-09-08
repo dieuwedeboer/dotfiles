@@ -2,7 +2,7 @@
 
 Source of truth for `packages.deny` and overlay-bin policy. Architecture is `docs/monarchy.md`.
 
-Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names: 13 wrapped, 20 denied, the rest not overridden). No pin, no clone — pacman does the pinning.
+Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names: 13 wrapped, 19 denied, the rest not overridden). No pin, no clone — pacman does the pinning.
 
 ## Blocker
 
