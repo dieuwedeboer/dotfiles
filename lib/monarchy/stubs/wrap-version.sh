@@ -11,22 +11,22 @@ name=$(basename -- "$0")
 
 case "$name" in
     omarchy-version)
+        # No longer a git checkout, so no -git suffix: this is the version
+        # file out of the omarchy package.
         [ -f "$omarchy_path/version" ] || exit 1
         version=$(tr -d '[:space:]' <"$omarchy_path/version")
         [ -n "$version" ] || exit 1
-        printf '%s-git\n' "$version"
+        printf '%s\n' "$version"
         ;;
     omarchy-version-branch)
+        # Was "branch @ commit" of the pinned fork. Monarchy tracks a package
+        # now, so the honest answer is the package and its installed version.
         [ -f "$pin" ] || exit 1
-        branch=$(awk -F= '$1=="branch"{print substr($0,index($0,"=")+1)}' "$pin")
-        commit=$(awk -F= '$1=="commit"{print substr($0,index($0,"=")+1)}' "$pin")
-        [ -n "$branch" ] || exit 1
-        [ -n "$commit" ] || exit 1
-        short=$commit
-        if [ ${#commit} -gt 7 ]; then
-            short=${commit:0:7}
-        fi
-        printf '%s @ %s\n' "$branch" "$short"
+        package=$(awk -F= '$1=="package"{print substr($0,index($0,"=")+1)}' "$pin")
+        [ -n "$package" ] || exit 1
+        installed=$(pacman -Q "$package" 2>/dev/null | awk '{print $2}')
+        [ -n "$installed" ] || installed=not-installed
+        printf '%s %s\n' "$package" "$installed"
         ;;
     omarchy-version-channel)
         if grep -q 'https://pkgs.omarchy.org/stable/' "$pacman_conf" 2>/dev/null; then

@@ -1,0 +1,55 @@
+# Monarchy: satisfy Omarchy's bootloader/snapshot dependencies without
+# installing them.
+#
+# `omarchy` hard-depends on limine, limine-mkinitcpio-hook, limine-snapper-sync
+# and snapper. Only one of those is actually dangerous here:
+# limine-mkinitcpio-hook ships /etc/pacman.d/hooks/90-mkinitcpio-install.hook,
+# and HookDir takes precedence over /usr/share/libalpm/hooks, so it *shadows*
+# the stock mkinitcpio hook by filename. Every kernel, DKMS and ZFS-module
+# update would then route through limine-mkinitcpio-install, which calls
+# `limine-entry-tool --add-kernel` and writes into $ESP_PATH. This box boots
+# rEFInd -> ZFSBootMenu, so that ESP is not Limine's to manage.
+#
+# limine and snapper are inert on their own (limine depends only on glibc and
+# drops binaries in /usr/share/limine; snapper ships an empty
+# /etc/snapper/configs and timers that are not enabled by default). They are
+# stubbed anyway so that docs/monarchy.md's "what we refuse" list stays true as
+# written, and so a later `pacman -S` cannot pull the real ones in silently.
+#
+# This package deliberately owns no files outside its own doc directory.
+
+pkgname=monarchy-boot-stub
+pkgver=1
+pkgrel=1
+pkgdesc="Satisfies Omarchy's Limine/Snapper deps on a rEFInd+ZFSBootMenu host"
+arch=('any')
+url='https://github.com/dieuwedeboer/dotfiles'
+license=('MIT')
+
+provides=(
+  'limine'
+  'limine-mkinitcpio-hook'
+  'limine-snapper-sync'
+  'snapper'
+)
+conflicts=(
+  'limine'
+  'limine-mkinitcpio-hook'
+  'limine-snapper-sync'
+  'snapper'
+)
+
+package() {
+  install -d "$pkgdir/usr/share/doc/$pkgname"
+  cat >"$pkgdir/usr/share/doc/$pkgname/README" <<'EOF'
+monarchy-boot-stub provides (and conflicts with) limine,
+limine-mkinitcpio-hook, limine-snapper-sync and snapper so that the official
+`omarchy` package can be installed on a CachyOS+ZFS host that boots via
+rEFInd -> ZFSBootMenu.
+
+Installing the real limine-mkinitcpio-hook would shadow the stock
+90-mkinitcpio-install.hook and hand ESP boot-entry management to Limine.
+
+See docs/monarchy.md, "Packages".
+EOF
+}

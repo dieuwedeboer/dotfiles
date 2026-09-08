@@ -1,5 +1,5 @@
-remote=https://github.com/berenddeboer/omarchy.git
-branch=quattro-on-zfs
-commit=1297c7bc98cba3183d6037e19761dcb99e0c902e
-hyprland=
-quickshell=
+# What Monarchy tracks. This used to pin a git commit on a third-party ZFS
+# fork; it now names the official package and channel, and pacman does the
+# pinning. Deployed to /etc/omarchy.lock at apply.
+package=omarchy
+channel=stable

@@ -20,8 +20,14 @@ monarchy_wrap_stub_for() {
         omarchy-display-text-size)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-display-text-size.sh"
             ;;
+        omarchy-disk-speedtest)
+            printf '%s\n' "$monarchy_lib_dir/stubs/wrap-disk-speedtest.sh"
+            ;;
         omarchy-version|omarchy-version-branch|omarchy-version-channel)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-version.sh"
+            ;;
+        omarchy-snapshot)
+            printf '%s\n' "$monarchy_lib_dir/stubs/wrap-snapshot.sh"
             ;;
         *)
             monarchy_die "no wrap stub for $name"
@@ -29,6 +35,15 @@ monarchy_wrap_stub_for() {
     esac
 }
 
+# The overlay is now only the names we override. Everything else resolves
+# from /usr/bin, which the omarchy package owns.
+#
+# This used to symlink all 438 clone bin/ names into the prefix, because a git
+# checkout put them nowhere else. With a real package there is nothing to
+# link: $OMARCHY_PATH/bin and /usr/local/bin both precede /usr/bin on PATH
+# (and in sudo's secure_path), so a deny stub or a wrap still wins, and an
+# allowed name needs no entry at all. That is what retired monarchy/bin.allow
+# and lib/monarchy/generate-inventories.py.
 monarchy_rebuild_overlay() {
     local dest="$MONARCHY_PATH/bin"
     local src_bin="$MONARCHY_SRC/bin"
@@ -36,7 +51,7 @@ monarchy_rebuild_overlay() {
     local yay="$monarchy_lib_dir/stubs/yay.sh"
     local name parent wrap_stub
 
-    [ -d "$src_bin" ] || monarchy_die "clone bin/ missing at $src_bin"
+    [ -d "$src_bin" ] || monarchy_die "omarchy package bin/ missing at $src_bin"
     [ -f "$stub" ] || monarchy_die "missing $stub"
 
     monarchy_log "rebuild overlay $dest"
@@ -45,10 +60,6 @@ monarchy_rebuild_overlay() {
     monarchy_write_to "$parent" find "$dest" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
     for name in "${MONARCHY_BIN_DENY[@]}"; do
         monarchy_write_to "$parent" install -m 755 "$stub" "$dest/$name"
-    done
-    for name in "${MONARCHY_BIN_ALLOW[@]}"; do
-        [ -e "$src_bin/$name" ] || monarchy_die "allowlisted $name missing from clone bin/"
-        monarchy_write_to "$parent" ln -sfn "$src_bin/$name" "$dest/$name"
     done
     for name in "${MONARCHY_BIN_WRAP[@]}"; do
         wrap_stub=$(monarchy_wrap_stub_for "$name")
@@ -66,35 +77,75 @@ monarchy_rebuild_overlay() {
             wrap_stub=$(monarchy_wrap_stub_for "$name")
             monarchy_sudo install -m 755 "$wrap_stub" "/usr/local/bin/$name"
         done
-        for name in "${MONARCHY_BIN_ALLOW[@]}"; do
-            [ -e "$src_bin/$name" ] || monarchy_die "allowlisted $name missing from clone bin/"
-            monarchy_sudo ln -sfn "$src_bin/$name" "/usr/local/bin/$name"
-        done
+        # A previous apply symlinked every allowed name here, pointing into
+        # the clone that no longer exists. Those are dangling now, and a
+        # dangling /usr/local/bin entry shadows the real /usr/bin one.
+        monarchy_prune_stale_overlay_links
         monarchy_install_update
     fi
 }
 
-monarchy_check_clone_bin_classified() {
-    local name new=0
-    local src_bin="$MONARCHY_SRC/bin"
-    [ -d "$src_bin" ] || monarchy_die "clone bin/ missing at $src_bin"
-    while IFS= read -r -d '' name; do
-        name=$(basename "$name")
-        if ! monarchy_inventory_has "$name"; then
-            echo "unclassified bin name (new relative to lock): $name" >&2
-            new=1
+# Remove /usr/local/bin/omarchy-* symlinks that no longer resolve, and any
+# that point somewhere other than a name we still override.
+monarchy_prune_stale_overlay_links() {
+    local f name
+    for f in /usr/local/bin/omarchy-*; do
+        [ -L "$f" ] || continue
+        name=$(basename "$f")
+        if monarchy_in_list "$name" "${MONARCHY_BIN_DENY[@]}" \
+            || monarchy_in_list "$name" "${MONARCHY_BIN_WRAP[@]}"; then
+            continue
         fi
-    done < <(find "$src_bin" -maxdepth 1 -type f -print0)
-    [ "$new" = 0 ] || monarchy_die "clone bin/ has names not in allow/wrap/deny"
+        monarchy_sudo rm -f "$f"
+        monarchy_log "pruned stale overlay link $f"
+    done
+}
+
+# What the exhaustive allow list was actually protecting against: a binary
+# that reconfigures the bootloader, replaces pacman.conf, or drives snapper
+# appearing upstream under a name nobody classified.
+#
+# Matching on content rather than on a list of 438 names is both smaller and
+# stronger: it still catches a hazard that arrives under a brand new name, and
+# it catches one that gets *renamed*, which an allow list by construction
+# cannot. Same shape as monarchy_check_migrations, which has always worked
+# this way.
+MONARCHY_BIN_HAZARD_RE='limine-entry-tool|limine-mkinitcpio|limine-install|limine-snapper|omarchy-refresh-pacman|use_omarchy_pacman_config|pacman-.*\.conf|zroot/ROOT|/etc/pam\.d/zfs-key|snapper -c|snapper create|snapper --csvout'
+
+monarchy_check_bin_hazards() {
+    local src_bin="$MONARCHY_SRC/bin"
+    local f name unclassified=0
+    [ -d "$src_bin" ] || monarchy_die "omarchy package bin/ missing at $src_bin"
+    while IFS= read -r name; do
+        [ -n "$name" ] || continue
+        if monarchy_in_list "$name" "${MONARCHY_BIN_DENY[@]}" \
+            || monarchy_in_list "$name" "${MONARCHY_BIN_WRAP[@]}"; then
+            continue
+        fi
+        echo "bin/$name touches limine, snapper or pacman.conf and is neither denied nor wrapped" >&2
+        unclassified=1
+    done < <(
+        for f in "$src_bin"/*; do
+            [ -f "$f" ] || continue
+            grep -lE "$MONARCHY_BIN_HAZARD_RE" "$f" >/dev/null 2>&1 && basename "$f"
+        done
+    )
+    [ "$unclassified" = 0 ] \
+        || monarchy_die "classify the names above into monarchy/bin.deny or monarchy/bin.wrap"
     return 0
 }
 
-monarchy_check_inventory_complete() {
-    local src_bin="$MONARCHY_SRC/bin"
-    local n clone_n
-    n=$((${#MONARCHY_BIN_ALLOW[@]} + ${#MONARCHY_BIN_WRAP[@]} + ${#MONARCHY_BIN_DENY[@]}))
-    clone_n=$(find "$src_bin" -maxdepth 1 -type f | wc -l)
-    [ "$n" -eq "$clone_n" ] || monarchy_die "inventory has $n names, clone bin/ has $clone_n"
+# Every name we claim to override must still exist upstream. A wrap or a deny
+# stub for a binary that was removed is dead weight that hides a rename.
+monarchy_check_overrides_exist() {
+    local name missing=0
+    for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}"; do
+        [ -e "$MONARCHY_SRC/bin/$name" ] && continue
+        echo "overridden name no longer in the omarchy package: $name" >&2
+        missing=1
+    done
+    [ "$missing" = 0 ] || monarchy_die "drop or reclassify the names above"
+    return 0
 }
 
 monarchy_overlay_lock_py() {
@@ -102,7 +153,7 @@ monarchy_overlay_lock_py() {
 }
 
 # Turn a prefix symlink-to-dir into a real directory of child symlinks so a
-# single file can be replaced without writing into the clone.
+# single file can be replaced without writing into a pacman-owned path.
 monarchy_explode_symlink_dir() {
     local dest=$1
     local target name tmp
@@ -148,8 +199,8 @@ monarchy_check_session_lock_overlay() {
     [ -f "$py" ] || monarchy_die "missing $py"
     lock_dir="$MONARCHY_SRC/shell/plugins/lock"
     menu="$MONARCHY_SRC/default/omarchy/omarchy-menu.jsonc"
-    [ -f "$lock_dir/LockView.qml" ] || monarchy_die "clone lock plugin missing"
-    [ -f "$menu" ] || monarchy_die "clone omarchy-menu.jsonc missing"
+    [ -f "$lock_dir/LockView.qml" ] || monarchy_die "omarchy package lock plugin missing"
+    [ -f "$menu" ] || monarchy_die "omarchy package omarchy-menu.jsonc missing"
     python3 "$py" check lock "$lock_dir" || monarchy_die "lock QML overlay no longer applies"
     python3 "$py" check menu "$menu" || monarchy_die "menu overlay no longer applies"
 }
@@ -167,7 +218,7 @@ monarchy_overlay_session_lock() {
     # Copy the whole plugins tree. PluginRegistry finds manifests with
     # `find -type f` and does not follow directory symlinks, so exploding
     # plugins/ into child-dir-symlinks hides wallpaper, menu, and the rest.
-    # Only lock/ is patched; the copy keeps the clone itself untouched.
+    # Only lock/ is patched; the copy keeps the package tree untouched.
     plugins_tmp=$(mktemp -d)
     cp -a "$MONARCHY_SRC/shell/plugins"/. "$plugins_tmp"/
     python3 "$py" apply lock "$plugins_tmp/lock" || {

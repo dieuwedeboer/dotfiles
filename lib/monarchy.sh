@@ -8,16 +8,16 @@ source "$_monarchy_dir/common.sh"
 source "$_monarchy_dir/users.sh"
 # shellcheck source=monarchy/denylist.sh
 source "$_monarchy_dir/denylist.sh"
-# shellcheck source=monarchy/clone.sh
-source "$_monarchy_dir/clone.sh"
+# shellcheck source=monarchy/prefix.sh
+source "$_monarchy_dir/prefix.sh"
 # shellcheck source=monarchy/overlay.sh
 source "$_monarchy_dir/overlay.sh"
 # shellcheck source=monarchy/pacman.sh
 source "$_monarchy_dir/pacman.sh"
+# shellcheck source=monarchy/pkgbuild.sh
+source "$_monarchy_dir/pkgbuild.sh"
 # shellcheck source=monarchy/update.sh
 source "$_monarchy_dir/update.sh"
-# shellcheck source=monarchy/repin.sh
-source "$_monarchy_dir/repin.sh"
 # shellcheck source=monarchy/packages.sh
 source "$_monarchy_dir/packages.sh"
 # shellcheck source=monarchy/sessions.sh

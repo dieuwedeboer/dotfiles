@@ -6,7 +6,10 @@ MONARCHY_DOTFILES=$(cd "$monarchy_lib_dir/../.." && pwd)
 MONARCHY_MISC="${MONARCHY_MISC:-$MONARCHY_DOTFILES/monarchy}"
 MONARCHY_SETUP="${MONARCHY_SETUP:-$MONARCHY_DOTFILES/install.sh}"
 
-MONARCHY_SRC="${MONARCHY_SRC:-/usr/local/src/monarchy/omarchy}"
+# The omarchy package owns this tree. Between omarchy and
+# omarchy-settings-monarchy it holds exactly the twelve names
+# monarchy_link_working_prefix links into the working prefix.
+MONARCHY_SRC="${MONARCHY_SRC:-/usr/share/omarchy}"
 MONARCHY_PATH="${MONARCHY_PATH:-/usr/local/share/omarchy}"
 MONARCHY_CONF="${MONARCHY_CONF:-/etc/omarchy.conf}"
 MONARCHY_PIN="${MONARCHY_PIN:-/etc/omarchy.lock}"
@@ -15,7 +18,7 @@ MONARCHY_ROOT_DATASET="${MONARCHY_ROOT_DATASET:-zpcachyos/ROOT/cos/root}"
 MONARCHY_ESP="${MONARCHY_ESP:-/boot/efi}"
 MONARCHY_ZBM_DIR="${MONARCHY_ZBM_DIR:-$MONARCHY_ESP/EFI/zbm}"
 MONARCHY_REFIND_DIR="${MONARCHY_REFIND_DIR:-$MONARCHY_ESP/EFI/refind}"
-MONARCHY_CACHE="${MONARCHY_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/monarchy/omarchy}"
+MONARCHY_OMARCHY_SERVER="${MONARCHY_OMARCHY_SERVER:-https://pkgs.omarchy.org/stable}"
 MONARCHY_ZFS_KEYFILE="${MONARCHY_ZFS_KEYFILE:-/etc/zfs/zroot.key}"
 MONARCHY_MKINITCPIO_CONF="${MONARCHY_MKINITCPIO_CONF:-/etc/mkinitcpio.conf}"
 
@@ -69,17 +72,10 @@ monarchy_load_lock() {
     local lock="$MONARCHY_MISC/omarchy.lock"
     [ -f "$lock" ] || monarchy_die "missing $lock"
     # lock is key=value, not shell. Parse it.
-    MONARCHY_LOCK_REMOTE=$(awk -F= '$1=="remote"{print substr($0,index($0,"=")+1)}' "$lock")
-    MONARCHY_LOCK_BRANCH=$(awk -F= '$1=="branch"{print substr($0,index($0,"=")+1)}' "$lock")
-    MONARCHY_LOCK_COMMIT=$(awk -F= '$1=="commit"{print substr($0,index($0,"=")+1)}' "$lock")
-    # Recorded in the lock for operators to read; no code consumes them yet.
-    # shellcheck disable=SC2034
-    MONARCHY_LOCK_HYPRLAND=$(awk -F= '$1=="hyprland"{print substr($0,index($0,"=")+1)}' "$lock")
-    # shellcheck disable=SC2034
-    MONARCHY_LOCK_QUICKSHELL=$(awk -F= '$1=="quickshell"{print substr($0,index($0,"=")+1)}' "$lock")
-    [ -n "$MONARCHY_LOCK_REMOTE" ] || monarchy_die "omarchy.lock missing remote"
-    [ -n "$MONARCHY_LOCK_BRANCH" ] || monarchy_die "omarchy.lock missing branch"
-    [ -n "$MONARCHY_LOCK_COMMIT" ] || monarchy_die "omarchy.lock missing commit"
+    MONARCHY_LOCK_PACKAGE=$(awk -F= '$1=="package"{print substr($0,index($0,"=")+1)}' "$lock")
+    MONARCHY_LOCK_CHANNEL=$(awk -F= '$1=="channel"{print substr($0,index($0,"=")+1)}' "$lock")
+    [ -n "$MONARCHY_LOCK_PACKAGE" ] || monarchy_die "omarchy.lock missing package"
+    [ -n "$MONARCHY_LOCK_CHANNEL" ] || monarchy_die "omarchy.lock missing channel"
 }
 
 monarchy_assert_root_pre_update_snapshot() {
@@ -151,18 +147,23 @@ monarchy_pkg_exactly() {
 monarchy_refuse_bootloader() {
     [ -d "$MONARCHY_REFIND_DIR" ] || monarchy_die "rEFInd missing at $MONARCHY_REFIND_DIR"
     [ -d "$MONARCHY_ZBM_DIR" ] || monarchy_die "ZFSBootMenu missing at $MONARCHY_ZBM_DIR"
-    if monarchy_pkg_installed limine \
-        || monarchy_pkg_installed limine-mkinitcpio-hook \
-        || monarchy_pkg_installed limine-snapper-sync; then
-        monarchy_die "limine packages are installed"
-    fi
+    # monarchy-boot-stub *provides* these names, and monarchy_pkg_installed
+    # follows Provides, so it would refuse our own stub. Only a package
+    # actually called limine* is a problem.
+    local p
+    for p in limine limine-mkinitcpio-hook limine-snapper-sync; do
+        monarchy_pkg_exactly "$p" && monarchy_die "the real $p is installed"
+    done
+    # The hook that made this a brick risk rather than dead weight: HookDir
+    # wins over /usr/share/libalpm/hooks by filename, so this shadows the
+    # stock mkinitcpio hook and hands ESP entries to limine-entry-tool.
+    [ -f /etc/pacman.d/hooks/90-mkinitcpio-install.hook ] \
+        && monarchy_die "limine's mkinitcpio hook is shadowing the stock one"
     return 0
 }
 
 monarchy_refuse_snapper() {
-    if monarchy_pkg_installed snapper; then
-        monarchy_die "snapper is installed"
-    fi
+    monarchy_pkg_exactly snapper && monarchy_die "the real snapper is installed"
     return 0
 }
 
@@ -182,12 +183,18 @@ monarchy_refuse_kernel_swap() {
     return 0
 }
 
+# `omarchy` is installed on purpose now. What must never be installed is a
+# settings package that carries upstream's post_install: it does
+# `rm -f /etc/os-release` and overwrites nsswitch.conf, faillock.conf,
+# plymouthd.conf and /etc/skel/.bashrc on every upgrade.
+# omarchy-settings-monarchy provides the name without the scriptlet, and
+# monarchy_pkg_exactly does not match a package by what it provides.
 monarchy_skip_os_release_clobber() {
     monarchy_assert_os_release
-    monarchy_pkg_installed omarchy-settings && monarchy_die "omarchy-settings is installed"
-    monarchy_pkg_installed omarchy-settings-dev && monarchy_die "omarchy-settings-dev is installed"
-    monarchy_pkg_installed omarchy && monarchy_die "omarchy metapackage is installed"
-    monarchy_pkg_installed omarchy-dev && monarchy_die "omarchy-dev is installed"
+    local p
+    for p in omarchy-settings omarchy-settings-dev omarchy-dev; do
+        monarchy_pkg_exactly "$p" && monarchy_die "$p is installed; it clobbers /etc/os-release"
+    done
     return 0
 }
 
@@ -230,9 +237,16 @@ monarchy_refuse_dataset_rename() {
     return 0
 }
 
+# The omarchy package ships this hook, and it is AbortOnFail on every
+# upgrade. Monarchy drives updates through monarchy-update, so the hook has
+# to be switched off -- an empty file of the same name under HookDir is the
+# documented way. Absent upstream hook means nothing to mask.
 monarchy_disable_omarchy_update_guard() {
     local hook=/usr/share/libalpm/hooks/00-omarchy-update-guard.hook
-    [ -e "$hook" ] && monarchy_die "Omarchy ALPM update guard is present at $hook"
+    local masked=/etc/pacman.d/hooks/00-omarchy-update-guard.hook
+    [ -e "$hook" ] || return 0
+    [ -f "$masked" ] || monarchy_die "Omarchy update guard is active; $masked missing"
+    [ -s "$masked" ] && monarchy_die "$masked must be empty to mask the update guard"
     return 0
 }
 

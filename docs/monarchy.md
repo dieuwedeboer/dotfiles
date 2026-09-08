@@ -18,9 +18,13 @@ Household boxes run CachyOS on native-encrypted ZFS with KDE Plasma, rEFInd chai
 
 CachyOS owns the OS: kernel, ZFS modules, repos, Plasma, `cachy-update`, sanoid, ZBM. Monarchy owns the Hyprland session, the clash bridge, and branding. Omarchy never owns `pacman.conf`, the bootloader, or `/etc/os-release`.
 
-The desktop comes from a pinned git clone of `berenddeboer/omarchy` branch `quattro-on-zfs`, plus official `[omarchy]` leaf packages. That fork is a real Omarchy+ZFS tree, but it encodes `zroot/ROOT/default`, Limine, archzfs, and a `pacman.conf` replacement. These machines will never match that contract. The fork is the desktop+script upstream, not an installer. Official Omarchy is Limine + Btrfs + a single-user greeter. Same problem.
+The desktop comes from the official `omarchy` package, plus two packages built here: `monarchy-boot-stub` and `omarchy-settings-monarchy`. There is no fork and no clone.
 
-Do not vendor-fork Omarchy. The overlay in this repo is what we maintain. If the fork stalls, re-pin. Do not start `dieuwedeboer/omarchy`.
+It used to be a pinned git clone of `berenddeboer/omarchy` branch `quattro-on-zfs`. Measured against official Omarchy 4.0.2, that fork was 403 of 428 shared `bin/` names byte-identical, 25 changed, 14 added, and 0 official names missing. Of the changes, exactly two carried ZFS logic: `omarchy-upgrade-to-quattro` and `omarchy-snapshot`. The first was already denied; the second is now `monarchy/bin.wrap` + `stubs/wrap-snapshot.sh`. Everything else the fork changed was personal preference, and everything it encodes about ZFS (`zroot/ROOT/default`, Limine, archzfs, a `pacman.conf` replacement) these machines refuse anyway.
+
+`berenddeboer/omarchy-zfs-pkgs` does not help either: its `omarchy-settings-dev.install` is upstream's byte-for-byte where it matters (`rm -f /etc/os-release` and the five unconditional `cp -f` into `/etc`), and its `omarchy-dev` hard-depends on all four of limine, limine-mkinitcpio-hook, limine-snapper-sync and snapper. That is correct for a box where Omarchy *is* the OS. It is the opposite of what this repo needs.
+
+Do not vendor-fork Omarchy. Do not re-add a clone. The overlay in this repo is what we maintain.
 
 ## Architecture
 
@@ -41,11 +45,11 @@ flowchart TB
 
   subgraph overlay [Monarchy overlay]
     Bridge["install.sh"]
-    Clone["git clone quattro-on-zfs<br/>/usr/local/src/monarchy/omarchy"]
-    Work["OMARCHY_PATH=/usr/local/share/omarchy<br/>data symlinks + overlay bin/"]
+    Pkgs["pacman -S omarchy<br/>+ monarchy-boot-stub<br/>+ omarchy-settings-monarchy"]
+    Work["OMARCHY_PATH=/usr/local/share/omarchy<br/>symlinks into /usr/share/omarchy + overlay bin/"]
     Conf["/etc/omarchy.conf"]
     Repo["[omarchy] after CachyOS<br/>SigLevel Required DatabaseOptional"]
-    Bridge --> Clone
+    Bridge --> Pkgs
     Bridge --> Work
     Bridge --> Conf
     Bridge --> Repo
@@ -59,59 +63,61 @@ flowchart TB
 Three layers:
 
 1. Official `[omarchy]` appended after CachyOS. Pacman first-match keeps `hyprland`, `quickshell`, `linux`, and `zfs-utils` on CachyOS. Names that exist only in Omarchy (`omarchy-nvim`, `omarchy-keyring`, `omacalc`, …) come from `[omarchy]`.
-2. A root-owned git clone plus a working prefix. Same idea as `omarchy-dev-link`, without installing `omarchy-dev`.
-3. Never the metapackages. `omarchy`, `omarchy-dev`, `omarchy-settings`, and `omarchy-settings-dev` are in `packages.deny`. Settings files are copied from the clone minus `monarchy/settings.skip`.
+2. The official `omarchy` package, plus a working prefix of symlinks into the tree it owns. Same idea as `omarchy-dev-link`, without installing `omarchy-dev`.
+3. Two local packages, not a denylist. `omarchy` is installed. `omarchy-settings` is replaced by `omarchy-settings-monarchy`; `limine*` and `snapper` are satisfied by `monarchy-boot-stub`. `omarchy-dev`, `omarchy-settings` and `omarchy-settings-dev` stay in `packages.deny`.
 
 Do not add `[omarchy-zfs]` or `[archzfs]`. Do not replace `/etc/pacman.d/mirrorlist` or any `cachyos-*-mirrorlist`.
 
-### Clone and working prefix
+### Package tree and working prefix
 
 | Path | Role |
 | --- | --- |
-| `/usr/local/src/monarchy/omarchy` | Root-owned clone of `berenddeboer/omarchy` `quattro-on-zfs` at the lock commit. Never on PATH. Never copied into `$HOME`. |
+| `/usr/share/omarchy` | Owned by `omarchy` + `omarchy-settings-monarchy`. Never written to. A symlink here aborts the pacman transaction, so apply removes a leftover one before installing. |
 | `/usr/local/share/omarchy` | `OMARCHY_PATH`. What the session reads. |
 | `/etc/omarchy.conf` | `OMARCHY_PATH=/usr/local/share/omarchy` |
 | `/etc/omarchy.lock` | Copy of `monarchy/omarchy.lock` written at apply. `omarchy-version-branch` reads it. |
-| `monarchy/omarchy.lock` | Pin: `remote`, `branch`, `commit`. Optional `hyprland` and `quickshell` keys for a recorded CachyOS version. |
+| `monarchy/omarchy.lock` | `package` and `channel`. Pacman does the version pinning now. |
 
-`monarchy_link_working_prefix` symlinks `default`, `shell`, `themes`, `migrations`, `config`, `install`, `applications`, `version`, `logo.txt`, `logo.svg`, `icon.txt`, and `icon.png` into the working prefix. `bin/` is not a symlink. Apply then explodes `shell/` and `default/` so lock QML and `omarchy-menu.jsonc` can be patched copies. Clone `bin/` stays in the git tree.
+`monarchy_link_working_prefix` symlinks `default`, `shell`, `themes`, `migrations`, `config`, `install`, `applications`, `version`, `logo.txt`, `logo.svg`, `icon.txt`, and `icon.png` into the working prefix. `omarchy` ships six of those names and `omarchy-settings-monarchy` the other six, so the set is complete without a clone. `bin/` is not a symlink. Apply then explodes `shell/` and `default/` so lock QML and `omarchy-menu.jsonc` can be patched copies — a pacman-owned path is not somewhere to write, because the next upgrade would silently revert both.
 
-env-bootstrap and `envs.lua` both prepend `$OMARCHY_PATH/bin`. That directory is the overlay. Putting clone `bin/` on PATH would skip it.
+env-bootstrap and `envs.lua` both prepend `$OMARCHY_PATH/bin`. That directory is the overlay: only the names Monarchy overrides. Everything else resolves from `/usr/bin`, which the `omarchy` package owns.
 
-`/usr/share/uwsm/env.d/10-monarchy` is `monarchy/10-monarchy`. Do not install the clone's `default/uwsm/env.d/10-omarchy`. That file hardcodes `/usr/share/omarchy/default/bash/env-bootstrap`.
+`/usr/share/uwsm/env.d/10-monarchy` is `monarchy/10-monarchy`. Do not install the package's `default/uwsm/env.d/10-omarchy`. That file hardcodes `/usr/share/omarchy/default/bash/env-bootstrap`.
 
 ### Overlay bin
 
-quattro-on-zfs `bin/` is 438 names at the current pin. Allow-default: every name except a short brick list and the wraps. `generate-inventories.py` rebuilds the three files so `allow ∪ wrap ∪ deny` is every `clone/bin/*` name.
+The overlay is only the names Monarchy overrides. There is no allow list.
+
+`omarchy` installs its 428 binaries into `/usr/bin`, with `/usr/share/omarchy/bin/` as symlinks to them. `$OMARCHY_PATH/bin` and `/usr/local/bin` both precede `/usr/bin` on PATH and in sudo's `secure_path`, so a stub or a wrap still wins and an un-overridden name needs no entry at all. That is what retired `monarchy/bin.allow` (438 rows) and `lib/monarchy/generate-inventories.py`.
 
 | File | Meaning | Overlay action |
 | --- | --- | --- |
-| `monarchy/bin.allow` | Exact filenames, no globs | Symlink to clone `bin/<name>` |
 | `monarchy/bin.wrap` | Exact filenames | Install a Monarchy wrapper |
 | `monarchy/bin.deny` | Brick list | Stub, exit 2, log to `/var/log/monarchy-setup.log` |
+| anything else | Not overridden | Nothing. Resolves from `/usr/bin`. |
 
-`monarchy_rebuild_overlay` empties `$OMARCHY_PATH/bin`, installs deny stubs, allow symlinks, wrap scripts, and a `yay` wrapper that execs `paru`. The same names also land under `/usr/local/bin` so systemd user units and `sudo omarchy-pkg-add` resolve. Arch `secure_path` includes `/usr/local/bin`. Deny stubs still win for brick names. Apply points `/usr/local/bin/monarchy-update` at `install.sh` and removes leftover `setup-monarchy`.
+`monarchy_rebuild_overlay` empties `$OMARCHY_PATH/bin`, installs deny stubs, wrap scripts, and a `yay` wrapper that execs `paru`. The same names also land under `/usr/local/bin` so systemd user units and `sudo omarchy-pkg-add` resolve. `monarchy_prune_stale_overlay_links` removes `/usr/local/bin/omarchy-*` symlinks left by the clone era: a dangling entry there would shadow the real `/usr/bin` one. Apply points `/usr/local/bin/monarchy-update` at `install.sh` and removes leftover `setup-monarchy`.
 
-`bin/omarchy` is the CLI router. Overlay **symlinks** clone `bin/omarchy`. Wrapping `omarchy` itself would break every spaced command (`omarchy theme set`, `omarchy update`). `omarchy update` (two words) is the router calling `omarchy-update`. Only that binary is wrapped.
+`bin/omarchy` is the CLI router and is **not** overridden. Wrapping `omarchy` itself would break every spaced command (`omarchy theme set`, `omarchy update`). `omarchy update` (two words) is the router calling `omarchy-update`. Only that binary is wrapped.
 
 Wraps:
 
 - `omarchy-update` / `omarchy-update-system-pkgs` → `monarchy-update`. The Omarchy menu still calls these names. The command to type is `monarchy-update`.
 - `omarchy-plymouth-set` / `omarchy-plymouth-reset` / `omarchy-refresh-plymouth` → Monarchy splash helpers (`mkinitcpio -P`, no Limine). plymouth-set restyles the greeter overlay.
-- `omarchy-refresh-sddm` → copy clone theme, overlay `Main.qml`
-- `omarchy-screensaver` → seed `screensaver.txt` from clone `logo.txt` if missing, then exec the clone binary
-- `omarchy-display-text-size` → clone binary, then `omarchy-hook display-text-size`. Chezmoi `hooks/apply-font-size` reads `~/.config/environment.d/monarchy.conf` (`MONARCHY_FONT_PT_OFFSET`, `MONARCHY_ALPHA`) and runs `hooks/font-size.d/*` plus `hooks/alpha.d/*` (foot, Alacritty, Emacs, …)
-- `omarchy-version` / `omarchy-version-branch` / `omarchy-version-channel` → Fastfetch About. Version is `$OMARCHY_PATH/version` plus `-git`. Branch is the apply pin. Channel is the `[omarchy]` pkg repo. The clone is detached and root-owned, so these do not run `git`.
+- `omarchy-refresh-sddm` → copy the package theme, overlay `Main.qml`
+- `omarchy-screensaver` → seed `screensaver.txt` from `logo.txt` if missing, then exec the packaged binary
+- `omarchy-display-text-size` → packaged binary, then `omarchy-hook display-text-size`. Chezmoi `hooks/apply-font-size` reads `~/.config/environment.d/monarchy.conf` (`MONARCHY_FONT_PT_OFFSET`, `MONARCHY_ALPHA`) and runs `hooks/font-size.d/*` plus `hooks/alpha.d/*` (foot, Alacritty, Emacs, …)
+- `omarchy-disk-speedtest` → packaged binary behind a `findmnt` shim. It resolves the target directory to a `/dev` node and samples that device's `/sys` counters; on ZFS `findmnt` names the dataset, so the test stops at "Cannot find a disk". The shim answers that one lookup with the pool's single data vdev. Multi-device pools are refused rather than measured one disk short.
+- `omarchy-snapshot` → `zfs-snapshot-pre-update.sh` for `create`; `restore` points at ZFSBootMenu and exits 2. Stock drives snapper and `limine-snapper-restore`, and would exit 127 here because `monarchy-boot-stub` ships no snapper binary. This is the one script `berenddeboer/omarchy` genuinely improved, kept without the fork.
+- `omarchy-version` / `omarchy-version-branch` / `omarchy-version-channel` → Fastfetch About. Version is `$OMARCHY_PATH/version` (no `-git`: it is a package now). Branch is `<package> <installed version>` from `/etc/omarchy.lock` plus `pacman -Q`. Channel is the `[omarchy]` pkg repo.
 
 `omarchy-refresh-pacman` stays in `bin.deny`. Its contract is "replace pacman.conf". Redirecting it to `--update` would hide that.
 
-`--check` / `--update` fail only on clone `bin/` names that are **new relative to the lock**. Reclassifying a name is a file edit, not a check failure.
+`monarchy_check_bin_hazards` greps the package `bin/` for the things that actually brick this host — `limine-entry-tool`, `limine-mkinitcpio`, `limine-install`, `limine-snapper`, `omarchy-refresh-pacman`, `use_omarchy_pacman_config`, a `pacman-*.conf`, `zroot/ROOT`, `/etc/pam.d/zfs-key`, or a `snapper` invocation — and fails on any hit that is neither denied nor wrapped. Same shape as `monarchy_check_migrations`.
 
-After a lock bump:
+Matching on content rather than on a list of names is both smaller and stronger: an allow list cannot notice a hazard that arrives under a *renamed* binary, and this does. `monarchy_check_overrides_exist` is the other half — a wrap or deny for a name upstream dropped is dead weight that would hide exactly that rename.
 
-```bash
-python3 lib/monarchy/generate-inventories.py /usr/local/src/monarchy/omarchy
-```
+There is nothing to regenerate after an upgrade. Classify a reported name into `monarchy/bin.deny` or `monarchy/bin.wrap` and re-run.
 
 ### Pacman
 
@@ -129,9 +135,25 @@ Server = https://pkgs.omarchy.org/stable/$arch
 
 CachyOS does not Include drop-ins, so this lives in `pacman.conf` itself. First edit takes `/etc/pacman.conf.monarchy.bak`. `monarchy_preserve_pacman_conf` aborts if `[cachyos]` / `[cachyos-v3]` do not precede `[omarchy]`, or if the CachyOS/Arch mirrorlist Includes are gone.
 
-`monarchy_install_packages` reads clone `install/omarchy-base.packages`, subtracts `monarchy/packages.deny`, `pacman -S --needed --noconfirm`, writes `monarchy/packages.installed` and `/var/lib/monarchy/packages.installed`. Do not install from `omarchy-other.packages`. Hardware stays CachyOS `chwd` plus `hardware/`.
+`monarchy_install_packages` reads `install/omarchy-base.packages` from the package tree, subtracts `monarchy/packages.deny`, `pacman -S --needed --noconfirm`, writes `monarchy/packages.installed` and `/var/lib/monarchy/packages.installed`. Do not install from `omarchy-other.packages`. Hardware stays CachyOS `chwd` plus `hardware/`.
 
 `--update` is snapshot, fetch, `--check`, then apply. `--check` fails if `omarchy-base.packages` grew a row that is neither denied nor in `packages.installed`. Classify it before applying. Apply then installs the current filtered set with `--needed`.
+
+### Packages
+
+Two PKGBUILDs in `pkgbuilds/`, built and installed by `lib/monarchy/pkgbuild.sh` as the `packaging` unit. Together they make `pacman -S omarchy` a normal install on this host.
+
+**`monarchy-boot-stub`** provides *and* conflicts with `limine`, `limine-mkinitcpio-hook`, `limine-snapper-sync` and `snapper`. It owns no files. `provides` is what lets `omarchy`'s hard deps resolve; `conflicts` is what stops a later `pacman -S` quietly landing the real ones.
+
+Only one of those four is genuinely dangerous. `limine-mkinitcpio-hook` ships `/etc/pacman.d/hooks/90-mkinitcpio-install.hook`, and `HookDir` takes precedence over `/usr/share/libalpm/hooks`, so it **shadows the stock mkinitcpio hook by filename**. Every kernel, DKMS and ZFS-module update would then route through `limine-mkinitcpio-install`, which calls `limine-entry-tool --add-kernel` and writes into `$ESP_PATH`. This box boots rEFInd → ZFSBootMenu; that ESP is not Limine's to manage. `limine` alone depends only on glibc, and `snapper` ships an empty `/etc/snapper/configs` with timers that are not enabled — both are inert, and are stubbed only so the refuse list stays true as written.
+
+**`omarchy-settings-monarchy`** is the official `omarchy-settings` package, rebuilt with its scriptlet dropped and the paths in `monarchy/settings.skip` removed. Everything else stays byte-identical to upstream, so there is no fork here either — only an exclude list.
+
+Upstream's `post_install`/`post_upgrade` is destructive by design, and says so in its own comment. On every install *and* upgrade it runs `rm -f /etc/os-release` and then overwrites `/etc/os-release`, `/etc/security/faillock.conf`, `/etc/nsswitch.conf`, `/etc/plymouth/plymouthd.conf` and `/etc/skel/.bashrc` from `usr/share/omarchy/etc-overrides/`. Dropping the scriptlet and that staged tree is the whole point of the package. Note that those five paths are **not** in `settings.skip`: they are not files in the package, so there is nothing to exclude — killing the scriptlet is what protects them.
+
+`pkgver` tracks whatever `omarchy` currently depends on. `omarchy` declares `omarchy-settings=<exact>`, so `monarchy_ensure_settings_pkg` reads that, downloads the matching official package straight from `[omarchy]`, verifies the signature against pacman's keyring, and rebuilds. Nothing to bump by hand; a mismatch between the repo and the dep is a hard error telling you to update first.
+
+`pacman -Sw omarchy-settings` cannot be used to fetch it, because our replacement conflicts with that name and resolution refuses before downloading. Hence the direct fetch — and hence the explicit `gpg --verify`, since `SigLevel` for `[omarchy]` is `Required` and bypassing pacman must not also bypass the signature.
 
 ## Apply
 
@@ -150,7 +172,7 @@ Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. 
 Both `monarchy_check` and `monarchy_apply` walk one ordered array:
 
 ```bash
-MONARCHY_UNITS=(guards clone overlay pacman settings sddm session logind portals user splash)
+MONARCHY_UNITS=(guards pacman packaging prefix overlay leaves settings sddm session logind portals user splash)
 ```
 
 Each unit has a `check` verb and an `apply` verb. Check runs every unit's check.
@@ -159,20 +181,26 @@ using a bare apply instead of an update — which is exactly how the two
 inventory guards went missing when these were two hand-maintained lists.
 
 The array is the ordering constraint, and it is the one thing to read before
-editing: clone before overlay, overlay before pacman, user before splash.
+editing. The order changed when the clone went away: `[omarchy]` has to exist
+before anything is downloaded, the `omarchy` package before the prefix that is
+linked out of it, the prefix before the overlay that sits on it, and
+`install/omarchy-base.packages` only exists once `omarchy` is installed.
 
 `--only=<unit>` runs a single unit, in check or apply. There is no canary box
 and `zfs-snapshot-pre-update` keeps three snapshots, so a full apply is an
 expensive way to iterate on one subsystem. An unknown name is an error, not a
 silent no-op.
 
-`monarchy_ensure_clone_for_check` is the one thing outside the units. It
-repoints `MONARCHY_SRC` at a user cache when no clone exists so a dry run has
-something to read, which must never happen during apply.
+There is no check-only escape hatch any more. `monarchy_ensure_clone_for_check`
+existed because a dry run needed a git clone from somewhere; `MONARCHY_SRC` is
+a pacman-owned path now, so check and apply read the same tree and every
+function check reaches also runs during apply. Units whose input is not yet on
+disk return early instead.
 
 King-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, Super+Ctrl+U bind, Super+Shift+E emacsclient (replaces HEY), unbind leftover HEY calendar/compose chords, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), drop `monarchy/applications.drop` (Basecamp, HEY), `omarchy-pkg-add` of spotify, signal-desktop, cursor-bin, cursor-cli, omakade, `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland` plus `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
 
 `lib/packages.sh` installs the shared set before apply. After apply or `--update` it strips competing copies (pacman emacs/bun/gh, Spotify/Discord flatpaks, curl-pipe cursor-agent, python-pipx, omarchy-emacs, AUR zoom) once `/etc/omarchy.conf` exists, so a box that has not finished apply is still usable. Zoom is the Omarchy webapp (`zoommtg://`), not AUR `zoom`.
+
 
 ### Repo layout
 
@@ -183,12 +211,13 @@ lib/monarchy/
   common.sh              # logging, snapshot-first, layout guards
   pacman.sh              # preserve CachyOS, append [omarchy]
   denylist.sh            # loads packages.deny, bin.*, migrations.deny, applications.drop
-  overlay.sh             # rebuild overlay bin, explode-and-patch lock/menu
-  overlay-lock.py        # Super+Ctrl+U hunks; --check fails if clone drifted
+  overlay.sh             # rebuild overlay bin, hazard scan, explode-and-patch
+  overlay-lock.py        # Super+Ctrl+U hunks; --check fails if upstream drifted
   switch-user.sh         # /usr/local/bin/monarchy-switch-user
   packages.sh            # filtered install, writes packages.installed
+  pkgbuild.sh            # build+install the two local packages, then omarchy
   plugins.sh             # third-party omarchy plugin clone+enable
-  clone.sh               # sync clone, working prefix, /etc/omarchy.conf
+  prefix.sh              # working prefix out of /usr/share/omarchy
   sessions.sh            # omarchy.desktop, AccountsService, hide stock Hyprland
   settings.sh            # omarchy-settings file tree minus settings.skip
   sddm.sh                # enable sddm, remove PLM, overlay greeter QML
@@ -199,6 +228,9 @@ lib/monarchy/
   update.sh              # --check, apply, --update
   user.sh
   stubs/                 # deny, wrap-update, wrap-plymouth, wrap-sddm, …
+pkgbuilds/
+  monarchy-boot-stub/    # provides limine*/snapper, installs nothing
+  omarchy-settings-monarchy/  # official omarchy-settings minus the /etc clobber
 tests/
   run.sh                 # every tests/**/test-*.sh, then shellcheck
   helpers.sh             # REPO, LIB, MISC, HARDWARE, fail()
@@ -211,7 +243,6 @@ monarchy/
   packages.installed
   applications.drop
   plugins
-  bin.allow
   bin.wrap
   bin.deny
   migrations.deny
@@ -272,11 +303,11 @@ These abort apply or check when the host has drifted. Full clash rows are `docs/
 | `monarchy_refuse_archzfs` | Fail if `[archzfs]` appears. |
 | `monarchy_refuse_omarchy_zfs_repo` | Fail if `[omarchy-zfs]` is present. |
 | `monarchy_refuse_kernel_swap` | Never install `linux` / `linux-headers`. Running pkgbase is `linux-cachyos*`. |
-| `monarchy_refuse_bootloader` | rEFInd at `/boot/efi/EFI/refind`, ZBM at `/boot/efi/EFI/zbm`. Refuse `limine*`. |
-| `monarchy_refuse_snapper` | Refuse `snapper`. Keep sanoid + pacman hook. |
+| `monarchy_refuse_bootloader` | rEFInd at `/boot/efi/EFI/refind`, ZBM at `/boot/efi/EFI/zbm`. Refuse a package *named* `limine*` (not our stub, which only provides the name) and refuse `/etc/pacman.d/hooks/90-mkinitcpio-install.hook`. |
+| `monarchy_refuse_snapper` | Refuse a package named `snapper`. Keep sanoid + pacman hook. |
 | `monarchy_refuse_dataset_rename` | Never run clone `install/config/zfs.sh`. Never write `/etc/pam.d/zfs-key`. |
-| `monarchy_disable_omarchy_update_guard` | Never install `omarchy` / `omarchy-dev`. Mask the ALPM hook if it appears. |
-| `monarchy_skip_os_release_clobber` | Never install `omarchy-settings*`. If `ID` is not `cachyos`, abort and restore from `/usr/lib/os-release`. |
+| `monarchy_disable_omarchy_update_guard` | `omarchy` ships `00-omarchy-update-guard.hook` and it is `AbortOnFail` on every upgrade. Require an empty file of the same name under `HookDir`. |
+| `monarchy_skip_os_release_clobber` | Never install a settings package that carries upstream's scriptlet: `omarchy-settings`, `omarchy-settings-dev`, `omarchy-dev`, by exact name. `omarchy` itself is installed on purpose. If `ID` is not `cachyos`, abort. |
 | `monarchy_skip_plymouth_zfs` | Never install AUR `plymouth-zfs`. plymouth-before-zfs only when the keyfile is in FILES. |
 | `monarchy_skip_autologin` | Autologin User empty in leftover plasmalogin and sddm conf. |
 | `monarchy_keep_family_mime` | No Omarchy mimeapps system-wide or in `~/.config/mimeapps.list`. |
@@ -365,8 +396,9 @@ ZFS datasets do not change: `zpcachyos/ROOT/cos/{root,home,varcache,varlog}`. Po
 | `/etc/omarchy.conf` | `OMARCHY_PATH=/usr/local/share/omarchy` |
 | `/etc/omarchy.lock` | Apply pin. `omarchy-version-branch` reads it |
 | `/etc/pam.d/omarchy-lock-password` | Quickshell lock PAM. Super+Ctrl+L is a no-op without it |
-| `/usr/local/src/monarchy/omarchy` | git clone |
-| `/usr/local/share/omarchy` | working prefix: data symlinks + overlay `bin/` |
+| `/usr/share/omarchy` | Package tree: `omarchy` + `omarchy-settings-monarchy` |
+| `/usr/local/share/omarchy` | working prefix: symlinks into `/usr/share/omarchy` + overlay `bin/` |
+| `/etc/pacman.d/hooks/00-omarchy-update-guard.hook` | empty file. Masks Omarchy's AbortOnFail upgrade guard. |
 | `/usr/local/bin/omarchy-*` | allow symlinks, wraps, and deny stubs |
 | `/usr/local/bin/monarchy-switch-user` | lock if needed, then return to SDDM |
 | `/usr/local/bin/monarchy-update` | symlink to `install.sh`. Bare run is `--update` |
@@ -382,16 +414,16 @@ ZFS datasets do not change: `zpcachyos/ROOT/cos/{root,home,varcache,varlog}`. Po
 | Updater | Owns | Must not |
 | --- | --- | --- |
 | `cachy-update` / `pacman -Syu` | CachyOS kernel, ZFS modules, Plasma, already-installed leaf packages | Be aborted by omarchy-update-guard. Swap kernel. Drop `[cachyos*]`. Replace mirrorlist. |
-| `monarchy-update` | Fetch quattro-on-zfs, dry-run vs lock inventories, overlay rebuild, filtered leaf packages, user/session/splash | Call `omarchy-refresh-pacman`. Unfiltered `-Syyuu`. Fast-forward past `bin/` names new to the lock. |
+| `monarchy-update` | Rebuild the two local packages, `pacman -S omarchy`, hazard scan, overlay rebuild, filtered leaf packages, user/session/splash | Call `omarchy-refresh-pacman`. Unfiltered `-Syyuu`. Apply past an unclassified hazard in `bin/` or `migrations/`. |
 
-Channel: `[omarchy]` **stable**. Clone follows `quattro-on-zfs`. Those two are allowed to differ. Hyprland and Quickshell stay on CachyOS first-match. Do not pull them from `[omarchy]` to "catch up."
+Channel: `[omarchy]` **stable**, for the packages and the desktop alike — they can no longer differ. Hyprland and Quickshell stay on CachyOS first-match. Do not pull them from `[omarchy]` to "catch up."
 
 Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZFSBootMenu, or clone+promote. Pacman.conf backup is `/etc/pacman.conf.monarchy.bak`. There is no `--uninstall`.
 
 ## What we refuse
 
 - Omarchy ISO, dual-booting two roots, or renaming datasets to `zroot/ROOT/default`
-- `linux` / `linux-headers`, archzfs, Limine, Snapper, `limine-snapper-sync`
+- `linux` / `linux-headers`, archzfs, and the real `limine`, `limine-mkinitcpio-hook`, `limine-snapper-sync` and `snapper` packages
 - Removing `linux-cachyos-zfs` or `zfs-dkms`. CachyOS Calamares installs both.
 - Removing Plasma. Seamless-login / autologin / Omarchy "direct boot"
 - Plymouth owning the ZFS unlock prompt
@@ -400,6 +432,6 @@ Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZFSBootMenu, or clone
 - A custom ISO
 - `[omarchy]` TrustAll
 
-The fork still hardcodes `zroot/ROOT/default` and Limine. That is why the denylist exists. The ask is https://github.com/berenddeboer/omarchy-zfs-pkgs/issues/1 (`berenddeboer/omarchy` has issues disabled). PAM homes, a plymouth-before-zfs mkinitcpio rewrite, and archzfs stay refused even if that lands.
+Upstream Omarchy hardcodes Limine and Btrfs, and `omarchy-settings` rewrites `/etc` from its scriptlet. That is why `omarchy-settings-monarchy` and `monarchy-boot-stub` exist. PAM homes, a plymouth-before-zfs mkinitcpio rewrite, and archzfs stay refused regardless.
 
 NVIDIA and Tuxedo/Clevo quirks stay in `hardware/system76-bonw9/apply.sh` / `chwd`. The king's fish, paru, tealdeer, chezmoi nvim, ghostty, docker group, and per-box ufw enable/disable stay.

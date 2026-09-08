@@ -2,7 +2,7 @@
 
 Source of truth for `packages.deny` and overlay-bin policy. Architecture is `docs/monarchy.md`.
 
-Pin: `berenddeboer/omarchy` `quattro-on-zfs` `1297c7bc98cba3183d6037e19761dcb99e0c902e` (442 `bin/` names: 411 allow, 11 wrap, 20 deny).
+Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names: 13 wrapped, 20 denied, the rest not overridden). No pin, no clone — pacman does the pinning.
 
 ## Blocker
 
@@ -75,33 +75,28 @@ the QML it links to are both produced by the overlay.
 
 ## Overlay bin
 
-- `monarchy/bin.allow`: symlink to clone `bin/<name>`
-- `monarchy/bin.wrap`: `omarchy-update` and `omarchy-update-system-pkgs` exec `monarchy-update`. Plymouth write-path names skip Limine and restyle the SDDM greeter from Monarchy `Main.qml`. `omarchy-refresh-sddm` copies the clone theme then overlays that QML (Unlock default). Apply then follows Style > Unlock if plymouth is already a named theme. The session theme does not restyle the greeter. `omarchy-display-text-size` runs the clone binary then the user `display-text-size` hook (`apply-font-size`).
+- `monarchy/bin.wrap`: `omarchy-update` and `omarchy-update-system-pkgs` exec `monarchy-update`. Plymouth write-path names skip Limine and restyle the SDDM greeter from Monarchy `Main.qml`. `omarchy-refresh-sddm` copies the packaged theme then overlays that QML (Unlock default). Apply then follows Style > Unlock if plymouth is already a named theme. The session theme does not restyle the greeter. `omarchy-display-text-size` runs the packaged binary then the user `display-text-size` hook (`apply-font-size`). `omarchy-snapshot` takes a ZFS snapshot instead of driving snapper.
 - `monarchy/bin.deny`: brick list only (pacman.conf, Limine, ISO provisioner, factory reset, dataset upgrade). Stub, exit 2. Also installed under `/usr/local/bin` on apply.
 
-Omarchy-first: `generate-inventories.py` allows every other `clone/bin` name, including `omarchy-install-*` and `omarchy-pkg-*`. Apply installs the omarchy-settings file tree via `settings.skip`. `omarchy` itself is the CLI router. `omarchy-refresh-pacman` stays deny, not a wrap.
+Omarchy-first: a name that is neither wrapped nor denied gets no overlay entry and resolves from `/usr/bin`, including `omarchy-install-*` and `omarchy-pkg-*`. `omarchy` itself is the CLI router and is not overridden. `omarchy-refresh-pacman` stays deny, not a wrap.
 
-Regenerate after a lock bump:
+`omarchy-settings-monarchy` installs the settings tree; `settings.skip` is that package's exclude list, not a copy filter. See "Packages" in `docs/monarchy.md`.
 
-```bash
-python3 lib/monarchy/generate-inventories.py /usr/local/src/monarchy/omarchy
-```
+## New upstream binaries
 
-`--dest <dir>` writes the three lists elsewhere, which is how `--repin-check`
-compares a candidate checkout without touching the tree.
+There is nothing to regenerate. `monarchy_check_bin_hazards` greps the package
+`bin/` for `limine-entry-tool`, `limine-mkinitcpio`, `limine-install`,
+`limine-snapper`, `omarchy-refresh-pacman`, `use_omarchy_pacman_config`, a
+`pacman-*.conf`, `zroot/ROOT`, `/etc/pam.d/zfs-key`, or a `snapper`
+invocation, and halts an apply on any hit that is neither denied nor wrapped.
+`monarchy_check_overrides_exist` halts on a wrap or deny whose name upstream
+dropped.
 
-## Bumping the pin
-
-`./install.sh --repin-check` reports what moving the lock to the branch head
-would bring in: position and whether the fork rebased away from the pin, both
-classification guards, the `bin/` and `packages.installed` diffs, every new
-migration with its summary line, and added or deleted privileged drop-ins. It
-writes nothing.
-
-The bump itself stays a human-reviewed step. `monarchy_check_migrations` and
-`monarchy_check_packages_deny` halt an apply on anything unclassified, and that
-is the judgement the guards exist to force. `.agents/skills/repin` is the
-procedure. `monarchy-update` is what then fetches the commit onto a box.
+Classifying a reported name into `monarchy/bin.deny` or `monarchy/bin.wrap` is
+a file edit. That judgement stays human: `monarchy_check_migrations` and
+`monarchy_check_packages_deny` halt on anything unclassified for the same
+reason, and there is no canary box. `monarchy-update` is what then moves a box
+onto the new package.
 
 Deleted rows are the ones to act on. Apply installs files and never reconciles
 them, so a `sudoers.d` rule upstream removed for security stays on the box, and

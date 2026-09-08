@@ -51,7 +51,7 @@ If Hyprland fails, stay on Plasma, boot a `pre-update-*` snapshot from ZFSBootMe
 ## What apply does
 
 - Snapshot via `/root/.local/bin/zfs-snapshot-pre-update.sh`. If that helper is missing or still has the varlog-only prune, apply installs the current copy from this repo, then asserts a `@pre-update-*` exists on `zpcachyos/ROOT/cos/root`.
-- Clone `berenddeboer/omarchy` `quattro-on-zfs` at the lock commit to `/usr/local/src/monarchy/omarchy`
+- Build `monarchy-boot-stub` and `omarchy-settings-monarchy`, then `pacman -S omarchy` (owns `/usr/share/omarchy`)
 - Working prefix `/usr/local/share/omarchy` (data symlinks + overlay `bin/`)
 - `/etc/omarchy.conf`
 - Recv and locally sign Omarchy packaging key `40DFB630FF42BCFFB047046CF0134EE680CAC571` (prompts once. Later runs skip). Append `[omarchy]` after CachyOS repos (`SigLevel = Required DatabaseOptional`) and install `omarchy-keyring`
@@ -59,8 +59,8 @@ If Hyprland fails, stay on Plasma, boot a `pre-update-*` snapshot from ZFSBootMe
 - Register `/usr/share/wayland-sessions/omarchy.desktop` (`TryExec=uwsm`, `DesktopNames=Hyprland`). Exec is the real `uwsm start … hyprland.desktop` once that file exists, otherwise the session probe
 - Install `/usr/share/uwsm/env.d/10-monarchy` (stock 10-omarchy with the working-prefix bootstrap + mise) and Hyprland portal defaults if missing
 - Install omarchy-settings files (`etc/` drop-ins, user systemd units, fontconfig, icons) minus `monarchy/settings.skip`. Enable cups/avahi/docker.socket/oomd when the units exist. Seed chromium native hosts, gnome-keyring, gtk theme, and user units
-- Seed `~/.config/hypr/*` (no overwrite), branding (`screensaver.txt` from clone `logo.txt`, `about.txt` from `icon.txt`). Do not override `TERMINAL`. Run `omarchy-refresh-applications` (mise agent stubs + webapps), drop Basecamp and HEY from `monarchy/applications.drop`, `omarchy-pkg-add` of spotify, signal-desktop, cursor-bin, cursor-cli, omakade, `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland`, and `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`). `omarchy-provision-user` is allowed for a later finalize
-- Install `monarchy/plugins` into `~/.config/omarchy/plugins/<id>/`. The file is the list: Grok usage, Activity Monitor, Screens, Sandman, Omarchy Spotify, and Omamail, each with `--enable`. `--enable` writes the row the shell would write: a bar widget goes into `shell.json` `bar.layout` under the section its manifest asks for, just after that section's anchor widget; a panel, overlay, menu or service goes into `plugins[]`. A widget already somewhere in the bar keeps its place and its settings. Grok usage is a service and correctly has no bar icon of its own: it adds Grok to the stock AI widget. Does not need a live Omarchy session. Add more rows to that list to grow the collection. `omarchy plugin update` is still the updater for a checkout that already exists. Sandman's hibernate helper is not installed; hibernation stays refused.
+- Seed `~/.config/hypr/*` (no overwrite), branding (`screensaver.txt` from `logo.txt`, `about.txt` from `icon.txt`). Do not override `TERMINAL`. Run `omarchy-refresh-applications` (mise agent stubs + webapps), drop Basecamp and HEY from `monarchy/applications.drop`, `omarchy-pkg-add` of spotify, signal-desktop, cursor-bin, cursor-cli, omakade, `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland`, and `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`). `omarchy-provision-user` is allowed for a later finalize
+- Install `monarchy/plugins` into `~/.config/omarchy/plugins/<id>/`. The file is the list: Grok usage, OmaStats, Screens, Sandman, Omarchy Spotify, and Omamail, each with `--enable`. `--enable` writes the row the shell would write: a bar widget goes into `shell.json` `bar.layout` under the section its manifest asks for, just after that section's anchor widget; a panel, overlay, menu or service goes into `plugins[]`. A widget already somewhere in the bar keeps its place and its settings. Grok usage is a service and correctly has no bar icon of its own: it adds Grok to the stock AI widget. Does not need a live Omarchy session. Add more rows to that list to grow the collection. `omarchy plugin update` is still the updater for a checkout that already exists. Sandman's hibernate helper is not installed; hibernation stays refused.
 - Install `OMARCHY_AUR_PACKAGES` from `lib/packages.sh` (currently `flea`) with `paru -S --assume-installed omarchy=<overlay version>`, and link `/usr/share/omarchy` to the overlay so the paths those PKGBUILDs hardcode resolve. Runs after apply because both halves need the overlay on disk. See `docs/monarchy-clashes.md`
 - Run `omarchy-apply-lock` so `/etc/pam.d/omarchy-lock-password` exists. Super+Ctrl+L is a no-op without it (`lock-denied: missing-pam`). SDDM staying up after login is expected. It is not the locker.
 - Enable `sddm.service`, remove `plasma-login-manager`, install `/etc/sddm.conf.d/zz-omarchy-sddm.conf` and the Omarchy greeter with the multi-user `Main.qml` overlay
@@ -80,7 +80,7 @@ After apply, `monarchy-update` is the PATH command (`install.sh --update`). The 
 ./install.sh --check
 ```
 
-Uses a user cache clone if `/usr/local/src/monarchy/omarchy` is absent. Writes nothing under `/etc` or `/usr/local`.
+Units whose input is not on disk yet return early, so a dry run works before the first apply. Writes nothing under `/etc` or `/usr/local`.
 
 ## Rollback
 
@@ -119,7 +119,7 @@ After reboot:
 8. Super+Ctrl+U (System menu too) locks if needed and returns to SDDM. The same chord on the lock screen is the family breakout. It does not need the locked user's password. Logging back into an open session from the greeter switches to that session's lock screen. It must not start a second compositor.
 9. `~/.config/omarchy/branding/screensaver.txt` exists (Omarchy wordmark). Super+Esc → Screensaver shows it. A key dismisses it. `$OMARCHY_PATH/logo.txt` is a symlink so Style > Screensaver > Restore Default works.
 10. `~/.config/omarchy/plugins/io.github.dougfour.grok-usage/` exists. Click the stock AI icon and switch to **Grok**. Needs `grok login` for weekly limits.
-11. `~/.config/omarchy/plugins/stappmus.activity-monitor/` exists. Bar widget for CPU, memory, GPU, storage, and processes.
+11. `~/.config/omarchy/plugins/crmne.omastats/` exists. Bar widget for CPU, memory, GPU, disk, network, sensors, and battery.
 12. `~/.config/omarchy/plugins/im0001gt.screens/` exists. Bar widget for arranging displays, HDR, VRR, and named profiles.
 13. `~/.config/omarchy/plugins/lgse.sandman/` exists. Bar widget for lid-close, screensaver, lock, displays-off, and sleep timeouts.
 14. `~/.config/omarchy/plugins/quickshell.spotify/` exists. Bar widget for Spotify in Quickshell. Sign-in is in the widget. The desktop Spotify client from `omarchy-pkg-add spotify` stays.

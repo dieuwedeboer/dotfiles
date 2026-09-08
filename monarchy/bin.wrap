@@ -1,9 +1,11 @@
+omarchy-disk-speedtest
 omarchy-display-text-size
 omarchy-plymouth-reset
 omarchy-plymouth-set
 omarchy-refresh-plymouth
 omarchy-refresh-sddm
 omarchy-screensaver
+omarchy-snapshot
 omarchy-update
 omarchy-update-system-pkgs
 omarchy-version

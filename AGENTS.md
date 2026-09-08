@@ -37,7 +37,10 @@ See `docs/agents/triage-labels.md`.
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root.
 See `docs/agents/domain.md`.
 
-### Re-pinning the overlay
+### Moving to a new Omarchy release
 
-`./install.sh --repin-check` reports what a lock bump would bring in, and
-writes nothing. The steps after that are `.agents/skills/repin`.
+There is no pin to bump. `monarchy-update` rebuilds the two local packages in
+`pkgbuilds/`, installs the current `omarchy` from `[omarchy]` stable, and halts
+if a new binary or migration touches Limine, snapper or `pacman.conf` without
+being classified into `monarchy/bin.deny`, `monarchy/bin.wrap` or
+`monarchy/migrations.deny`. Classifying it is a human call.

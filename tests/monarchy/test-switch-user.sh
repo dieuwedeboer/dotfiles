@@ -7,8 +7,8 @@ TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$TEST_DIR/../helpers.sh"
 # shellcheck source=../../lib/monarchy/common.sh
 source "$LIB/common.sh"
-# shellcheck source=../../lib/monarchy/clone.sh
-source "$LIB/clone.sh"
+# shellcheck source=../../lib/monarchy/prefix.sh
+source "$LIB/prefix.sh"
 # shellcheck source=../../lib/monarchy/overlay.sh
 source "$LIB/overlay.sh"
 # shellcheck source=../../lib/monarchy/user.sh
@@ -149,7 +149,7 @@ if grep -q SwitchToGreeter "$state/busctl.log"; then
     fail "missing-pam still called SwitchToGreeter"
 fi
 
-clone=$(require_clone "${1:-}")
+clone=$(require_omarchy_tree "${1:-}")
 [ -f "$clone/shell/plugins/lock/LockView.qml" ] \
     || fail "clone at $clone has no lock plugin LockView.qml"
 python3 "$py" check lock "$clone/shell/plugins/lock" || fail "lock overlay check failed against clone"
