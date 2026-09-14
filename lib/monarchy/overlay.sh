@@ -26,6 +26,9 @@ monarchy_wrap_stub_for() {
         omarchy-version|omarchy-version-branch|omarchy-version-channel)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-version.sh"
             ;;
+        omarchy-voxtype-config)
+            printf '%s\n' "$monarchy_lib_dir/stubs/wrap-voxtype.sh"
+            ;;
         omarchy-snapshot)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-snapshot.sh"
             ;;

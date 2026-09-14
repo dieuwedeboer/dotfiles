@@ -73,7 +73,40 @@ grep -q 'wrap-version does not handle' "$dest/omarchy-version" || fail "omarchy-
 # The one script the ZFS fork actually improved, kept without the fork.
 [ -x "$dest/omarchy-snapshot" ] || fail "snapshot wrap missing"
 grep -q 'ZFSBootMenu' "$dest/omarchy-snapshot" || fail "snapshot wrap is not the ZFS one"
+[ -x "$dest/omarchy-voxtype-config" ] || fail "voxtype-config wrap missing"
+[ ! -L "$dest/omarchy-voxtype-config" ] || fail "voxtype-config wrap is a symlink"
+grep -q 'omarchy-voxtype-install' "$dest/omarchy-voxtype-config" \
+    || fail "voxtype-config wrap does not route missing voxtype to install"
 [ -x "$dest/yay" ] || fail "yay wrapper missing"
+
+# Drive the wrap with a fake PATH so missing voxtype cannot reach
+# `voxtype configure` + omarchy-restart-shell, and a present voxtype still
+# execs the packaged binary.
+vox=$(mktemp -d)
+mkdir -p "$vox/bin" "$vox/src/bin"
+cat >"$vox/src/bin/omarchy-voxtype-config" <<'EOF'
+#!/bin/sh
+echo packaged-config
+EOF
+cat >"$vox/bin/omarchy-launch-floating-terminal-with-presentation" <<'EOF'
+#!/bin/sh
+printf 'launch:%s\n' "$*"
+EOF
+cat >"$vox/bin/omarchy-restart-shell" <<'EOF'
+#!/bin/sh
+echo restarted
+EOF
+chmod +x "$vox/bin"/* "$vox/src/bin"/*
+vox_path="$vox/bin:/usr/bin:/bin"
+vox_out=$(MONARCHY_SRC=$vox/src PATH="$vox_path" "$LIB/stubs/wrap-voxtype.sh")
+[ "$vox_out" = "launch:omarchy-voxtype-install" ] \
+    || fail "missing voxtype did not launch install: $vox_out"
+printf '#!/bin/sh\necho voxtype\n' >"$vox/bin/voxtype"
+chmod +x "$vox/bin/voxtype"
+vox_out=$(MONARCHY_SRC=$vox/src PATH="$vox_path" "$LIB/stubs/wrap-voxtype.sh")
+[ "$vox_out" = "packaged-config" ] \
+    || fail "present voxtype did not exec packaged config: $vox_out"
+rm -rf "$vox"
 
 # The point of dropping bin.allow: a name we do not override gets no overlay
 # entry at all and resolves from /usr/bin.
