@@ -20,7 +20,13 @@ if [ ! -f /usr/lib/qt6/plugins/ksystemstats/ksystemstats_plugin_scripts.so ]; th
 fi
 
 echo "=== Applying chezmoi to ensure zpool sensor exists ==="
-chezmoi apply
+# Same TTY gate as household_refresh: chezmoi apply prompts, and a
+# menu-driven monarchy-update has no terminal to answer on.
+if [ "${MONARCHY_NONINTERACTIVE:-0}" != 1 ] && [ -t 0 ] && [ -t 1 ]; then
+    chezmoi apply
+else
+    echo "  skipping chezmoi apply (no terminal); run: chezmoi apply"
+fi
 
 echo "=== Restarting ksystemstats to load new sensors ==="
 systemctl restart --user plasma-ksystemstats.service

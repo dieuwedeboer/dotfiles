@@ -97,13 +97,17 @@ cat >"$vox/bin/omarchy-restart-shell" <<'EOF'
 echo restarted
 EOF
 chmod +x "$vox/bin"/* "$vox/src/bin"/*
-vox_path="$vox/bin:/usr/bin:/bin"
-vox_out=$(MONARCHY_SRC=$vox/src PATH="$vox_path" "$LIB/stubs/wrap-voxtype.sh")
+# Only the fake bin dir. Including /usr/bin would pick up a host voxtype-bin
+# and make the missing-binary path untestable. Absolute bash so the PATH
+# override does not hide the interpreter.
+vox_path="$vox/bin"
+vox_bash=$(command -v bash)
+vox_out=$(MONARCHY_SRC=$vox/src PATH="$vox_path" "$vox_bash" "$LIB/stubs/wrap-voxtype.sh")
 [ "$vox_out" = "launch:omarchy-voxtype-install" ] \
     || fail "missing voxtype did not launch install: $vox_out"
 printf '#!/bin/sh\necho voxtype\n' >"$vox/bin/voxtype"
 chmod +x "$vox/bin/voxtype"
-vox_out=$(MONARCHY_SRC=$vox/src PATH="$vox_path" "$LIB/stubs/wrap-voxtype.sh")
+vox_out=$(MONARCHY_SRC=$vox/src PATH="$vox_path" "$vox_bash" "$LIB/stubs/wrap-voxtype.sh")
 [ "$vox_out" = "packaged-config" ] \
     || fail "present voxtype did not exec packaged config: $vox_out"
 rm -rf "$vox"
