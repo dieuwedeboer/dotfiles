@@ -121,7 +121,7 @@ The install script will:
 - Apply hardware quirks when DMI or a device node matches
 - Install Monarchy (Omarchy Quattro as a second session. Family default stays Plasma)
 
-`./install.sh --check` is a Monarchy dry-run. After the first install, `monarchy-update` is the command that refreshes the overlay. Operator notes and rollback are in `docs/monarchy-install.md`.
+`./install.sh --check` is a Monarchy dry-run. After the first install, `./install.sh` and `monarchy-update` are the same command: they refresh chezmoi-managed dotfiles, then the overlay. Operator notes and rollback are in `docs/monarchy-install.md`.
 
 ### Double Password Solution
 

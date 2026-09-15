@@ -158,15 +158,17 @@ Upstream's `post_install`/`post_upgrade` is destructive by design, and says so i
 
 ## Apply
 
-Entry point: `install.sh`. bash, `set -e`, idempotent, sudo only where needed. Bare invocation is the full setup, including Monarchy apply. Flags are Monarchy-only.
+Entry point: `install.sh`. bash, `set -e`, idempotent, sudo only where needed. One pipeline: household refresh (packages, chezmoi, hardware, ZFS), then Monarchy. `--check`, `--splash-only`, and `--only` skip the household refresh; `--update` does not.
 
 ```bash
-./install.sh           # first run: packages, chezmoi, hardware, ZFS, Monarchy apply
+./install.sh           # first run: household refresh, then Monarchy apply
+                       # after /etc/omarchy.conf exists: same as --update
 ./install.sh --check   # Monarchy dry-run. Writes nothing under /etc or /usr/local.
-monarchy-update        # after that: snapshot, fetch, check, apply
+./install.sh --update  # household refresh, then snapshot, fetch, check, apply
+monarchy-update        # this file with --update
 ```
 
-`/usr/local/bin/monarchy-update` is a symlink to `install.sh`. Invoked by that name, a bare run is `--update`, not the household bootstrap. Wrapped `omarchy-update` execs it so the Omarchy Update menu does not run stock Omarchy.
+`/usr/local/bin/monarchy-update` is a symlink to `install.sh`. Invoked by that name, a bare run is `--update`. Wrapped `omarchy-update` execs it so the Omarchy Update menu does not run stock Omarchy. That menu has no terminal, so chezmoi apply is skipped rather than hanging on a prompt; an interactive run applies.
 
 Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. That helper hard-codes `zpcachyos/ROOT/cos`. If it is missing or still has the varlog-only prune, apply installs the current copy from this repo, then asserts a `@pre-update-*` exists on `zpcachyos/ROOT/cos/root`. The pacman hook uses that installed helper.
 
@@ -317,7 +319,7 @@ These abort apply or check when the host has drifted. Full clash rows are `docs/
 
 Install scripts the bridge never invokes, even when a binary of the same name is allowlisted: `install/helpers/pacman.sh`, `install/post-install/pacman.sh`, `install/config/zfs.sh`, snapper, enable-services, firewall, increase-lockout-limit, nvidia, intel ptl-kernel, network, tuxedo backlight, hardware/pacman, `install/user/all.sh`. `install/config/lockscreen-pam.sh` is invoked as overlay `omarchy-apply-lock`.
 
-`omarchy-provision-first-run` is allowlisted. Apply seeds `~/.local/state/omarchy/first-run-user` so a later run no-ops.
+`omarchy-provision-first-run` is allowlisted. Apply seeds `~/.local/state/omarchy/first-run-user` so a later run no-ops. That also skips the first-run invitations (voxtype, fingerprint, default agent) and speaker tuning; the Dictate wrap sends a missing voxtype to `omarchy-voxtype-install` instead.
 
 `monarchy/migrations.deny` is pre-seeded (all five call `limine-mkinitcpio`). `--check` also fails any migration body that matches `limine-mkinitcpio`, `omarchy-refresh-pacman`, or `use_omarchy_pacman_config`.
 

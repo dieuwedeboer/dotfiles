@@ -37,9 +37,15 @@ an absent file is a valid state, so that one never dies.
 
 The new-box case needs no special handling: `install.sh` installs chezmoi in
 `packages_install`, runs `chezmoi apply`, and only then runs Monarchy apply. By
-the time Monarchy asserts, chezmoi has already run. The only path lacking a
-chezmoi step is `monarchy-update`, and a box reaching that path is provisioned
-by definition.
+the time Monarchy asserts, chezmoi has already run.
+
+Interactive `--update` and a hand-run `monarchy-update` now share that
+household refresh, including `chezmoi apply`, so a provisioned box cannot
+diverge from the clone just because the operator typed `--update`. The TTY
+gate is unchanged: a menu-driven `omarchy-update` still cannot prompt, so
+that path reports chezmoi drift and continues rather than hanging. The
+hypr assert later in `monarchy_setup_user` still dies naming the command if
+those four files are missing or drifted and nobody can answer.
 
 ## Consequences
 

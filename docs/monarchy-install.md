@@ -1,12 +1,12 @@
 # Monarchy install
 
-Omarchy Quattro as a second Wayland session on a CachyOS+ZFS+KDE box. `./install.sh` is the one-shot path: packages, chezmoi, hardware, ZFS, then Monarchy apply. Plasma stays the family default. The king picks Omarchy at the greeter.
+Omarchy Quattro as a second Wayland session on a CachyOS+ZFS+KDE box. `./install.sh` is the one entry point: household refresh (packages, chezmoi, hardware, ZFS), then Monarchy apply. After `/etc/omarchy.conf` exists, a bare `./install.sh` is the same as `--update`. Plasma stays the family default. The king picks Omarchy at the greeter.
 
 ## Where to run it
 
 Any machine that followed the README Calamares path (CachyOS, encrypted ZFS, KDE Plasma, rEFInd, ZFSBootMenu). First bring-up was zbook. kingfisher, bonw9, and leftover boxes still on the old package set use the same script.
 
-`--check` is snapshot-free and writes nothing under `/etc` or `/usr/local`. Do not pass `--update` on a first apply. That path still re-pins the lock commit and does not migrate.
+`--check` is snapshot-free and writes nothing under `/etc` or `/usr/local`. Do not pass `--update` on a first apply: that path rebuilds the local packages before `[omarchy]` has been appended, so the settings fetch has nowhere to go.
 
 ## New machine
 
@@ -70,9 +70,9 @@ If Hyprland fails, stay on Plasma, boot a `pre-update-*` snapshot from ZFSBootMe
 
 `--splash-only` is the same Plymouth step without redoing packages or user config.
 
-`--no-packages` skips the leaf set (still does overlay, repo, and session).
+`--no-packages` skips the leaf set (still does overlay, repo, session, and chezmoi).
 
-After apply, `monarchy-update` is the PATH command (`install.sh --update`). The Omarchy menu's `omarchy-update` wraps it.
+After apply, `./install.sh` and `monarchy-update` are the same PATH command (`install.sh --update`): household refresh, then snapshot, rebuild, check, apply. The Omarchy menu's `omarchy-update` wraps it; that path has no terminal, so chezmoi apply is skipped rather than hanging.
 
 ## Check (review only)
 
