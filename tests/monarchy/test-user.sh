@@ -192,6 +192,11 @@ for f in bindings.lua looknfeel.lua input.lua autostart.lua; do
     [ -f "$REPO/chezmoi/dot_config/hypr/$f" ] \
         || fail "chezmoi does not carry hypr/$f"
 done
+bindings="$REPO/chezmoi/dot_config/hypr/bindings.lua"
+grep -q 'SUPER + Q' "$bindings" \
+    || fail "chezmoi bindings.lua missing Super+Q close window"
+grep -q 'hl.dsp.window.close' "$bindings" \
+    || fail "chezmoi Super+Q is not close window"
 
 # Plugins keep their own marked blocks in the files they extend: the screens
 # plugin writes `-- BEGIN im0001gt.screens` into bindings.lua. Those lines are

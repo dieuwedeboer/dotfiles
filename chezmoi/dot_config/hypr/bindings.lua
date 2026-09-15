@@ -37,3 +37,7 @@ o.bind("SUPER + SHIFT + E", "Emacs", "emacsclient -c --no-wait")
 -- HEY calendar and compose. Left free.
 hl.unbind("SUPER + SHIFT + C")
 hl.unbind("SUPER + SHIFT + ALT + E")
+
+-- Omarchy 4.0.2 dropped Super+Q close (tiling.lua is Super+W only). Quattro
+-- still binds both. Super+Q is free here; Super+Ctrl+Q stays Calculator.
+o.bind("SUPER + Q", "Close window", hl.dsp.window.close())
