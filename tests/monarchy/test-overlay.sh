@@ -83,6 +83,10 @@ grep -q 'ZFSBootMenu' "$dest/omarchy-snapshot" || fail "snapshot wrap is not the
 [ ! -L "$dest/omarchy-voxtype-config" ] || fail "voxtype-config wrap is a symlink"
 grep -q 'omarchy-voxtype-install' "$dest/omarchy-voxtype-config" \
     || fail "voxtype-config wrap does not route missing voxtype to install"
+[ -x "$dest/omarchy-battery-status" ] || fail "battery-status wrap missing"
+[ ! -L "$dest/omarchy-battery-status" ] || fail "battery-status wrap is a symlink"
+grep -q 'estimate_time' "$dest/omarchy-battery-status" \
+    || fail "battery-status wrap does not fill in the time estimate"
 [ -x "$dest/yay" ] || fail "yay wrapper missing"
 
 # Drive the wrap with a fake PATH so missing voxtype cannot reach

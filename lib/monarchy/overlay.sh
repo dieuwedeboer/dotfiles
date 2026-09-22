@@ -23,6 +23,9 @@ monarchy_wrap_stub_for() {
         omarchy-disk-speedtest)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-disk-speedtest.sh"
             ;;
+        omarchy-battery-status)
+            printf '%s\n' "$monarchy_lib_dir/stubs/wrap-battery-status.sh"
+            ;;
         omarchy-version|omarchy-version-branch|omarchy-version-channel)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-version.sh"
             ;;
