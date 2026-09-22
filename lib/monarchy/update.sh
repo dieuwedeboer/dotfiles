@@ -261,6 +261,7 @@ monarchy_portals_apply() {
 monarchy_user_check() {
     monarchy_check_plugins
     monarchy_check_applications_drop
+    monarchy_assert_denied_migrations_marked
 }
 
 monarchy_user_apply() {

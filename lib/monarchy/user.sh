@@ -244,6 +244,56 @@ monarchy_user_omarchy_defaults() {
     fi
 }
 
+# migrations.deny records a decision that a migration must never run on this
+# host. Until now nothing acted on it. The list was read in one place --
+# monarchy_check_migrations, which halts an apply until a newly arrived
+# hazardous migration is classified -- and once classified, omarchy-migrate
+# went on offering it. A denied migration stayed pending for ever and was one
+# menu click from running. 1789325478.sh installs linux-omarchy and its
+# headers *before* it reaches the limine command that fails on this host, so
+# the kernel lands and the marker does not, and it retries next time.
+#
+# bin.deny is enforced by stubbing the name. This is the equivalent for
+# migrations, and it uses Omarchy's own mechanism rather than fighting it:
+# completion is a per-user marker under ~/.local/state/omarchy/migrations/,
+# and the omarchy package pre-marks the whole set into /etc/skel so a fresh
+# account skips every migration that predates it. Marking a denied one
+# complete is exactly what skel already does; omarchy-migrate then drops it
+# from --pending and never runs it.
+#
+# Only names the package actually ships are marked. A deny row for a migration
+# upstream has dropped would otherwise leave a marker behind for ever, and
+# monarchy_check_migrations is what notices such a row going stale.
+monarchy_mark_denied_migrations() {
+    local dir="$HOME/.local/state/omarchy/migrations"
+    local src="$MONARCHY_SRC/migrations"
+    [ -d "$src" ] || return 0
+    local name
+    mkdir -p "$dir"
+    for name in "${MONARCHY_MIGRATE_DENY[@]}"; do
+        [ -f "$src/$name" ] || continue
+        [ ! -e "$dir/$name" ] || continue
+        : >"$dir/$name"
+        monarchy_log "marked denied migration $name complete for $USER"
+    done
+    return 0
+}
+
+# Postcondition of monarchy_mark_denied_migrations. A denied migration that
+# omarchy-migrate would still offer is the bug this pair exists to close.
+monarchy_assert_denied_migrations_marked() {
+    local dir="$HOME/.local/state/omarchy/migrations"
+    local src="$MONARCHY_SRC/migrations"
+    [ -d "$src" ] || return 0
+    local name
+    for name in "${MONARCHY_MIGRATE_DENY[@]}"; do
+        [ -f "$src/$name" ] || continue
+        [ -e "$dir/$name" ] \
+            || monarchy_die "$name is in migrations.deny but not marked complete for $USER; omarchy-migrate would still run it"
+    done
+    return 0
+}
+
 monarchy_mark_first_run_done() {
     local dir="$HOME/.local/state/omarchy/done"
     mkdir -p "$dir" "$HOME/.local/state/omarchy"
@@ -431,6 +481,7 @@ monarchy_setup_user() {
     monarchy_run_install_script "$MONARCHY_SRC/install/user/first-run/gnome-theme.sh"
     monarchy_run_install_script "$MONARCHY_SRC/install/user/first-run/gtk-primary-paste.sh"
     monarchy_enable_user_units
+    monarchy_mark_denied_migrations
     monarchy_mark_first_run_done
     monarchy_keep_family_mime
     if [ -f "$HOME/.config/mimeapps.list" ] && grep -qi omarchy "$HOME/.config/mimeapps.list"; then
