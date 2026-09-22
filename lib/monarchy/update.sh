@@ -321,6 +321,7 @@ monarchy_apply_lock() {
 
 monarchy_apply() {
     local u
+    monarchy_ensure_log
     monarchy_assert_only_valid
     monarchy_load_lock
     monarchy_load_inventories
@@ -377,6 +378,7 @@ monarchy_classify_check() {
 }
 
 monarchy_update() {
+    monarchy_ensure_log
     monarchy_load_lock
     monarchy_load_inventories
     monarchy_snapshot_first

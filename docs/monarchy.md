@@ -105,7 +105,7 @@ A sparse overlay broke all five silently. The one that mattered was the first: `
 | File | Meaning | Overlay action |
 | --- | --- | --- |
 | `monarchy/bin.wrap` | Exact filenames | Install a Monarchy wrapper |
-| `monarchy/bin.deny` | Brick list | Stub, exit 2, log to `/var/log/monarchy-setup.log` |
+| `monarchy/bin.deny` | Brick list | Stub, exit 2, log to journald (`journalctl -t monarchy`) and, for the administrator, to `/var/log/monarchy-setup.log` |
 | anything else | Not overridden | Symlink onto `/usr/share/omarchy/bin/<name>` |
 
 `monarchy_rebuild_overlay` empties `$OMARCHY_PATH/bin`, mirrors the packaged `bin/` with `cp -srT`, then installs deny stubs, wrap scripts, and a `yay` wrapper that execs `paru` over the top. Mirror first: `install(1)` unlinks its destination before writing, so a stub replaces the symlink instead of writing through it into the pacman-owned `/usr/bin`. The same names also land under `/usr/local/bin` so systemd user units and `sudo omarchy-pkg-add` resolve. `monarchy_prune_stale_overlay_links` removes `/usr/local/bin/omarchy-*` symlinks left by the clone era: a dangling entry there would shadow the real `/usr/bin` one. Apply points `/usr/local/bin/monarchy-update` at `install.sh` and removes leftover `setup-monarchy`.
@@ -453,7 +453,8 @@ ZFS datasets do not change: `zpcachyos/ROOT/cos/{root,home,varcache,varlog}`. Po
 | `/usr/share/plymouth/themes/omarchy/` | Omarchy Plymouth theme |
 | `~/.config/omarchy/plugins/<id>/` | User plugin checkouts. Not chezmoi. King only. |
 | `/root/.local/bin/zfs-snapshot-pre-update.sh` | snapshot helper. Required. |
-| `/var/log/monarchy-setup.log` | setup + stub invocations |
+| `/var/log/monarchy-setup.log` | setup + stub invocations, for whoever administers the box |
+| `journalctl -t monarchy` | the same lines whenever the file cannot be written, and every deny-stub block from any account |
 
 ## Updates
 
