@@ -11,5 +11,6 @@
   "theme": "auto",
   "enabledPlugins": {
     "php-lsp@claude-plugins-official": true
-  }
+  },
+  "hooks": {"SessionStart":[{"matcher":"*","hooks":[{"type":"command","command":"bash '/home/dieuwe/.claude/hooks/herdr-agent-state.sh' session","timeout":10}]}]}
 }
