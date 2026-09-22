@@ -189,6 +189,15 @@ before anything is downloaded, the `omarchy` package before the prefix that is
 linked out of it, the prefix before the overlay that sits on it, and
 `install/omarchy-base.packages` only exists once `omarchy` is installed.
 
+The partial-upgrade guard sits on `leaves`, not on `pacman`. `pacman` runs
+before `packaging`, and once an `[omarchy]` package hard-depends on `omarchy`
+(`flea` 0.3.1 does), the pending upgrade a converting box cannot clear is the
+very one `packaging` makes resolvable — by installing
+`omarchy-settings-monarchy` in place of the upstream `omarchy-settings` whose
+64 hand-installed files block the transaction. On `pacman` the guard refused
+every route to its own precondition, and `--only=packaging` was the only way
+through. `monarchy_install_packages` calls it again at the point of use.
+
 `--only=<unit>` runs a single unit, in check or apply. There is no canary box
 and `zfs-snapshot-pre-update` keeps three snapshots, so a full apply is an
 expensive way to iterate on one subsystem. An unknown name is an error, not a

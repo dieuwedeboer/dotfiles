@@ -42,6 +42,10 @@ monarchy_refuse_omarchy_zfs_repo() {
 # upgrading already-installed dependents is a partial upgrade: ffmpeg 9
 # lands while chromaprint, vlc-plugin-ffmpeg, jellyfin-ffmpeg, gst-libav
 # still need the old sonames. CachyOS updater owns -Syu.
+#
+# Called from the `leaves` unit and from monarchy_install_packages, not from
+# the `pacman` unit: it guards installing leaves, and on the `pacman` unit it
+# ran before `packaging` could clear the pending upgrade. See monarchy_leaves_check.
 monarchy_refuse_partial_upgrade() {
     local pending n
     pending=$(pacman -Qu 2>/dev/null || true)

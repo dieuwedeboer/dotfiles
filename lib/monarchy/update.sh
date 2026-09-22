@@ -116,7 +116,6 @@ monarchy_pacman_check() {
     monarchy_preserve_pacman_conf
     monarchy_refuse_archzfs
     monarchy_refuse_omarchy_zfs_repo
-    monarchy_refuse_partial_upgrade
 }
 
 monarchy_pacman_apply() {
@@ -176,8 +175,21 @@ monarchy_overlay_apply() {
 
 # ---- leaves: the filtered omarchy-base.packages set ----------------------
 
+# The partial-upgrade guard lives here, on the only unit that installs from a
+# repo, and not on `pacman` where it used to sit. `pacman` runs before
+# `packaging`, and once an [omarchy] package hard-depends on `omarchy` --
+# flea 0.3.1 does -- the pending upgrade a converting box cannot clear is the
+# very one `packaging` makes resolvable, by installing omarchy-settings-monarchy
+# in place of the upstream omarchy-settings that collides with 64 files.
+# The guard then refused every route to its own precondition and the only way
+# through was --only=packaging, which is an escape hatch, not a workflow.
+#
+# Nothing is lost by moving it: this check returns early until `omarchy` has
+# landed install/omarchy-base.packages, there are no leaves to install before
+# that, and monarchy_install_packages calls the guard again at the point of use.
 monarchy_leaves_check() {
     [ -f "$MONARCHY_SRC/install/omarchy-base.packages" ] || return 0
+    monarchy_refuse_partial_upgrade
     monarchy_check_packages_deny
     monarchy_filtered_packages | grep -qx sddm \
         || monarchy_die "sddm missing from filtered package list"
