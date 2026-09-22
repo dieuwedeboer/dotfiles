@@ -22,13 +22,54 @@ MONARCHY_OMARCHY_SERVER="${MONARCHY_OMARCHY_SERVER:-https://pkgs.omarchy.org/sta
 MONARCHY_ZFS_KEYFILE="${MONARCHY_ZFS_KEYFILE:-/etc/zfs/zroot.key}"
 MONARCHY_MKINITCPIO_CONF="${MONARCHY_MKINITCPIO_CONF:-/etc/mkinitcpio.conf}"
 
+# stdout always, plus one durable copy. The file is that copy when it can be
+# written; journald is the fallback, so a line is never silently dropped.
+#
+# It used to be file-or-nothing, and the file lost. /var/log is root-owned and
+# an apply runs as the user, so once a root-run had created
+# /var/log/monarchy-setup.log every later [ -w ] test failed and the `|| true`
+# swallowed it. Nothing was written for weeks and the log looked merely quiet.
+#
+# The old test was also wrong in its own terms: it accepted a writable *parent*
+# for an existing unwritable file, where the append cannot open the file at
+# all. The parent only matters when the file is not there yet. And the
+# `2>/dev/null` sat on `[`, which writes nothing to stderr, so it hid nothing.
 monarchy_log() {
     local line
     line="$(date -Iseconds) $*"
     echo "$line"
-    if [ -w "$MONARCHY_LOG" ] || [ -w "$(dirname "$MONARCHY_LOG")" ] 2>/dev/null; then
-        printf '%s\n' "$line" >>"$MONARCHY_LOG" 2>/dev/null || true
+    if [ -w "$MONARCHY_LOG" ] \
+        || { [ ! -e "$MONARCHY_LOG" ] && [ -w "$(dirname "$MONARCHY_LOG")" ]; }; then
+        printf '%s\n' "$line" >>"$MONARCHY_LOG" 2>/dev/null && return 0
     fi
+    if command -v logger >/dev/null 2>&1; then
+        logger -t monarchy "$line"
+    fi
+    return 0
+}
+
+# Take ownership of the log once, at the top of an apply, rather than
+# elevating on every monarchy_log call. Self-healing: it re-runs whenever the
+# file is not writable by whoever is running, so a change of administrator
+# fixes itself on the next apply.
+#
+# touch before chown, never `install /dev/null`, which would truncate the
+# history this exists to keep. Failure to elevate is not fatal: monarchy_log
+# falls back to journald, and refusing to apply because a log file could not
+# be chowned would be the wrong trade.
+#
+# This only fixes the file for the administrator. A deny stub run by another
+# account still cannot write it, and does not need to: deny.sh calls
+# `logger -t monarchy` first and unconditionally, so a block is recorded for
+# every account no matter who runs it.
+monarchy_ensure_log() {
+    [ -d "$(dirname "$MONARCHY_LOG")" ] || return 0
+    [ ! -w "$MONARCHY_LOG" ] || return 0
+    monarchy_sudo touch "$MONARCHY_LOG" \
+        && monarchy_sudo chown "$(id -u):$(id -g)" "$MONARCHY_LOG" \
+        && monarchy_sudo chmod 0644 "$MONARCHY_LOG" \
+        || monarchy_log "warning: cannot write $MONARCHY_LOG; logging to journald only"
+    return 0
 }
 
 monarchy_die() {
