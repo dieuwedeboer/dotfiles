@@ -41,3 +41,10 @@ hl.unbind("SUPER + SHIFT + ALT + E")
 -- Omarchy 4.0.2 dropped Super+Q close (tiling.lua is Super+W only). Quattro
 -- still binds both. Super+Q is free here; Super+Ctrl+Q stays Calculator.
 o.bind("SUPER + Q", "Close window", hl.dsp.window.close())
+
+-- BEGIN im0001gt.screens
+hl.unbind("SUPER + SLASH")
+hl.unbind("SUPER + ALT + SLASH")
+o.bind("SUPER + SLASH", "Monitor scaling up", "/home/dieuwe/.config/omarchy/plugins/im0001gt.screens/scripts/display-ctl scale up")
+o.bind("SUPER + ALT + SLASH", "Monitor scaling down", "/home/dieuwe/.config/omarchy/plugins/im0001gt.screens/scripts/display-ctl scale down")
+-- END im0001gt.screens
