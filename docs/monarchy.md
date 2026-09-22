@@ -356,7 +356,15 @@ Install scripts the bridge never invokes, even when a binary of the same name is
 
 `omarchy-provision-first-run` is allowlisted. Apply seeds `~/.local/state/omarchy/first-run-user` so a later run no-ops. That also skips the first-run invitations (voxtype, fingerprint, default agent) and speaker tuning; the Dictate wrap sends a missing voxtype to `omarchy-voxtype-install` instead.
 
-`monarchy/migrations.deny` is pre-seeded (all five call `limine-mkinitcpio`). `--check` also fails any migration body that matches `limine-mkinitcpio`, `omarchy-refresh-pacman`, or `use_omarchy_pacman_config`.
+`monarchy/migrations.deny` is both a classification list and an enforcement list, and the two halves sit in different units.
+
+`monarchy_check_migrations` (the `prefix` unit, and `monarchy_classify_check`) fails any migration body matching `limine-mkinitcpio`, `omarchy-refresh-pacman` or `use_omarchy_pacman_config` that is not already classified. That halts the apply until a human decides. It is the only thing that notices a deny row going stale, which is why marking never covers a row upstream has dropped.
+
+`monarchy_mark_denied_migrations` (the `user` unit) is what makes the decision bite. Omarchy records completion as an empty per-user marker under `~/.local/state/omarchy/migrations/`, and the `omarchy` package pre-marks all of them into `/etc/skel`, so a fresh account skips every migration that predates it. Marking a denied one complete is the same mechanism, and `omarchy-migrate` then drops it from `--pending`.
+
+Without that second half the list recorded a decision and nothing acted on it: a denied migration stayed pending for ever and was one menu click from running. `1789325478.sh` is why it matters — it runs `omarchy-pkg-add linux-omarchy linux-omarchy-headers` *before* it reaches the `limine-mkinitcpio` that fails here, so the kernel lands, the marker does not, and it comes back next time. `bin.deny` is enforced by stubbing the name; this is the equivalent for migrations.
+
+Marking is per user, like the rest of the `user` unit. New accounts are covered by `/etc/skel`; an existing account is covered when it runs the apply.
 
 ## Greeter
 

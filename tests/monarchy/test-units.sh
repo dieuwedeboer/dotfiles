@@ -28,7 +28,8 @@ for fn in monarchy_assert_zfs_layout monarchy_assert_os_release \
     monarchy_check_packages_deny monarchy_check_applications_drop monarchy_check_plugins \
     monarchy_check_session_lock_overlay monarchy_check_logind \
     monarchy_check_hidden_hyprland_sessions monarchy_assert_settings_assets \
-    monarchy_assert_sddm_assets monarchy_assert_sddm_runtime; do
+    monarchy_assert_sddm_assets monarchy_assert_sddm_runtime \
+    monarchy_assert_denied_migrations_marked; do
     monarchy_reaches check | grep -qx "$fn" || fail "check no longer reaches $fn"
 done
 
@@ -42,6 +43,14 @@ for fn in monarchy_build_packages monarchy_link_working_prefix monarchy_rebuild_
     monarchy_keep_family_mime monarchy_splash monarchy_splash_maybe_theme; do
     monarchy_reaches apply | grep -qx "$fn" || fail "apply no longer reaches $fn"
 done
+
+# monarchy_reaches only parses update.sh, so a call made from another lib file
+# is invisible to it. The enforcement half of migrations.deny is one of those:
+# monarchy_setup_user marks denied migrations complete, and without it the list
+# records a decision that nothing acts on.
+setup_user_body=$(awk '/^monarchy_setup_user\(\)/,/^}$/' "$LIB/user.sh")
+printf '%s\n' "$setup_user_body" | grep -qE '^[[:space:]]*monarchy_mark_denied_migrations$' \
+    || fail "monarchy_setup_user no longer marks denied migrations; omarchy-migrate would still offer them"
 
 # Apply runs each unit's apply and then its check, so a guard cannot be
 # skipped by using a bare apply instead of an update. The order is apply-then-

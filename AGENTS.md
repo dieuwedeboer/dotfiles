@@ -44,3 +44,8 @@ There is no pin to bump. `monarchy-update` rebuilds the two local packages in
 if a new binary or migration touches Limine, snapper or `pacman.conf` without
 being classified into `monarchy/bin.deny`, `monarchy/bin.wrap` or
 `monarchy/migrations.deny`. Classifying it is a human call.
+
+A row in `migrations.deny` is then enforced, not just recorded: the `user` unit
+marks it complete under `~/.local/state/omarchy/migrations/` so `omarchy-migrate`
+stops offering it. Only names the package still ships are marked, so a row that
+has gone stale stays visible to the classification guard.
