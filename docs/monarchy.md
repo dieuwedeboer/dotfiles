@@ -138,7 +138,7 @@ CachyOS does not Include drop-ins, so this lives in `pacman.conf` itself. First 
 
 `monarchy_install_packages` reads `install/omarchy-base.packages` from the package tree, subtracts `monarchy/packages.deny`, `pacman -S --needed --noconfirm`, writes `monarchy/packages.installed` and `/var/lib/monarchy/packages.installed`. Do not install from `omarchy-other.packages`. Hardware stays CachyOS `chwd` plus `hardware/`.
 
-`--update` is snapshot, fetch, `--check`, then apply. `--check` fails if `omarchy-base.packages` grew a row that is neither denied nor in `packages.installed`. Classify it before applying. Apply then installs the current filtered set with `--needed`.
+`--update` is snapshot, fetch, classify, then apply. `monarchy_classify_check` fails if `omarchy-base.packages` grew a row that is neither denied nor in `packages.installed`. Classify it before applying. Apply then installs the current filtered set with `--needed`.
 
 ### Packages
 
@@ -164,7 +164,7 @@ Entry point: `install.sh`. bash, `set -e`, idempotent, sudo only where needed. O
 ./install.sh           # first run: household refresh, then Monarchy apply
                        # after /etc/omarchy.conf exists: same as --update
 ./install.sh --check   # Monarchy dry-run. Writes nothing under /etc or /usr/local.
-./install.sh --update  # household refresh, then snapshot, fetch, check, apply
+./install.sh --update  # household refresh, then snapshot, fetch, classify, apply
 monarchy-update        # this file with --update
 ```
 
@@ -179,15 +179,23 @@ MONARCHY_UNITS=(guards pacman packaging prefix overlay leaves settings sddm sess
 ```
 
 Each unit has a `check` verb and an `apply` verb. Check runs every unit's check.
-Apply runs each unit's check and then its apply, so a guard cannot be skipped by
+Apply runs each unit's apply and then its check, so a guard cannot be skipped by
 using a bare apply instead of an update — which is exactly how the two
 inventory guards went missing when these were two hand-maintained lists.
 
-The array is the ordering constraint, and it is the one thing to read before
-editing. The order changed when the clone went away: `[omarchy]` has to exist
-before anything is downloaded, the `omarchy` package before the prefix that is
-linked out of it, the prefix before the overlay that sits on it, and
-`install/omarchy-base.packages` only exists once `omarchy` is installed.
+Apply-then-check, in that order, because a unit's check is a **postcondition**:
+it asserts what that unit's apply is supposed to have just produced. Checking
+first aborted every fresh box on `session`, and every converting box on `sddm`.
+
+`--update` does not run the check sweep before the apply, for the same reason.
+It runs `monarchy_classify_check` — the guards that stop a new upstream release
+landing a migration, binary, package row or dropped `applications.drop` name
+that a human has not classified. Those are the only preconditions an update
+has. A postcondition reset by a package upgrade is the ordinary case for an
+updater, not an error: every `hyprland` upgrade replaces
+`/usr/share/wayland-sessions/hyprland.desktop` and drops the `NoDisplay=true`
+that `monarchy_install_omarchy_session` writes. A sweep first refuses the
+apply that would put it back.
 
 The partial-upgrade guard sits on `leaves`, not on `pacman`. `pacman` runs
 before `packaging`, and once an `[omarchy]` package hard-depends on `omarchy`
@@ -197,6 +205,12 @@ very one `packaging` makes resolvable — by installing
 64 hand-installed files block the transaction. On `pacman` the guard refused
 every route to its own precondition, and `--only=packaging` was the only way
 through. `monarchy_install_packages` calls it again at the point of use.
+
+The array is the ordering constraint, and it is the one thing to read before
+editing. The order changed when the clone went away: `[omarchy]` has to exist
+before anything is downloaded, the `omarchy` package before the prefix that is
+linked out of it, the prefix before the overlay that sits on it, and
+`install/omarchy-base.packages` only exists once `omarchy` is installed.
 
 `--only=<unit>` runs a single unit, in check or apply. There is no canary box
 and `zfs-snapshot-pre-update` keeps three snapshots, so a full apply is an

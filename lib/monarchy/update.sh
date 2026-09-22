@@ -345,14 +345,44 @@ monarchy_apply() {
     monarchy_log "apply complete${MONARCHY_ONLY:+ (only $MONARCHY_ONLY)}"
 }
 
+# What a new upstream release can bring that a human has to classify before
+# anything is applied: a migration or a binary that touches Limine, snapper or
+# pacman.conf, a new omarchy-base.packages row, an applications.drop name that
+# upstream stopped shipping, a wrap or deny for a name upstream renamed.
+#
+# These are the only preconditions an update has. Every other unit check is a
+# postcondition -- it asserts what that unit's apply is supposed to have just
+# produced -- which is why monarchy_apply runs apply before check.
+#
+# monarchy_update used to run the whole check sweep first and so re-broke
+# exactly what that ordering fixed. Every `hyprland` upgrade replaces
+# /usr/share/wayland-sessions/hyprland.desktop and drops the NoDisplay=true
+# that monarchy_install_omarchy_session writes, so monarchy_session_check
+# failed and the update refused to run the apply that would put it back. The
+# same shape waits in monarchy_assert_sddm_runtime. A postcondition reset by a
+# package upgrade is the ordinary case for an updater, not an error.
+#
+# --only is "run one unit only", so the sweep is not part of it; that unit's
+# own check still runs inside monarchy_apply.
+monarchy_classify_check() {
+    [ -z "${MONARCHY_ONLY:-}" ] || return 0
+    [ -d "$MONARCHY_SRC/bin" ] || return 0
+    monarchy_check_overrides_exist
+    monarchy_check_bin_hazards
+    monarchy_check_migrations
+    monarchy_check_packages_deny
+    monarchy_check_applications_drop
+    monarchy_log "classification guards passed"
+}
+
 monarchy_update() {
     monarchy_load_lock
     monarchy_load_inventories
     monarchy_snapshot_first
-    # Build and install the packages before check, so a new upstream version
-    # is classified against the tree that is about to be applied rather than
-    # the one already on disk.
+    # Build and install the packages before classifying, so a new upstream
+    # version is classified against the tree that is about to be applied
+    # rather than the one already on disk.
     monarchy_build_packages
-    monarchy_check
+    monarchy_classify_check
     monarchy_apply
 }
