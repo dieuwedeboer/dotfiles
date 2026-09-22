@@ -106,9 +106,22 @@ monarchy_rebuild_overlay() {
 
 # Remove /usr/local/bin/omarchy-* symlinks that no longer resolve, and any
 # that point somewhere other than a name we still override.
+# The glob was omarchy-* and so never matched the bare router, `omarchy`.
+# That one link outlived every prune, still pointing into the clone-era
+# /usr/local/src/monarchy/omarchy, and it is the worst one to leave behind:
+# `omarchy` is the CLI router behind every menu command, it is deliberately
+# not overridden, and /usr/local/bin precedes /usr/bin. While the clone is on
+# disk the stale router runs in any shell that does not have the overlay
+# first; once the clone is removed the link dangles and shadows
+# /usr/bin/omarchy, so `omarchy` stops working altogether.
+#
+# Only symlinks are pruned. Everything this overlay installs into
+# /usr/local/bin is a real file, so a symlink there is clone-era by
+# definition.
 monarchy_prune_stale_overlay_links() {
+    local dir="${MONARCHY_LOCAL_BIN:-/usr/local/bin}"
     local f name
-    for f in /usr/local/bin/omarchy-*; do
+    for f in "$dir"/omarchy "$dir"/omarchy-*; do
         [ -L "$f" ] || continue
         name=$(basename "$f")
         if monarchy_in_list "$name" "${MONARCHY_BIN_DENY[@]}" \
