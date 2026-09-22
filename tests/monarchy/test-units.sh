@@ -103,6 +103,31 @@ for fn in monarchy_assert_zfs_layout monarchy_assert_os_release \
         || fail "$fn is not in monarchy_guards_check, so --only can skip it"
 done
 
+# The partial-upgrade guard must not sit on a unit that runs before
+# `packaging`. flea hard-depends on omarchy, so on a converting box the
+# pending upgrade the guard refuses is the very one `packaging` makes
+# resolvable -- on `pacman` it refused every route to its own precondition and
+# left --only=packaging, an escape hatch, as the only way through.
+unit_at() {
+    local want=$1 i
+    for i in "${!MONARCHY_UNITS[@]}"; do
+        [ "${MONARCHY_UNITS[$i]}" = "$want" ] && { printf '%s\n' "$i"; return 0; }
+    done
+    fail "no $want unit"
+}
+[ "$(unit_at packaging)" -gt "$(unit_at pacman)" ] || fail "packaging must run after pacman"
+[ "$(unit_at leaves)" -gt "$(unit_at packaging)" ] || fail "leaves must run after packaging"
+
+pacman_check_body=$(awk '/^monarchy_pacman_check\(\)/,/^}$/' "$LIB/update.sh")
+if printf '%s\n' "$pacman_check_body" | grep -q 'monarchy_refuse_partial_upgrade'; then
+    fail "monarchy_refuse_partial_upgrade is back on the pacman unit, which runs before packaging"
+fi
+leaves_check_body=$(awk '/^monarchy_leaves_check\(\)/,/^}$/' "$LIB/update.sh")
+printf '%s\n' "$leaves_check_body" | grep -q 'monarchy_refuse_partial_upgrade' \
+    || fail "monarchy_leaves_check no longer refuses a partial upgrade"
+grep -q 'monarchy_refuse_partial_upgrade' "$LIB/packages.sh" \
+    || fail "monarchy_install_packages no longer refuses a partial upgrade at the point of use"
+
 # The role vocabulary is written down twice: user-setup.sh is installed
 # standalone at /usr/local/bin and cannot source the library. Nothing else
 # catches the two drifting apart.
