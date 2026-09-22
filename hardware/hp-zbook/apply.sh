@@ -9,13 +9,18 @@ set -e
 # =========================================================================
 # Scope of THIS script:
 #   - DMI-gated. Skip on anything that is not an HP ZBook.
-#   - Publish a synthetic BAT0/power_now so Omarchy can show watts.
+#   - Publish a synthetic BAT0/power_now so Omarchy can show watts, beside
+#     symlinks to the kernel's charge/energy, voltage and status attributes
+#     so a consumer can turn that rate into a time remaining.
 #   - Relax RAPL energy_uj so wheel can read package/psys counters.
 # What this script deliberately does NOT do:
 #   - Install TLP / tlp-pd (conflicts with power-profiles-daemon).
 #   - Touch power-profiles-daemon, platform_profile, or CPU governors.
 #   - Bind-mount over kernel BAT0 (that would feed UPower a fake rate).
 #   - Guess EC current registers (ztop's 0x9d/0xa5 are a later ZBook).
+#   - Do the time-remaining arithmetic. That belongs to the consumer, and
+#     lib/monarchy/stubs/wrap-battery-status.sh does it for Omarchy off this
+#     tree. Nothing about it is ZBook-shaped once power_now exists.
 #   - Enable thermald / intel-lpmd (lpmd is Alder Lake+; thermald is
 #     unrelated to the 0W reading).
 # =========================================================================
@@ -23,8 +28,17 @@ set -e
 #   ACPI _BST Present Rate is 0xFFFFFFFF (Unknown). Kernel still creates
 #   current_now because the battery reports mAh units; reads return
 #   ENODEV. omarchy-battery-status prefers that file over UPower's
-#   energy-rate (~8W from charge_now history) and prints 0W.
-#   UPower already has the number. Plasma shows it. Omarchy does not.
+#   energy-rate and prints 0W.
+#
+#   UPower does not have the number either, and an earlier version of this
+#   comment said it did. /var/lib/upower/history-rate-* settles it: every
+#   charging sample carries a rate, every discharging sample is 0.000. The
+#   rate the kernel withholds is withheld from everyone.
+#
+#   That is also why there is no time left. UPower divides energy by
+#   energy-rate; 0 leaves it nothing to divide, history-time-empty has only
+#   ever held 0, and the panel shows a real "Time to full" on AC against an
+#   em dash on battery.
 # =========================================================================
 # Lessons learned (dead ends) — DO NOT REDO.
 # (A) TLP. tlp-stat does not create current_now either. tlp-pd Provides

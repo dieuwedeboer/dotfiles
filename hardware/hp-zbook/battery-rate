@@ -8,8 +8,13 @@ file as usable, overwrites UPower's energy-rate, and the power panel shows 0W.
 
 This process writes a private power_supply tree. On ZBook, UWSM points
 OMARCHY_POWER_SUPPLY_PATH at that tree so the stock Omarchy script sees a
-real power_now. The kernel's BAT0 is left alone, so UPower keeps estimating
-from charge_now and does not enter a feedback loop.
+real power_now. The kernel's BAT0 is left alone, so nothing we publish can
+feed back into what we sample.
+
+The tree also mirrors the kernel's charge/energy, voltage and status
+attributes. Publishing a rate is half the answer; the other half is the time
+remaining, which UPower cannot give without a rate either, and which
+lib/monarchy/stubs/wrap-battery-status.sh computes from those attributes.
 
 If current_now actually works (later firmware, different ZBook), the tree is
 just a symlink to sysfs and this is a no-op.
@@ -25,6 +30,26 @@ from pathlib import Path
 WINDOW_S = 60.0
 MIN_DT_S = 8.0
 INTERVAL_S = 2.0
+
+# Kernel attributes mirrored into the synthetic tree alongside power_now.
+# They are what a consumer needs to turn the rate into a time remaining:
+# charge/energy now and full, the voltage that converts charge to energy, and
+# the state that says which direction to count. cycle_count is just the panel's
+# "Charge cycles" row. Whichever names this pack does not have are skipped.
+#
+# current_now is deliberately absent. omarchy-battery-status falls back to
+# current_now * voltage_now when power_now is missing, and on this EC that read
+# is the ENODEV this helper exists to route around -- mirroring it would hand
+# the fallback path a 0W answer.
+MIRRORED = (
+    "charge_now",
+    "charge_full",
+    "energy_now",
+    "energy_full",
+    "voltage_now",
+    "status",
+    "cycle_count",
+)
 
 
 def env_path(name: str, default: str) -> Path:
@@ -106,12 +131,13 @@ def ensure_tree(runtime: Path, sys_bat: Path, sys_ac: Path) -> Path:
         if ac_link.is_symlink() or ac_link.exists():
             ac_link.unlink()
         ac_link.symlink_to(sys_ac)
-    cycle = sys_bat / "cycle_count"
-    cycle_link = bat / "cycle_count"
-    if cycle.exists():
-        if cycle_link.is_symlink() or cycle_link.exists():
-            cycle_link.unlink()
-        cycle_link.symlink_to(cycle)
+    for name in MIRRORED:
+        target = sys_bat / name
+        link = bat / name
+        if link.is_symlink() or link.exists():
+            link.unlink()
+        if target.exists():
+            link.symlink_to(target)
     return bat
 
 
@@ -164,7 +190,7 @@ def loop() -> int:
             time.sleep(30)
             continue
 
-        if not (bat / "cycle_count").exists():
+        if not (bat / "status").exists():
             bat = ensure_tree(runtime, sys_bat, sys_ac)
 
         now = time.time()
