@@ -78,7 +78,7 @@ the QML it links to are both produced by the overlay.
 - `monarchy/bin.wrap`: `omarchy-update` and `omarchy-update-system-pkgs` exec `monarchy-update`. Plymouth write-path names skip Limine and restyle the SDDM greeter from Monarchy `Main.qml`. `omarchy-refresh-sddm` copies the packaged theme then overlays that QML (Unlock default). Apply then follows Style > Unlock if plymouth is already a named theme. The session theme does not restyle the greeter. `omarchy-display-text-size` runs the packaged binary then the user `display-text-size` hook (`apply-font-size`). `omarchy-snapshot` takes a ZFS snapshot instead of driving snapper.
 - `monarchy/bin.deny`: brick list only (pacman.conf, Limine, ISO provisioner, factory reset, dataset upgrade). Stub, exit 2. Also installed under `/usr/local/bin` on apply.
 
-Omarchy-first: a name that is neither wrapped nor denied gets no overlay entry and resolves from `/usr/bin`, including `omarchy-install-*` and `omarchy-pkg-*`. `omarchy` itself is the CLI router and is not overridden. `omarchy-refresh-pacman` stays deny, not a wrap.
+Omarchy-first: a name that is neither wrapped nor denied is mirrored into the overlay as a symlink onto the packaged tree and behaves exactly as upstream ships it, including `omarchy-install-*` and `omarchy-pkg-*`. The mirror is not about PATH precedence, which a stub wins anyway; it is that packaged scripts resolve siblings as `$OMARCHY_PATH/bin/<name>`. See `docs/monarchy.md`. `omarchy` itself is the CLI router and is not overridden. `omarchy-refresh-pacman` stays deny, not a wrap.
 
 `omarchy-settings-monarchy` installs the settings tree; `settings.skip` is that package's exclude list, not a copy filter. See "Packages" in `docs/monarchy.md`.
 

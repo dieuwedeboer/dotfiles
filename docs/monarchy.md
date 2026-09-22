@@ -80,23 +80,35 @@ Do not add `[omarchy-zfs]` or `[archzfs]`. Do not replace `/etc/pacman.d/mirrorl
 
 `monarchy_link_working_prefix` symlinks `default`, `shell`, `themes`, `migrations`, `config`, `install`, `applications`, `version`, `logo.txt`, `logo.svg`, `icon.txt`, and `icon.png` into the working prefix. `omarchy` ships six of those names and `omarchy-settings-monarchy` the other six, so the set is complete without a clone. `bin/` is not a symlink. Apply then explodes `shell/` and `default/` so lock QML and `omarchy-menu.jsonc` can be patched copies — a pacman-owned path is not somewhere to write, because the next upgrade would silently revert both.
 
-env-bootstrap and `envs.lua` both prepend `$OMARCHY_PATH/bin`. That directory is the overlay: only the names Monarchy overrides. Everything else resolves from `/usr/bin`, which the `omarchy` package owns.
+env-bootstrap and `envs.lua` both prepend `$OMARCHY_PATH/bin`. That directory is the overlay: a full mirror of the packaged `bin/`, with Monarchy's stubs and wraps over the names we override.
 
 `/usr/share/uwsm/env.d/10-monarchy` is `monarchy/10-monarchy`. Do not install the package's `default/uwsm/env.d/10-omarchy`. That file hardcodes `/usr/share/omarchy/default/bash/env-bootstrap`.
 
 ### Overlay bin
 
-The overlay is only the names Monarchy overrides. There is no allow list.
+The overlay mirrors every packaged name. There is still no allow list: what a name gets is decided by `bin.wrap` and `bin.deny`, not by being listed.
 
-`omarchy` installs its 428 binaries into `/usr/bin`, with `/usr/share/omarchy/bin/` as symlinks to them. `$OMARCHY_PATH/bin` and `/usr/local/bin` both precede `/usr/bin` on PATH and in sudo's `secure_path`, so a stub or a wrap still wins and an un-overridden name needs no entry at all. That is what retired `monarchy/bin.allow` (438 rows) and `lib/monarchy/generate-inventories.py`.
+`omarchy` installs its 428 binaries into `/usr/bin`, with `/usr/share/omarchy/bin/` as symlinks to them. `$OMARCHY_PATH/bin` and `/usr/local/bin` both precede `/usr/bin` on PATH and in sudo's `secure_path`, so a stub or a wrap wins on PATH alone. That is what retired `monarchy/bin.allow` (438 rows) and `lib/monarchy/generate-inventories.py`.
+
+Retiring the allow list is not a reason to stop mirroring, and for one release it was taken as one. `$OMARCHY_PATH/bin` is an advertised path, not just a PATH element — packaged scripts resolve siblings through it absolutely, and so does `lib/monarchy/plugins.sh`:
+
+| Caller | Absolute reference |
+| --- | --- |
+| `omarchy-system-sleep-monitor` | `$OMARCHY_PATH/bin/omarchy-system-sleep-{monitor,lock}` |
+| `omarchy-install-chromium-ytdlp` | `$OMARCHY_PATH/bin/omarchy-chromium-ytdlp-host` |
+| `omarchy-install-chromium-copy-url` | `$OMARCHY_PATH/bin/omarchy-chromium-copy-url-host` |
+| `monarchy_validate_plugin_dir` | `$MONARCHY_PATH/bin/omarchy-plugin-validate` |
+| `monarchy_install_plugins` | `$MONARCHY_PATH/bin/omarchy-shell` |
+
+A sparse overlay broke all five silently. The one that mattered was the first: `omarchy-sleep-lock.service` re-execs itself through `OMARCHY_PATH`, so it exited 1 on every start, restarted on a two-second loop, and never held logind's delay inhibitor. Suspends that did not come from the awake lid-close binding left the session unlocked, and nothing reported it. Mirroring costs 441 symlinks.
 
 | File | Meaning | Overlay action |
 | --- | --- | --- |
 | `monarchy/bin.wrap` | Exact filenames | Install a Monarchy wrapper |
 | `monarchy/bin.deny` | Brick list | Stub, exit 2, log to `/var/log/monarchy-setup.log` |
-| anything else | Not overridden | Nothing. Resolves from `/usr/bin`. |
+| anything else | Not overridden | Symlink onto `/usr/share/omarchy/bin/<name>` |
 
-`monarchy_rebuild_overlay` empties `$OMARCHY_PATH/bin`, installs deny stubs, wrap scripts, and a `yay` wrapper that execs `paru`. The same names also land under `/usr/local/bin` so systemd user units and `sudo omarchy-pkg-add` resolve. `monarchy_prune_stale_overlay_links` removes `/usr/local/bin/omarchy-*` symlinks left by the clone era: a dangling entry there would shadow the real `/usr/bin` one. Apply points `/usr/local/bin/monarchy-update` at `install.sh` and removes leftover `setup-monarchy`.
+`monarchy_rebuild_overlay` empties `$OMARCHY_PATH/bin`, mirrors the packaged `bin/` with `cp -srT`, then installs deny stubs, wrap scripts, and a `yay` wrapper that execs `paru` over the top. Mirror first: `install(1)` unlinks its destination before writing, so a stub replaces the symlink instead of writing through it into the pacman-owned `/usr/bin`. The same names also land under `/usr/local/bin` so systemd user units and `sudo omarchy-pkg-add` resolve. `monarchy_prune_stale_overlay_links` removes `/usr/local/bin/omarchy-*` symlinks left by the clone era: a dangling entry there would shadow the real `/usr/bin` one. Apply points `/usr/local/bin/monarchy-update` at `install.sh` and removes leftover `setup-monarchy`.
 
 `bin/omarchy` is the CLI router and is **not** overridden. Wrapping `omarchy` itself would break every spaced command (`omarchy theme set`, `omarchy update`). `omarchy update` (two words) is the router calling `omarchy-update`. Only that binary is wrapped.
 

@@ -38,15 +38,30 @@ monarchy_wrap_stub_for() {
     esac
 }
 
-# The overlay is now only the names we override. Everything else resolves
-# from /usr/bin, which the omarchy package owns.
+# $OMARCHY_PATH/bin is a full mirror of the packaged bin/, with our deny stubs
+# and wraps installed over the top of the names we override.
 #
-# This used to symlink all 438 clone bin/ names into the prefix, because a git
-# checkout put them nowhere else. With a real package there is nothing to
-# link: $OMARCHY_PATH/bin and /usr/local/bin both precede /usr/bin on PATH
-# (and in sudo's secure_path), so a deny stub or a wrap still wins, and an
-# allowed name needs no entry at all. That is what retired monarchy/bin.allow
-# and lib/monarchy/generate-inventories.py.
+# PATH precedence alone would be enough to make an override win: both
+# $OMARCHY_PATH/bin and /usr/local/bin precede /usr/bin (and sudo's
+# secure_path), so an allowed name needs no entry to resolve. Mirroring is not
+# about precedence. It is that $OMARCHY_PATH/bin is an advertised path, not
+# just a PATH element: packaged scripts resolve their siblings through it
+# absolutely, and so do we.
+#
+#   omarchy-system-sleep-monitor  -> $OMARCHY_PATH/bin/omarchy-system-sleep-{monitor,lock}
+#   omarchy-install-chromium-*    -> $OMARCHY_PATH/bin/omarchy-chromium-*-host
+#   monarchy_validate_plugin_dir  -> $MONARCHY_PATH/bin/omarchy-plugin-validate
+#   monarchy_install_plugins      -> $MONARCHY_PATH/bin/omarchy-shell
+#
+# A sparse overlay silently breaks every one of those. It broke the pre-suspend
+# lock: omarchy-sleep-lock.service re-execs itself through OMARCHY_PATH, so it
+# died on start, restarted forever, and never held the logind delay inhibitor.
+# The session suspended unlocked and nothing said so. Mirror the whole tree;
+# the cost is 441 symlinks.
+#
+# install(1) unlinks its destination before writing, so a stub laid over a
+# mirrored symlink replaces the link rather than writing through it into the
+# pacman-owned /usr/bin. The mirror must therefore come first.
 monarchy_rebuild_overlay() {
     local dest="$MONARCHY_PATH/bin"
     local src_bin="$MONARCHY_SRC/bin"
@@ -61,6 +76,7 @@ monarchy_rebuild_overlay() {
     parent=$(dirname "$dest")
     monarchy_write_to "$parent" mkdir -p "$dest"
     monarchy_write_to "$parent" find "$dest" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+    monarchy_write_to "$parent" cp -srT "$src_bin" "$dest"
     for name in "${MONARCHY_BIN_DENY[@]}"; do
         monarchy_write_to "$parent" install -m 755 "$stub" "$dest/$name"
     done
