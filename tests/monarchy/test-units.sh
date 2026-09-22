@@ -81,26 +81,31 @@ c_at=$(printf '%s\n' "$apply_body" | grep -n '"monarchy_${u}_check"' | head -1 |
 grep -q 'NoDisplay=true' "$LIB/sessions.sh" \
     || fail "monarchy_check_hidden_hyprland_sessions asserts NoDisplay but sessions.sh never writes it"
 
-# --only shrinks blast radius; it must not remove the host guards. Both check
-# and apply call monarchy_guards_check unconditionally, outside the loop.
-for fn in monarchy_check monarchy_apply; do
-    body=$(awk -v f="$fn" '$0 ~ "^" f "\\(\\) \\{" {i=1} i {print} i && /^}/ && NR>1 {exit}' "$LIB/update.sh")
-    g_at=$(printf '%s\n' "$body" | grep -n '^[[:space:]]*monarchy_guards_check$' | head -1 | cut -d: -f1 || true)
-    loop_at=$(printf '%s\n' "$body" | grep -n 'MONARCHY_UNITS\[@\]' | head -1 | cut -d: -f1 || true)
-    [ -n "$g_at" ] || fail "$fn does not call monarchy_guards_check outside the unit loop"
-    [ -n "$loop_at" ] || fail "$fn has no unit loop"
-    [ "$g_at" -lt "$loop_at" ] || fail "$fn runs the guards inside the loop, so --only can skip them"
-done
+# ...and monarchy_update must not undo that ordering by running the whole
+# check sweep as if it were a precondition. Every hyprland upgrade replaces
+# wayland-sessions/hyprland.desktop and drops the NoDisplay, so a sweep first
+# refuses the apply that would put it back.
+update_body=$(awk '/^monarchy_update\(\)/,/^}$/' "$LIB/update.sh")
+if printf '%s\n' "$update_body" | grep -qE '^[[:space:]]*monarchy_check$'; then
+    fail "monarchy_update runs the whole check sweep before apply; unit checks are postconditions"
+fi
+printf '%s\n' "$update_body" | grep -qE '^[[:space:]]*monarchy_classify_check$' \
+    || fail "monarchy_update does not run the classification guards before apply"
 
-# Every host guard must be reachable from monarchy_guards_check specifically,
-# not merely from some unit that --only might skip.
-guards_body=$(awk '/^monarchy_guards_check\(\)/,/^}$/' "$LIB/update.sh")
-for fn in monarchy_assert_zfs_layout monarchy_assert_os_release \
-    monarchy_refuse_bootloader monarchy_refuse_snapper monarchy_refuse_kernel_swap \
-    monarchy_skip_os_release_clobber monarchy_skip_plymouth_zfs \
-    monarchy_refuse_dataset_rename monarchy_disable_omarchy_update_guard; do
-    printf '%s\n' "$guards_body" | grep -qE "^[[:space:]]*$fn\$" \
-        || fail "$fn is not in monarchy_guards_check, so --only can skip it"
+# What an update does owe before it touches anything: the guards that stop a
+# new upstream release landing something a human has not classified.
+classify_body=$(awk '/^monarchy_classify_check\(\)/,/^}$/' "$LIB/update.sh")
+for fn in monarchy_check_overrides_exist monarchy_check_bin_hazards \
+    monarchy_check_migrations monarchy_check_packages_deny \
+    monarchy_check_applications_drop; do
+    printf '%s\n' "$classify_body" | grep -qE "^[[:space:]]*$fn\$" \
+        || fail "$fn is not in monarchy_classify_check, so an unclassified change reaches apply"
+done
+# A postcondition in there re-creates the bug it was written to fix.
+for fn in monarchy_check_hidden_hyprland_sessions monarchy_assert_sddm_runtime; do
+    if printf '%s\n' "$classify_body" | grep -q "$fn"; then
+        fail "$fn is a postcondition; running it before apply blocks the apply that restores it"
+    fi
 done
 
 # The partial-upgrade guard must not sit on a unit that runs before
@@ -127,6 +132,28 @@ printf '%s\n' "$leaves_check_body" | grep -q 'monarchy_refuse_partial_upgrade' \
     || fail "monarchy_leaves_check no longer refuses a partial upgrade"
 grep -q 'monarchy_refuse_partial_upgrade' "$LIB/packages.sh" \
     || fail "monarchy_install_packages no longer refuses a partial upgrade at the point of use"
+
+# --only shrinks blast radius; it must not remove the host guards. Both check
+# and apply call monarchy_guards_check unconditionally, outside the loop.
+for fn in monarchy_check monarchy_apply; do
+    body=$(awk -v f="$fn" '$0 ~ "^" f "\\(\\) \\{" {i=1} i {print} i && /^}/ && NR>1 {exit}' "$LIB/update.sh")
+    g_at=$(printf '%s\n' "$body" | grep -n '^[[:space:]]*monarchy_guards_check$' | head -1 | cut -d: -f1 || true)
+    loop_at=$(printf '%s\n' "$body" | grep -n 'MONARCHY_UNITS\[@\]' | head -1 | cut -d: -f1 || true)
+    [ -n "$g_at" ] || fail "$fn does not call monarchy_guards_check outside the unit loop"
+    [ -n "$loop_at" ] || fail "$fn has no unit loop"
+    [ "$g_at" -lt "$loop_at" ] || fail "$fn runs the guards inside the loop, so --only can skip them"
+done
+
+# Every host guard must be reachable from monarchy_guards_check specifically,
+# not merely from some unit that --only might skip.
+guards_body=$(awk '/^monarchy_guards_check\(\)/,/^}$/' "$LIB/update.sh")
+for fn in monarchy_assert_zfs_layout monarchy_assert_os_release \
+    monarchy_refuse_bootloader monarchy_refuse_snapper monarchy_refuse_kernel_swap \
+    monarchy_skip_os_release_clobber monarchy_skip_plymouth_zfs \
+    monarchy_refuse_dataset_rename monarchy_disable_omarchy_update_guard; do
+    printf '%s\n' "$guards_body" | grep -qE "^[[:space:]]*$fn\$" \
+        || fail "$fn is not in monarchy_guards_check, so --only can skip it"
+done
 
 # The role vocabulary is written down twice: user-setup.sh is installed
 # standalone at /usr/local/bin and cannot source the library. Nothing else

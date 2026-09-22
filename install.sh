@@ -2,7 +2,7 @@
 # One entry point. Bare ./install.sh on a fresh box is household bootstrap
 # plus Monarchy apply. After /etc/omarchy.conf exists, bare ./install.sh is
 # the same as --update: household refresh (packages, chezmoi, hardware, ZFS)
-# then snapshot, rebuild packages, check, apply. PATH has monarchy-update
+# then snapshot, rebuild packages, classify, apply. PATH has monarchy-update
 # (this file, --update).
 set -e
 VERBOSE=0
@@ -34,9 +34,9 @@ usage: install.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
                   chezmoi, rEFInd glow, services, hardware, ZFS, then apply.
                   Once /etc/omarchy.conf exists, the same as --update.
   --check         Monarchy dry-run. Writes nothing under /etc or /usr/local.
-  --update        Household refresh, then snapshot, rebuild packages, check,
-                  apply. After the first install this is the command;
-                  monarchy-update is this file with --update.
+  --update        Household refresh, then snapshot, rebuild packages,
+                  classify, apply. After the first install this is the
+                  command; monarchy-update is this file with --update.
   --no-packages   Monarchy apply without pacman leaf packages. Still refreshes
                   chezmoi-managed dotfiles.
   --splash-only   Omarchy Plymouth theme, plymouth around zfs, retain-splash.
