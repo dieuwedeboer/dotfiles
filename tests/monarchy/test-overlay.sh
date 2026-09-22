@@ -2,9 +2,10 @@
 # Rebuild the overlay into a temp prefix. No sudo. No /etc edits.
 #
 # This used to need the real tree on disk, because the overlay was a symlink
-# farm over a git clone and the test had to compare against it. The overlay is
-# now only the names Monarchy overrides, so the tree can be synthetic and the
-# test is deterministic.
+# farm over a git clone and the test had to compare against it. The tree is
+# synthetic now, so the test is deterministic, but the overlay is still a full
+# mirror: $OMARCHY_PATH/bin is an advertised path that packaged scripts
+# resolve their siblings through, not just a PATH element.
 set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,9 +23,14 @@ trap 'rm -rf "$tmp"' EXIT
 
 monarchy_load_inventories
 
-# A stand-in for /usr/share/omarchy: every name we override, plus a few plain
-# ones that must end up NOT in the overlay.
-PLAIN=(omarchy omarchy-install-app omarchy-pkg-add omarchy-apply-lock omarchy-plymouth-set-by-theme)
+# A stand-in for /usr/share/omarchy: every name we override, plus plain ones
+# that must end up in the overlay as symlinks. The sleep pair is the
+# regression: omarchy-system-sleep-monitor re-execs itself and the lock helper
+# as "$OMARCHY_PATH/bin/<name>", so a sparse overlay killed the service that
+# holds logind's delay inhibitor and the box suspended unlocked.
+PLAIN=(omarchy omarchy-install-app omarchy-pkg-add omarchy-apply-lock omarchy-plymouth-set-by-theme
+    omarchy-system-sleep-monitor omarchy-system-sleep-lock
+    omarchy-plugin-validate omarchy-shell)
 mkdir -p "$tmp/src/bin"
 for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}" "${PLAIN[@]}"; do
     printf '#!/bin/sh\necho %s\n' "$name" >"$tmp/src/bin/$name"
@@ -112,16 +118,34 @@ vox_out=$(MONARCHY_SRC=$vox/src PATH="$vox_path" "$vox_bash" "$LIB/stubs/wrap-vo
     || fail "present voxtype did not exec packaged config: $vox_out"
 rm -rf "$vox"
 
-# The point of dropping bin.allow: a name we do not override gets no overlay
-# entry at all and resolves from /usr/bin.
+# A name we do not override is mirrored, as a symlink onto the packaged tree.
+# Resolving is the whole point: a dangling entry would be worse than none,
+# because it shadows /usr/bin as well as failing an absolute call.
 for name in "${PLAIN[@]}"; do
-    [ ! -e "$dest/$name" ] || fail "$name is not overridden and must not be in the overlay"
+    [ -L "$dest/$name" ] || fail "$name is not mirrored into the overlay as a symlink"
+    [ -x "$dest/$name" ] || fail "$name does not resolve through the overlay"
+    [ "$(readlink "$dest/$name")" = "$MONARCHY_SRC/bin/$name" ] \
+        || fail "$name does not point at the packaged tree"
 done
+
+# Every packaged name is reachable at $OMARCHY_PATH/bin, override or not.
+while IFS= read -r name; do
+    [ -e "$dest/$name" ] || fail "packaged name $name is missing from the overlay"
+done < <(cd "$MONARCHY_SRC/bin" && ls)
+
+# install(1) unlinks before writing, so laying a stub over a mirrored symlink
+# must replace the link, never write through it into the packaged tree. That
+# ordering is why the mirror can come first.
+grep -q 'monarchy_refresh_sddm' "$MONARCHY_SRC/bin/omarchy-refresh-sddm" \
+    && fail "wrap wrote through the overlay symlink into the packaged tree"
+grep -qx '#!/bin/sh' "$MONARCHY_SRC/bin/omarchy-refresh-pacman" \
+    || fail "deny stub wrote through the overlay symlink into the packaged tree"
 
 wrap_n=${#MONARCHY_BIN_WRAP[@]}
 deny_n=${#MONARCHY_BIN_DENY[@]}
+src_n=$(find "$MONARCHY_SRC/bin" -maxdepth 1 \( -type f -o -type l \) | wc -l)
 overlay_n=$(find "$dest" -maxdepth 1 \( -type f -o -type l \) | wc -l)
-expected=$((wrap_n + deny_n + 1)) # + yay
+expected=$((src_n + 1)) # + yay, which upstream does not ship
 [ "$overlay_n" -eq "$expected" ] || fail "overlay has $overlay_n entries, expected $expected"
 
 # The hazard scan is what replaced "every name must be in an inventory". It
@@ -209,4 +233,4 @@ if [ "${EUID:-$(id -u)}" -ne 0 ]; then
     unset -f monarchy_sudo
 fi
 
-echo "overlay test passed ($wrap_n wrap, $deny_n deny, no allow list)"
+echo "overlay test passed ($src_n mirrored, $wrap_n wrap, $deny_n deny, no allow list)"
