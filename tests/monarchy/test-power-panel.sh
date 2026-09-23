@@ -37,6 +37,16 @@ grep -q 'upowerStates(), root.hasChargeLimit' "$tmp/Panel.qml" || fail "Panel.qm
     || fail "all three Model call sites must pass the gate"
 grep -q 'batteryInfo.threshold' "$tmp/Panel.qml" || fail "the gate must read the threshold field"
 
+# The gate is only as good as batteryInfo, and stock fills batteryInfo only
+# while the panel is open. Without the seed the bar icon never leaves stock
+# behaviour on a machine nobody has clicked the battery on.
+grep -q 'root.batteryPresent && root.hasChargeLimit === undefined' "$tmp/Panel.qml" \
+    || fail "Panel.qml does not seed the status read the gate needs"
+grep -q 'triggeredOnStart: true' "$tmp/Panel.qml" || fail "the seed timer does not fire at startup"
+# Self-limiting: the seed must stop once batteryInfo lands, not poll forever.
+grep -q 'running: root.opened; repeat: true' "$tmp/Panel.qml" \
+    || fail "the stock open-only refresh timer is gone; the seed may now be redundant"
+
 # Applying to already-patched files must fail rather than double-patch.
 if python3 "$py" apply "$tmp" 2>/dev/null; then
     fail "overlay applied twice without complaining"

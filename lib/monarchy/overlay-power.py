@@ -17,6 +17,12 @@ Undefined until the first status read, which leaves stock behaviour rather
 than guessing from an empty batteryInfo -- the bar icon reads this before the
 panel has ever been opened.
 
+Which is why the second patch exists. Stock reads the battery status only
+while the panel is open, so on a machine nobody has clicked the battery on,
+the gate stays undefined for the life of the shell and the bar glyph goes on
+flickering with the pulse. A small timer seeds that one read and stops itself
+once it lands.
+
 Machines that do have a charge threshold are unaffected: the field is present,
 the gate passes, and every branch decides as it does upstream.
 
@@ -120,6 +126,43 @@ PANEL_ACTIVE_NEW = """  readonly property bool chargeThresholdActive: {
 """
 
 
+PANEL_SEED_OLD = """  Process {
+    id: batteryProc
+    command: ["omarchy-battery-status", "--shell"]
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateKeyValue(text, "battery") }
+  }
+"""
+
+PANEL_SEED_NEW = """  Process {
+    id: batteryProc
+    command: ["omarchy-battery-status", "--shell"]
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateKeyValue(text, "battery") }
+  }
+
+  // Monarchy: seed the one status read the gate needs.
+  //
+  // batteryInfo is stock's, and stock only fills it while the panel is open
+  // -- onOpenedChanged calls refresh(), and the 5s timer below runs on
+  // `root.opened`. So before the panel has ever been opened batteryInfo is
+  // {}, hasChargeLimit is undefined, and the bar icon takes the stock answer:
+  // on an EC that pulse-charges, the glyph flips between the charging and
+  // plain sets every few seconds for as long as nobody clicks it. The panel
+  // looked fixed because opening it is what fixed it.
+  //
+  // Self-limiting by construction: `running` goes false the moment
+  // batteryInfo lands, so a machine whose first read answers pays for exactly
+  // one process. The repeat is for a UPower that is not up yet at launch, and
+  // a machine with no battery never starts the timer at all.
+  Timer {
+    interval: 2000
+    running: root.batteryPresent && root.hasChargeLimit === undefined
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: if (!batteryProc.running) batteryProc.running = true
+  }
+"""
+
+
 def must_replace(content: str, old: str, new: str, label: str) -> str:
     if old not in content:
         raise SystemExit(f"overlay-power: {label} missing from packaged file")
@@ -139,6 +182,7 @@ def patch_model(content: str) -> str:
 def patch_panel(content: str) -> str:
     content = must_replace(content, PANEL_FUNCS_OLD, PANEL_FUNCS_NEW, "batteryIcon/modeLabel")
     content = must_replace(content, PANEL_ACTIVE_OLD, PANEL_ACTIVE_NEW, "chargeThresholdActive property")
+    content = must_replace(content, PANEL_SEED_OLD, PANEL_SEED_NEW, "battery status seed")
     return content
 
 
