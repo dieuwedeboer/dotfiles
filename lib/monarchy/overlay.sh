@@ -324,6 +324,57 @@ monarchy_overlay_power_panel() {
     monarchy_log "overlaid $dir"
 }
 
+# ---- launcher.hides -----------------------------------------------------
+#
+# AppLibrary.qml reads exactly one path, $OMARCHY_PATH/default/omarchy/
+# launcher.hides, and hides every desktop id in it. There is no user-level
+# override and no second file it merges, so putting an application back in
+# the launcher means owning that file.
+#
+# Owning it outright would mean never seeing a row upstream adds. So the
+# overlay is subtractive: copy the omarchy list, drop the names in
+# launcher.unhides, write the rest. A new upstream row still hides.
+
+monarchy_launcher_hides_src() {
+    printf '%s\n' "$MONARCHY_SRC/default/omarchy/launcher.hides"
+}
+
+# A row that upstream no longer hides is a no-op, and a no-op row is
+# indistinguishable from one that works. Fail instead, the way
+# monarchy_check_applications_drop does for a dropped .desktop.
+monarchy_check_launcher_unhides() {
+    local src name
+    src=$(monarchy_launcher_hides_src)
+    [ -f "$MONARCHY_MISC/launcher.unhides" ] || monarchy_die "missing launcher.unhides"
+    [ -f "$src" ] || monarchy_die "omarchy package launcher.hides missing"
+    for name in "${MONARCHY_LAUNCHER_UNHIDE[@]}"; do
+        grep -qx -- "$name" "$src" \
+            || monarchy_die "launcher.unhides $name is not hidden by the omarchy launcher.hides"
+    done
+    return 0
+}
+
+# Prefix must already be linked.
+monarchy_overlay_launcher_hides() {
+    local src dest tmp pat
+    src=$(monarchy_launcher_hides_src)
+    [ -f "$src" ] || monarchy_die "missing $src"
+
+    monarchy_explode_symlink_dir "$MONARCHY_PATH/default"
+    monarchy_explode_symlink_dir "$MONARCHY_PATH/default/omarchy"
+    dest="$MONARCHY_PATH/default/omarchy/launcher.hides"
+    # One pass, with the names as fixed whole-line patterns. -F so a name is
+    # never read as a regex, -x so a row is only dropped on an exact match.
+    # grep exits 1 when nothing is left to print, which is not an error here.
+    tmp=$(mktemp)
+    pat=$(mktemp)
+    printf '%s\n' "${MONARCHY_LAUNCHER_UNHIDE[@]}" >"$pat"
+    grep -vxF -f "$pat" "$src" >"$tmp" || :
+    rm -f "$pat"
+    monarchy_overlay_replace_file "$dest" "$tmp"
+    monarchy_log "overlaid $dest (unhid ${#MONARCHY_LAUNCHER_UNHIDE[@]})"
+}
+
 monarchy_install_update() {
     [ -f "$MONARCHY_SETUP" ] || monarchy_die "missing $MONARCHY_SETUP"
     monarchy_sudo ln -sfn "$MONARCHY_SETUP" /usr/local/bin/monarchy-update

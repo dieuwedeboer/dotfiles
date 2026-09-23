@@ -26,7 +26,7 @@ for fn in monarchy_assert_zfs_layout monarchy_assert_os_release \
     monarchy_assert_source_tree monarchy_check_overrides_exist \
     monarchy_check_bin_hazards monarchy_check_migrations \
     monarchy_check_packages_deny monarchy_check_applications_drop monarchy_check_plugins \
-    monarchy_check_session_lock_overlay monarchy_check_logind \
+    monarchy_check_session_lock_overlay monarchy_check_launcher_unhides monarchy_check_logind \
     monarchy_check_hidden_hyprland_sessions monarchy_assert_settings_assets \
     monarchy_assert_sddm_assets monarchy_assert_sddm_runtime \
     monarchy_assert_denied_migrations_marked; do
@@ -35,7 +35,8 @@ done
 
 # Every action the old linear apply performed must still be reached.
 for fn in monarchy_build_packages monarchy_link_working_prefix monarchy_rebuild_overlay \
-    monarchy_overlay_session_lock monarchy_install_switch_user monarchy_install_user_setup \
+    monarchy_overlay_session_lock monarchy_overlay_launcher_hides \
+    monarchy_install_switch_user monarchy_install_user_setup \
     monarchy_write_omarchy_conf monarchy_add_omarchy_repo monarchy_install_packages \
     monarchy_install_settings monarchy_run_omarchy_config monarchy_keep_sddm \
     monarchy_apply_lock monarchy_install_omarchy_session monarchy_apply_logind \
@@ -106,7 +107,7 @@ printf '%s\n' "$update_body" | grep -qE '^[[:space:]]*monarchy_classify_check$' 
 classify_body=$(awk '/^monarchy_classify_check\(\)/,/^}$/' "$LIB/update.sh")
 for fn in monarchy_check_overrides_exist monarchy_check_bin_hazards \
     monarchy_check_migrations monarchy_check_packages_deny \
-    monarchy_check_applications_drop; do
+    monarchy_check_applications_drop monarchy_check_launcher_unhides; do
     printf '%s\n' "$classify_body" | grep -qE "^[[:space:]]*$fn\$" \
         || fail "$fn is not in monarchy_classify_check, so an unclassified change reaches apply"
 done

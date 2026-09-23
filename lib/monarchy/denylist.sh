@@ -14,6 +14,7 @@ monarchy_load_inventories() {
     mapfile -t MONARCHY_PKG_DENY < <(monarchy_load_list "$MONARCHY_MISC/packages.deny")
     mapfile -t MONARCHY_MIGRATE_DENY < <(monarchy_load_list "$MONARCHY_MISC/migrations.deny")
     mapfile -t MONARCHY_APP_DROP < <(monarchy_load_list "$MONARCHY_MISC/applications.drop")
+    mapfile -t MONARCHY_LAUNCHER_UNHIDE < <(monarchy_load_list "$MONARCHY_MISC/launcher.unhides")
 }
 
 monarchy_in_list() {

@@ -165,12 +165,14 @@ monarchy_overlay_check() {
     [ -f "$monarchy_lib_dir/stubs/wrap-update.sh" ] || monarchy_die "missing wrap-update.sh"
     monarchy_check_session_lock_overlay
     monarchy_check_power_panel_overlay
+    monarchy_check_launcher_unhides
 }
 
 monarchy_overlay_apply() {
     monarchy_rebuild_overlay
     monarchy_overlay_session_lock
     monarchy_overlay_power_panel
+    monarchy_overlay_launcher_hides
     monarchy_install_switch_user
     monarchy_install_user_setup
 }
@@ -376,6 +378,7 @@ monarchy_classify_check() {
     monarchy_check_migrations
     monarchy_check_packages_deny
     monarchy_check_applications_drop
+    monarchy_check_launcher_unhides
     monarchy_log "classification guards passed"
 }
 

@@ -1,0 +1,14 @@
+# Desktop ids (no .desktop suffix) removed from the omarchy launcher.hides
+# list before it is written into the working prefix. Omarchy keeps hiding
+# everything else, so a row upstream adds still lands; only a name listed
+# here is put back in the launcher.
+#
+# Every row must still be in the omarchy list. A name upstream stops hiding
+# makes this row a silent no-op, so monarchy_check_launcher_unhides fails
+# rather than let it rot.
+#
+# libreoffice-fresh ships all six applications and omarchy shows three.
+# Base additionally wants a java-runtime for its default HSQLDB engine.
+libreoffice-base
+libreoffice-draw
+libreoffice-math

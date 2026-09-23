@@ -86,7 +86,7 @@ Do not add `[omarchy-zfs]` or `[archzfs]`. Do not replace `/etc/pacman.d/mirrorl
 | `/etc/omarchy.lock` | Copy of `monarchy/omarchy.lock` written at apply. `omarchy-version-branch` reads it. |
 | `monarchy/omarchy.lock` | `package` and `channel`. Pacman does the version pinning now. |
 
-`monarchy_link_working_prefix` symlinks `default`, `shell`, `themes`, `migrations`, `config`, `install`, `applications`, `version`, `logo.txt`, `logo.svg`, `icon.txt`, and `icon.png` into the working prefix. `omarchy` ships six of those names and `omarchy-settings-monarchy` the other six, so the set is complete without a clone. `bin/` is not a symlink. Apply then explodes `shell/` and `default/` so lock QML, the power panel and `omarchy-menu.jsonc` can be patched copies — a pacman-owned path is not somewhere to write, because the next upgrade would silently revert them.
+`monarchy_link_working_prefix` symlinks `default`, `shell`, `themes`, `migrations`, `config`, `install`, `applications`, `version`, `logo.txt`, `logo.svg`, `icon.txt`, and `icon.png` into the working prefix. `omarchy` ships six of those names and `omarchy-settings-monarchy` the other six, so the set is complete without a clone. `bin/` is not a symlink. Apply then explodes `shell/` and `default/` so lock QML, the power panel, `omarchy-menu.jsonc` and `launcher.hides` can be patched copies — a pacman-owned path is not somewhere to write, because the next upgrade would silently revert them.
 
 env-bootstrap and `envs.lua` both prepend `$OMARCHY_PATH/bin`. That directory is the overlay: a full mirror of the packaged `bin/`, with Monarchy's stubs and wraps over the names we override.
 
@@ -140,6 +140,16 @@ Wraps:
 Matching on content rather than on a list of names is both smaller and stronger: an allow list cannot notice a hazard that arrives under a *renamed* binary, and this does. `monarchy_check_overrides_exist` is the other half — a wrap or deny for a name upstream dropped is dead weight that would hide exactly that rename.
 
 There is nothing to regenerate after an upgrade. Classify a reported name into `monarchy/bin.deny` or `monarchy/bin.wrap` and re-run.
+
+### Launcher hides
+
+`AppLibrary.qml` reads exactly one path, `$OMARCHY_PATH/default/omarchy/launcher.hides`, and hides every desktop id listed in it. There is no user-level override and no second file it merges, so putting an application back in the launcher means owning that file. `monarchy/launcher.unhides` names what to put back.
+
+The overlay is **subtractive**, not a replacement. `monarchy_overlay_launcher_hides` copies the packaged list, drops the names in `launcher.unhides` with a single `grep -vxF -f`, and writes the rest into the exploded `default/omarchy/`. A row a later Omarchy release adds still hides, which a Monarchy-owned list would have quietly stopped doing. Same reason `bin.wrap` is not an allow list: the interesting case is the name that arrives *after* the decision was made.
+
+`monarchy_check_launcher_unhides` fails when a row is no longer in the packaged list. A name upstream stops hiding makes the row a no-op, and a no-op row is indistinguishable from one that works — the same rot `monarchy_check_overrides_exist` catches for a dropped binary, and `monarchy_check_applications_drop` for a dropped `.desktop`. It runs in `monarchy_classify_check`, so an update refuses before apply rather than after.
+
+`libreoffice-fresh` is the case it was written for. The package ships all six applications and Omarchy shows three; `base`, `draw` and `math` are unhidden. Base additionally wants a `java-runtime` for its default HSQLDB engine, which is a package to install, not something the launcher can fix.
 
 ### Pacman
 
@@ -210,8 +220,8 @@ first aborted every fresh box on `session`, and every converting box on `sddm`.
 
 `--update` does not run the check sweep before the apply, for the same reason.
 It runs `monarchy_classify_check` — the guards that stop a new upstream release
-landing a migration, binary, package row or dropped `applications.drop` name
-that a human has not classified. Those are the only preconditions an update
+landing a migration, binary, package row, dropped `applications.drop` name or
+stale `launcher.unhides` row that a human has not classified. Those are the only preconditions an update
 has. A postcondition reset by a package upgrade is the ordinary case for an
 updater, not an error: every `hyprland` upgrade replaces
 `/usr/share/wayland-sessions/hyprland.desktop` and drops the `NoDisplay=true`
@@ -257,7 +267,8 @@ lib/monarchy.sh          # sources the library
 lib/monarchy/
   common.sh              # logging, snapshot-first, layout guards
   pacman.sh              # preserve CachyOS, append [omarchy]
-  denylist.sh            # loads packages.deny, bin.*, migrations.deny, applications.drop
+  denylist.sh            # loads packages.deny, bin.*, migrations.deny, applications.drop,
+                         #   launcher.unhides
   overlay.sh             # rebuild overlay bin, hazard scan, explode-and-patch
   overlay-lock.py        # Super+Ctrl+U hunks; --check fails if upstream drifted
   overlay-power.py       # power panel: "Holding" needs a charge limit to exist
@@ -290,6 +301,7 @@ monarchy/
   packages.deny
   packages.installed
   applications.drop
+  launcher.unhides
   plugins
   bin.wrap
   bin.deny
