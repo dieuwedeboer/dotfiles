@@ -18,8 +18,18 @@ MONARCHY_BUILD_DIR="${MONARCHY_BUILD_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/monarc
 # omarchy-settings=<exact>, so our replacement has to provide that same
 # version or the dep does not resolve.
 monarchy_settings_required_version() {
-    pacman -Si omarchy 2>/dev/null \
-        | awk -F': ' '$1 ~ /^Depends On/ { print $2 }' \
+    pacman -Si omarchy 2>/dev/null | monarchy_parse_settings_pin
+}
+
+# The same pin, read from the omarchy that is installed now. On a release
+# bump this is the old version while the sync DB already has the new one.
+monarchy_installed_settings_pin() {
+    pacman -Qi omarchy 2>/dev/null | monarchy_parse_settings_pin
+}
+
+# stdin: `pacman -Si` / `-Qi` output for omarchy.
+monarchy_parse_settings_pin() {
+    awk -F': ' '$1 ~ /^Depends On/ { print $2 }' \
         | tr ' ' '\n' \
         | sed -n 's/^omarchy-settings=\(.*\)$/\1/p' \
         | head -1
@@ -178,12 +188,14 @@ monarchy_plan_overwrites() {
         || monarchy_log "taking ownership of ${#MONARCHY_OVERWRITE_ARGS[@]} hand-installed path(s) for $(basename "$pkg")" >&2
 }
 
+# Extra arguments after the package go to pacman as-is.
 monarchy_install_built_pkg() {
     local pkg=$1
+    shift
     monarchy_plan_overwrites "$pkg"
     monarchy_log "pacman -U $(basename "$pkg")"
     monarchy_sudo pacman -U --noconfirm --needed \
-        "${MONARCHY_OVERWRITE_ARGS[@]}" "$pkg" \
+        "${MONARCHY_OVERWRITE_ARGS[@]}" "$@" "$pkg" \
         || monarchy_die "pacman -U failed for $pkg"
 }
 
@@ -274,7 +286,26 @@ monarchy_ensure_settings_pkg() {
         "$tmp/upstream.pkg.tar.zst" "$skip")
     unset MONARCHY_SETTINGS_PKGVER
     rm -rf "$tmp"
-    monarchy_install_built_pkg "$built"
+
+    # A release bump. The installed omarchy still pins the old settings
+    # version, so installing ours alone "breaks dependency" and pacman
+    # refuses; the new omarchy cannot come first either, because -Syu then
+    # wants the upstream omarchy-settings we conflict with. Deadlock, unless
+    # pacman is told the old version stays satisfied for this one
+    # transaction. The full upgrade that follows replaces omarchy and the
+    # pin matches again. Pulling the new omarchy in here instead would be a
+    # partial upgrade, which cachy-update owns.
+    local pinned
+    local -a assume=()
+    pinned=$(monarchy_installed_settings_pin)
+    if [ -n "$pinned" ] && [ "$pinned" != "$ver" ]; then
+        assume=(--assume-installed "omarchy-settings=$pinned")
+    fi
+    monarchy_install_built_pkg "$built" "${assume[@]}"
+
+    if [ ${#assume[@]} -gt 0 ]; then
+        monarchy_die "omarchy-settings-monarchy now tracks omarchy-settings=$ver; installed omarchy still pins $pinned. Run cachy-update (or sudo pacman -Syu) to bring omarchy up to it, then re-run monarchy-update"
+    fi
 }
 
 # ---- the official omarchy package ---------------------------------------

@@ -69,9 +69,61 @@ monarchy_check_pkgbuilds || fail "monarchy_check_pkgbuilds rejected the shipped 
 # omarchy depends on omarchy-settings=<exact>, so the replacement has to
 # provide that same bare version or the dep does not resolve.
 parse=$(printf 'Name            : omarchy\nVersion         : 4.0.2-1\nDepends On      : omarchy-keyring  omarchy-settings=4.0.2  limine  snapper\n' \
-    | awk -F': ' '$1 ~ /^Depends On/ { print $2 }' \
-    | tr ' ' '\n' | sed -n 's/^omarchy-settings=\(.*\)$/\1/p' | head -1)
+    | monarchy_parse_settings_pin)
 [ "$parse" = "4.0.2" ] || fail "settings version parse produced '$parse', expected 4.0.2"
+
+# A release bump: the sync DB has omarchy 4.0.4 pinning settings 4.0.4, the
+# installed omarchy still pins 4.0.2. Installing our 4.0.4 on its own breaks
+# that dependency and pacman refuses; the full upgrade cannot go first
+# because it wants the upstream omarchy-settings. The install has to carry
+# --assume-installed for the old pin, then hand off to the full upgrade.
+bump=$(mktemp -d)
+(
+    installed_omarchy=4.0.2
+    # shellcheck disable=SC2329  # stubs called by the function under test
+    pacman() {
+        case "$*" in
+            "-Si omarchy") printf 'Version         : 4.0.4-1\nDepends On      : omarchy-keyring  omarchy-settings=4.0.4  limine\n' ;;
+            "-Si omarchy-settings") printf 'Version         : 4.0.4-1\n' ;;
+            "-Qi omarchy") printf 'Version         : %s-1\nDepends On      : omarchy-keyring  omarchy-settings=%s  limine\n' "$installed_omarchy" "$installed_omarchy" ;;
+            "-Q omarchy-settings-monarchy") echo "omarchy-settings-monarchy 4.0.2-1" ;;
+            *) return 1 ;;
+        esac
+    }
+    # shellcheck disable=SC2329
+    monarchy_assert_can_makepkg() { :; }
+    # shellcheck disable=SC2329
+    monarchy_fetch_official_settings() { :; }
+    # shellcheck disable=SC2329
+    monarchy_build_pkg() { echo "$bump/omarchy-settings-monarchy-4.0.4-1-any.pkg.tar.zst"; }
+    # shellcheck disable=SC2329
+    monarchy_install_built_pkg() { printf '%s\n' "$@" >"$bump/args"; }
+    # shellcheck disable=SC2034  # read by monarchy_ensure_settings_pkg
+    MONARCHY_MISC="$bump"
+    # shellcheck disable=SC2034
+    MONARCHY_LOG="$bump/log"
+    : >"$bump/settings.skip"
+
+    if ( monarchy_ensure_settings_pkg ) >/dev/null 2>&1; then
+        echo "a release bump did not stop to hand off to the full upgrade" >&2
+        exit 1
+    fi
+    grep -qx -- '--assume-installed' "$bump/args" && grep -qx 'omarchy-settings=4.0.2' "$bump/args" || {
+        echo "a release bump installed without --assume-installed omarchy-settings=4.0.2:" >&2
+        cat "$bump/args" >&2
+        exit 1
+    }
+
+    # Same version installed and in the repo: a plain rebuild, no assume.
+    installed_omarchy=4.0.4
+    rm -f "$bump/args"
+    ( monarchy_ensure_settings_pkg ) >/dev/null 2>&1 \
+        || { echo "a rebuild with no bump failed" >&2; exit 1; }
+    grep -q -- '--assume-installed' "$bump/args" \
+        && { echo "a rebuild with no bump passed --assume-installed" >&2; exit 1; }
+    exit 0
+) || fail "monarchy_ensure_settings_pkg mishandles an omarchy release bump"
+rm -rf "$bump"
 
 # ---- the exclusion list, against the real package ------------------------
 
@@ -131,7 +183,7 @@ fi
 grep -q 'monarchy_plan_overwrites "$pkg"' "$LIB/pkgbuild.sh" \
     || fail "monarchy_install_built_pkg does not plan overwrites"
 # shellcheck disable=SC2016  # grep pattern for the literal array expansion
-grep -qF 'MONARCHY_OVERWRITE_ARGS[@]}" "$pkg"' "$LIB/pkgbuild.sh" \
+grep -qF 'MONARCHY_OVERWRITE_ARGS[@]}" "$@" "$pkg"' "$LIB/pkgbuild.sh" \
     || fail "pacman -U is not passed the planned --overwrite arguments"
 # shellcheck disable=SC2016
 grep -q 'rm -f "\$p"' "$LIB/pkgbuild.sh" \
