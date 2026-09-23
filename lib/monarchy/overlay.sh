@@ -187,6 +187,10 @@ monarchy_overlay_lock_py() {
     printf '%s\n' "$monarchy_lib_dir/overlay-lock.py"
 }
 
+monarchy_overlay_power_py() {
+    printf '%s\n' "$monarchy_lib_dir/overlay-power.py"
+}
+
 # Turn a prefix symlink-to-dir into a real directory of child symlinks so a
 # single file can be replaced without writing into a pacman-owned path.
 monarchy_explode_symlink_dir() {
@@ -274,6 +278,50 @@ monarchy_overlay_session_lock() {
     }
     monarchy_overlay_replace_file "$menu_dest" "$menu_tmp"
     monarchy_log "overlaid $menu_dest"
+}
+
+# ---- power panel --------------------------------------------------------
+#
+# The panel calls UPower's pending-charge a hold at a charge limit without
+# checking that the machine has one. An EC that pulse-charges reports "Not
+# charging" at any charge level, so the rows read "Charge limit -" and
+# "Battery state: Holding" while the pack is filling. See overlay-power.py.
+
+monarchy_check_power_panel_overlay() {
+    local py dir
+    py=$(monarchy_overlay_power_py)
+    [ -f "$py" ] || monarchy_die "missing $py"
+    dir="$MONARCHY_SRC/shell/plugins/panels/power"
+    [ -f "$dir/Model.js" ] || monarchy_die "omarchy package power panel missing"
+    python3 "$py" check "$dir" || monarchy_die "power panel overlay no longer applies"
+}
+
+# Runs after monarchy_overlay_session_lock, which recopies shell/plugins from
+# the package tree on every apply -- so this patches a fresh copy each time
+# rather than re-patching its own output.
+monarchy_overlay_power_panel() {
+    local py dir tmp name
+    py=$(monarchy_overlay_power_py)
+    dir="$MONARCHY_PATH/shell/plugins/panels/power"
+    [ -d "$dir" ] && [ ! -L "$dir" ] \
+        || monarchy_die "$dir is not a real directory; lock overlay must run first"
+    tmp=$(mktemp -d)
+    for name in Model.js Panel.qml; do
+        # A symlink here would mean writing through into the pacman-owned
+        # tree, which the next upgrade would revert without saying so.
+        [ -f "$dir/$name" ] && [ ! -L "$dir/$name" ] \
+            || monarchy_die "$dir/$name is not a real file"
+        cp -a "$dir/$name" "$tmp/$name"
+    done
+    python3 "$py" apply "$tmp" || {
+        rm -rf "$tmp"
+        monarchy_die "power panel overlay failed"
+    }
+    for name in Model.js Panel.qml; do
+        monarchy_overlay_replace_file "$dir/$name" "$tmp/$name"
+    done
+    rmdir "$tmp"
+    monarchy_log "overlaid $dir"
 }
 
 monarchy_install_update() {

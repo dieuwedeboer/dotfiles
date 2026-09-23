@@ -28,9 +28,14 @@
 #     dead end (C): UPower would stop estimating and echo our own number back.
 #   - Re-rendering the human one-line form from scratch. Reusing the packaged
 #     output keeps the three branches (holding / charging / discharging)
-#     upstream's to word. The substitution below is anchored on stock spacing,
-#     so if upstream re-spaces that line the fill-in stops firing and the field
-#     reads as it does today. Quiet no-op, not a mangled line.
+#     upstream's to word. The one word this does change is "left" on a pack
+#     the tree says is charging: stock picks that wording from UPower's state,
+#     and gives it to anything that is not "charging" -- including the
+#     pending-charge an EC that pulses the charge spends most of its time in.
+#     A time to full under a "left" label is worse than no time at all.
+#     The substitutions below are anchored on stock spacing, so if upstream
+#     re-spaces that line the fill-in stops firing and the field reads as it
+#     does today. Quiet no-op, not a mangled line.
 set -uo pipefail
 
 packaged="${MONARCHY_SRC:-/usr/share/omarchy}/bin/omarchy-battery-status"
@@ -109,28 +114,45 @@ battery_energy_uwh() {
     awk -v c="$charge" -v v="$volts" 'BEGIN { printf "%d", c * v / 1000000 }'
 }
 
-# The whole point of the wrapper. Empty output means "say nothing", which
-# leaves the packaged em dash in place.
-estimate_time() {
-    local bat state rate now full remaining
-
+# The direction the tree says the pack is going. On a ZBook that is the
+# helper's smoothed status; anywhere else it is the kernel's own.
+battery_state() {
+    local bat
     bat=$(find_battery) || return 0
+    read_attr "$bat/status" || return 0
+}
+
+# Microwatt-hours between here and the end of the current direction: down to
+# empty, or up to full. Empty output for a pack that is going neither way.
+battery_remaining_uwh() {
+    local bat=$1 state now full
+
     state=$(read_attr "$bat/status") || return 0
-    rate=$(battery_rate_uw "$bat") || return 0
     now=$(battery_energy_uwh "$bat" now) || return 0
 
     case "$state" in
         Discharging)
-            remaining=$now
+            printf '%s\n' "$now"
             ;;
         Charging)
             full=$(battery_energy_uwh "$bat" full) || return 0
-            remaining=$((full - now))
+            printf '%s\n' "$((full - now))"
             ;;
         # Full / Not charging / Unknown: the panel shows a dash for these
         # anyway, and a hold at a charge threshold has no end to predict.
         *) return 0 ;;
     esac
+}
+
+# The whole point of the wrapper. Empty output means "say nothing", which
+# leaves the packaged em dash in place.
+estimate_time() {
+    local bat rate remaining
+
+    bat=$(find_battery) || return 0
+    rate=$(battery_rate_uw "$bat") || return 0
+    remaining=$(battery_remaining_uwh "$bat") || return 0
+    [ -n "$remaining" ] || return 0
 
     awk -v uwh="$remaining" -v uw="$rate" 'BEGIN {
         if (uw <= 0 || uwh <= 0) exit 0
@@ -147,14 +169,54 @@ estimate_time() {
     }'
 }
 
+# True when the time the packaged script printed cannot be squared with the
+# rate printed beside it.
+#
+# The two come from different places. The rate is sysfs power_now, which the
+# packaged script prefers over UPower precisely because UPower's lags. The
+# time is energy divided by UPower's energy-rate and nothing else. Where that
+# rate is merely stale the two still agree within a little; where sysfs is a
+# corrected tree standing in for an EC that cannot be believed, they do not
+# agree at all -- 14.5W beside "8h 5m to full" for 14Wh of headroom, which is
+# an hour's charging, because UPower divided by a 1.8W sample of a pulse.
+#
+# A panel that prints both is claiming both. The factor of two is deliberately
+# far wider than any lag: it fires on contradiction, not on disagreement.
+time_contradicts_rate() {
+    local text=$1 bat rate remaining hours minutes seconds
+
+    [ -n "$text" ] || return 1
+    bat=$(find_battery) || return 1
+    rate=$(battery_rate_uw "$bat") || return 1
+    remaining=$(battery_remaining_uwh "$bat") || return 1
+    [ -n "$remaining" ] || return 1
+
+    hours=0
+    minutes=0
+    [[ $text =~ ([0-9]+)h ]] && hours=${BASH_REMATCH[1]}
+    [[ $text =~ ([0-9]+)m ]] && minutes=${BASH_REMATCH[1]}
+    seconds=$((hours * 3600 + minutes * 60))
+    [ "$seconds" -gt 0 ] || return 1
+
+    awk -v uwh="$remaining" -v uw="$rate" -v s="$seconds" 'BEGIN {
+        if (uw <= 0 || uwh <= 0) exit 1
+        implied = uwh / (s / 3600.0)
+        ratio = implied > uw ? implied / uw : uw / implied
+        exit ratio > 2 ? 0 : 1
+    }'
+}
+
 if [ "${1:-}" = "--shell" ]; then
-    # Only a present-but-empty time field is ours. No line at all means no
-    # battery; a filled one means UPower answered.
-    if awk -F'\t' '$1 == "time" && $2 == "" { found = 1 } END { exit !found }' <<<"$out"; then
+    # An empty time field is ours to fill. A filled one is ours only when it
+    # contradicts the rate on the line above it. No line at all means no
+    # battery, and stays that way.
+    packaged_time=$(awk -F'\t' '$1 == "time" { print $2 }' <<<"$out")
+    if awk -F'\t' '$1 == "time" { found = 1 } END { exit !found }' <<<"$out" \
+        && { [ -z "$packaged_time" ] || time_contradicts_rate "$packaged_time"; }; then
         human=$(estimate_time)
         if [ -n "$human" ]; then
             out=$(awk -F'\t' -v v="$human" 'BEGIN { OFS = "\t" }
-                $1 == "time" && $2 == "" { print $1, v; next }
+                $1 == "time" { print $1, v; next }
                 { print }' <<<"$out")
         fi
     fi
@@ -164,13 +226,23 @@ fi
 
 # Human form. Stock renders "·  <time> left  ·" and "·  <time> to full  ·";
 # with the time empty those collapse to the three-space shapes matched here.
-case "$out" in
-    *"·   left  ·"* | *"·   to full  ·"*)
-        human=$(estimate_time)
-        if [ -n "$human" ]; then
-            out=${out/"·   left  ·"/"·  $human left  ·"}
-            out=${out/"·   to full  ·"/"·  $human to full  ·"}
-        fi
-        ;;
-esac
+# A filled figure is replaced only when it contradicts the rate beside it.
+packaged_time=$(sed -n 's/.*·  \(.*\) \(left\|to full\)  ·.*/\1/p' <<<"$out")
+if [ -z "$packaged_time" ] || time_contradicts_rate "$packaged_time"; then
+    human=$(estimate_time)
+    if [ -n "$human" ]; then
+        # With $packaged_time empty these are stock's own collapsed shapes,
+        # so the same two patterns cover a missing figure and a wrong one.
+        word=left
+        [ "$(battery_state)" = "Charging" ] && word="to full"
+        case "$out" in
+            *"·  $packaged_time left  ·"*)
+                out=${out/"·  $packaged_time left  ·"/"·  $human $word  ·"}
+                ;;
+            *"·  $packaged_time to full  ·"*)
+                out=${out/"·  $packaged_time to full  ·"/"·  $human to full  ·"}
+                ;;
+        esac
+    fi
+fi
 printf '%s\n' "$out"

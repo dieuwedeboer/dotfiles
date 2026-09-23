@@ -1,23 +1,38 @@
 #!/usr/bin/env python3
-"""Publish a synthetic BAT0/power_now for HP ZBooks whose ACPI rate is unknown.
+"""Publish a synthetic BAT0 rate and state for HP ZBooks whose EC misreports.
 
-The 14u G6 (and likely other HP EC firmware) fills _BST Battery Present Rate
-with 0xFFFFFFFF. The kernel still creates current_now because the battery
-reports mA units, but reads return ENODEV. omarchy-battery-status treats the
-file as usable, overwrites UPower's energy-rate, and the power panel shows 0W.
+Two separate lies from the same EC, one for each direction of current:
 
-This process writes a private power_supply tree. On ZBook, UWSM points
-OMARCHY_POWER_SUPPLY_PATH at that tree so the stock Omarchy script sees a
-real power_now. The kernel's BAT0 is left alone, so nothing we publish can
-feed back into what we sample.
+Discharging. ACPI _BST Battery Present Rate is 0xFFFFFFFF (Unknown). The
+kernel still creates current_now because the battery reports mA units, but
+reads return ENODEV. omarchy-battery-status treats the file as usable,
+overwrites UPower's energy-rate, and the power panel shows 0W.
 
-The tree also mirrors the kernel's charge/energy, voltage and status
-attributes. Publishing a rate is half the answer; the other half is the time
-remaining, which UPower cannot give without a rate either, and which
-lib/monarchy/stubs/wrap-battery-status.sh computes from those attributes.
+Charging. current_now reads, and is a sawtooth: the EC pulse-charges, ramping
+0 -> ~2.9A over ~12s, dropping out, and repeating, with BAT0/status
+alternating Charging / Not charging across the cycle. Measured over 98s on a
+14u G6, the mean of current_now x voltage_now (15.8W) matches the charge
+counter's own integral (15.8W) exactly -- so the EC is not lying about the
+instant, but any single sample lands anywhere in 0-44.6W, and the panel
+samples every 5s. UPower turns the "Not charging" half of the cycle into
+state: pending-charge, which the power panel reads as a hold at a charge
+limit; this machine has no charge_control_* at all. That half of the fix is
+lib/monarchy/overlay-power.py.
 
-If current_now actually works (later firmware, different ZBook), the tree is
-just a symlink to sysfs and this is a no-op.
+So the rate here is always the charge counter's, averaged over a window that
+spans several pulses, in both directions. An earlier version handed off to
+the kernel tree whenever current_now merely read, which meant the smoothing
+this file exists for was off for the whole of every charge.
+
+The tree also carries a synthetic `status`. The kernel's flips twice a minute
+while charging normally, and a consumer dividing energy by rate needs to know
+which way to count. Charging/Discharging/Not charging/Full keep their kernel
+meanings -- the value is smoothed, not redefined. Everything else
+(charge/energy now and full, voltage, cycle_count) is a symlink to sysfs.
+
+current_now is deliberately absent from the tree. omarchy-battery-status
+falls back to current_now x voltage_now when power_now is missing, and
+mirroring it would hand that path either the ENODEV or the sawtooth.
 """
 
 from __future__ import annotations
@@ -28,26 +43,32 @@ import time
 from pathlib import Path
 
 WINDOW_S = 60.0
-MIN_DT_S = 8.0
+# Two full pulse cycles. Below that the window can sit entirely inside one
+# ramp or one drop-out and the answer is the sawtooth again.
+MIN_DT_S = 30.0
 INTERVAL_S = 2.0
+# A pack that is not moving still wobbles: charge_now steps in whole mAh, which
+# at this pack's voltage is ~11 mWh, and a step either way inside a 60s window
+# reads as 0.7W. Anything under 1.5W is that wobble, not a rate and not a
+# direction. A real charge is 15W here and a trickle that genuinely sits below
+# the floor has no useful time to full left to print anyway.
+MIN_RATE_UW = 1_500_000
 
-# Kernel attributes mirrored into the synthetic tree alongside power_now.
-# They are what a consumer needs to turn the rate into a time remaining:
-# charge/energy now and full, the voltage that converts charge to energy, and
-# the state that says which direction to count. cycle_count is just the panel's
-# "Charge cycles" row. Whichever names this pack does not have are skipped.
-#
-# current_now is deliberately absent. omarchy-battery-status falls back to
-# current_now * voltage_now when power_now is missing, and on this EC that read
-# is the ENODEV this helper exists to route around -- mirroring it would hand
-# the fallback path a 0W answer.
+# t, charge uAh, energy uWh, voltage uV. A pack has charge units or energy
+# units, not both, so one of the middle two is None.
+Sample = tuple[float, "int | None", "int | None", "int | None"]
+
+# Kernel attributes mirrored into the synthetic tree alongside power_now and
+# status. They are what a consumer needs to turn the rate into a time
+# remaining: charge/energy now and full, and the voltage that converts charge
+# to energy. cycle_count is just the panel's "Charge cycles" row. Whichever
+# names this pack does not have are skipped.
 MIRRORED = (
     "charge_now",
     "charge_full",
     "energy_now",
     "energy_full",
     "voltage_now",
-    "status",
     "cycle_count",
 )
 
@@ -70,53 +91,137 @@ def read_text(path: Path) -> str:
         return ""
 
 
-def current_now_works(bat: Path) -> bool:
-    try:
-        text = (bat / "current_now").read_text().strip()
-    except OSError:
-        return False
-    return text != ""
-
-
-def power_uw_from_samples(samples: list[tuple[float, int, int]]) -> int | None:
-    """Watts in microwatts from (t, charge_uAh, voltage_uV) samples.
-
-    Uses the first and last sample. charge_now on this EC moves in a few-mAh
-    steps every ~15s, so a short window is a 0W/25W square wave. 60s covers
-    a few steps and lands near UPower's energy-rate.
-    """
-    if len(samples) < 2:
+def sample_battery(bat: Path, now: float) -> Sample | None:
+    """(t, charge uAh, energy uWh, voltage uV). Whichever units the pack has."""
+    charge = read_int(bat / "charge_now")
+    energy = read_int(bat / "energy_now")
+    if charge is None and energy is None:
         return None
-    t0, c0, v0 = samples[0]
-    t1, c1, v1 = samples[-1]
-    dt = t1 - t0
+    return now, charge, energy, read_int(bat / "voltage_now")
+
+
+def ac_online(sys_ac: Path) -> bool:
+    return read_text(sys_ac / "online") == "1"
+
+
+def delta_uwh(first: Sample, last: Sample) -> int | None:
+    """Energy that moved between two samples, in microwatt-hours.
+
+    A charge-reporting pack has its *delta* converted, never its two absolute
+    readings. voltage_now swings ~0.3V across a charge pulse on this EC, and
+    0.3V against a 1.2Ah pack is 0.36Wh of pure artefact -- larger than the
+    0.26Wh a minute the pack is actually taking on, and it read as 68W before
+    this was written the other way round.
+    """
+    _, c0, e0, v0 = first
+    _, c1, e1, v1 = last
+    if e0 is not None and e1 is not None:
+        return e1 - e0
+    if c0 is None or c1 is None or v0 is None or v1 is None:
+        return None
+    return int((c1 - c0) * ((v0 + v1) / 2.0) / 1_000_000)
+
+
+def counter(sample: Sample) -> int | None:
+    """Whichever of the two counters this pack keeps."""
+    _, charge, energy, _ = sample
+    return energy if energy is not None else charge
+
+
+def record(steps: list[Sample], sample: Sample) -> list[Sample]:
+    """Keep a sample only when the counter has actually moved.
+
+    charge_now does not tick smoothly: it sits still and then jumps a few mAh,
+    every ~15s while charging. First-and-last-sample over a fixed window
+    therefore measures a whole number of jumps across a span that does not
+    line up with them, which on a 60s window is a +-25% error on the rate --
+    measured against the counter's own integral, 14.3-31.2W for a pack drawing
+    20.6W. First-and-last-*jump* measures the same energy over the span it
+    actually took, and the only error left is when the jump was noticed.
+    """
+    if steps and counter(steps[-1]) == counter(sample):
+        return steps
+    steps.append(sample)
+    return steps
+
+
+def rate_from_samples(steps: list[Sample]) -> tuple[int, int] | None:
+    """(magnitude uW, signed delta uWh) across the window, or None if unknown."""
+    if len(steps) < 2:
+        return None
+    dt = steps[-1][0] - steps[0][0]
     if dt < MIN_DT_S:
         return None
-    d_uah = abs(c1 - c0)
-    if d_uah == 0:
+    delta = delta_uwh(steps[0], steps[-1])
+    if delta is None:
         return None
-    voltage_uv = (v0 + v1) / 2.0
-    current_ua = d_uah * 3600.0 / dt
-    return int(current_ua * voltage_uv / 1_000_000.0)
+    return int(abs(delta) * 3600.0 / dt), delta
 
 
-def prune(samples: list[tuple[float, int, int]], now: float) -> list[tuple[float, int, int]]:
-    cutoff = now - WINDOW_S
-    return [s for s in samples if s[0] >= cutoff]
+def rate_now(steps: list[Sample], now: float) -> tuple[int, int] | None:
+    """The rate as of `now`, or None while there is nothing to say.
+
+    A counter that has not moved in a whole window is a pack that is not
+    moving: held at a limit, full, or idle on the charger. That is a rate of
+    zero, which is an answer, not the absence of one.
+    """
+    rate = rate_from_samples(steps)
+    if rate is None and steps and now - steps[-1][0] >= WINDOW_S:
+        return 0, 0
+    return rate
+
+
+def smooth_status(kernel_status: str, ac: bool, rate: tuple[int, int] | None) -> str:
+    """The direction the pack is actually going.
+
+    Discharging is the one state this EC never gets wrong -- it is not
+    reported while the charger is attached -- so it is taken at its word. On
+    AC the kernel flag is the unreliable one and the counter decides.
+    """
+    if kernel_status == "Discharging":
+        return "Discharging"
+    if not ac or rate is None:
+        return kernel_status or "Unknown"
+    power_uw, delta = rate
+    if delta > 0 and power_uw >= MIN_RATE_UW:
+        return "Charging"
+    if kernel_status == "Full":
+        return "Full"
+    return "Not charging"
 
 
 def compute_from_stdin() -> int:
-    samples: list[tuple[float, int, int]] = []
+    """Samples in, `power_uw status` out. What the tests drive.
+
+    `t charge_uAh voltage_uV` for a charge-reporting pack, `t energy_uWh` for
+    an energy-reporting one.
+    """
+    samples: list[Sample] = []
+    last_seen = 0.0
+    kernel_status = os.environ.get("ZBOOK_STATUS", "Charging")
+    ac = os.environ.get("ZBOOK_AC", "1") == "1"
     for line in sys.stdin:
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         parts = line.split()
-        samples.append((float(parts[0]), int(parts[1]), int(parts[2])))
-    power = power_uw_from_samples(samples)
-    if power is None:
+        if len(parts) == 3:
+            sample = (float(parts[0]), int(parts[1]), None, int(parts[2]))
+        else:
+            sample = (float(parts[0]), None, int(parts[1]), None)
+        samples = record(samples, sample)
+        # When the counter last moved and when it was last *looked at* are
+        # different questions, and staleness is the second one.
+        last_seen = sample[0]
+    rate = rate_now(samples, last_seen)
+    status = smooth_status(kernel_status, ac, rate)
+    if rate is None:
+        print(f"- {status}")
         return 1
-    print(power)
+    power_uw, _ = rate
+    if power_uw < MIN_RATE_UW:
+        power_uw = 0
+    print(f"{power_uw} {status}")
     return 0
 
 
@@ -138,33 +243,37 @@ def ensure_tree(runtime: Path, sys_bat: Path, sys_ac: Path) -> Path:
             link.unlink()
         if target.exists():
             link.symlink_to(target)
+    # status is written, not linked: see the module docstring. A leftover
+    # symlink from an older install would otherwise be written through.
+    status = bat / "status"
+    if status.is_symlink():
+        status.unlink()
     return bat
 
 
-def link_native(runtime: Path, sys_bat: Path, sys_ac: Path) -> None:
-    tree = runtime / "power_supply"
-    tree.mkdir(parents=True, exist_ok=True)
-    for name, target in (("BAT0", sys_bat), ("AC", sys_ac)):
-        dest = tree / name
-        if dest.is_symlink() or dest.exists():
-            if dest.is_dir() and not dest.is_symlink():
-                for child in dest.iterdir():
-                    child.unlink()
-                dest.rmdir()
-            else:
-                dest.unlink()
-        if target.exists():
-            dest.symlink_to(target)
-    (runtime / "mode").write_text("native\n")
+def write_file(path: Path, text: str) -> None:
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text)
+    tmp.replace(path)
 
 
-def write_power(bat: Path, runtime: Path, power_uw: int) -> None:
-    tmp = bat / "power_now.tmp"
-    tmp.write_text(f"{power_uw}\n")
-    tmp.replace(bat / "power_now")
-    watts = power_uw / 1_000_000.0
-    (runtime / "watts").write_text(f"{watts:.1f}\n")
-    (runtime / "mode").write_text("synthetic\n")
+def publish(bat: Path, runtime: Path, power_uw: int | None, status: str) -> None:
+    write_file(bat / "status", f"{status}\n")
+    if power_uw is None:
+        return
+    write_file(bat / "power_now", f"{power_uw}\n")
+    write_file(runtime / "watts", f"{power_uw / 1_000_000.0:.1f}\n")
+
+
+def prune(steps: list[Sample], now: float) -> list[Sample]:
+    """Drop what has aged out, but never the latest reading.
+
+    How long ago the counter last moved is itself the answer for a pack that
+    is not moving at all, and dropping it would leave nothing to say that
+    with.
+    """
+    kept = [s for s in steps if s[0] >= now - WINDOW_S]
+    return kept if kept else steps[-1:]
 
 
 def loop() -> int:
@@ -173,45 +282,33 @@ def loop() -> int:
     runtime = env_path("ZBOOK_RUNTIME", "/run/zbook-battery")
     runtime.mkdir(parents=True, exist_ok=True)
 
-    if current_now_works(sys_bat):
-        link_native(runtime, sys_bat, sys_ac)
-        while True:
-            if not current_now_works(sys_bat):
-                break
-            time.sleep(30)
-
     bat = ensure_tree(runtime, sys_bat, sys_ac)
-    samples: list[tuple[float, int, int]] = []
-    last_power: int | None = None
+    write_file(runtime / "mode", "synthetic\n")
+    samples: list[Sample] = []
+    last_ac: bool | None = None
 
     while True:
-        if current_now_works(sys_bat):
-            link_native(runtime, sys_bat, sys_ac)
-            time.sleep(30)
-            continue
-
-        if not (bat / "status").exists():
+        if not bat.is_dir():
             bat = ensure_tree(runtime, sys_bat, sys_ac)
 
         now = time.time()
-        charge = read_int(sys_bat / "charge_now")
-        volt = read_int(sys_bat / "voltage_now")
-        status = read_text(sys_bat / "status")
+        ac = ac_online(sys_ac)
+        # Plugging in or pulling out reverses the sign mid-window. Averaging
+        # across that point describes neither side of it.
+        if ac != last_ac:
+            samples = []
+            last_ac = ac
 
-        if charge is not None and volt is not None:
-            samples.append((now, charge, volt))
-            samples = prune(samples, now)
+        sample = sample_battery(sys_bat, now)
+        if sample is not None:
+            samples = prune(record(samples, sample), now)
 
-        if status in ("Full", "Not charging"):
-            write_power(bat, runtime, 0)
-            last_power = 0
-        else:
-            power = power_uw_from_samples(samples)
-            if power is not None:
-                write_power(bat, runtime, power)
-                last_power = power
-            elif last_power is not None and not (bat / "power_now").exists():
-                write_power(bat, runtime, last_power)
+        rate = rate_now(samples, now)
+        status = smooth_status(read_text(sys_bat / "status"), ac, rate)
+        power_uw: int | None = None
+        if rate is not None:
+            power_uw = rate[0] if rate[0] >= MIN_RATE_UW else 0
+        publish(bat, runtime, power_uw, status)
 
         time.sleep(INTERVAL_S)
 

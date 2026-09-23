@@ -78,7 +78,7 @@ Do not add `[omarchy-zfs]` or `[archzfs]`. Do not replace `/etc/pacman.d/mirrorl
 | `/etc/omarchy.lock` | Copy of `monarchy/omarchy.lock` written at apply. `omarchy-version-branch` reads it. |
 | `monarchy/omarchy.lock` | `package` and `channel`. Pacman does the version pinning now. |
 
-`monarchy_link_working_prefix` symlinks `default`, `shell`, `themes`, `migrations`, `config`, `install`, `applications`, `version`, `logo.txt`, `logo.svg`, `icon.txt`, and `icon.png` into the working prefix. `omarchy` ships six of those names and `omarchy-settings-monarchy` the other six, so the set is complete without a clone. `bin/` is not a symlink. Apply then explodes `shell/` and `default/` so lock QML and `omarchy-menu.jsonc` can be patched copies — a pacman-owned path is not somewhere to write, because the next upgrade would silently revert both.
+`monarchy_link_working_prefix` symlinks `default`, `shell`, `themes`, `migrations`, `config`, `install`, `applications`, `version`, `logo.txt`, `logo.svg`, `icon.txt`, and `icon.png` into the working prefix. `omarchy` ships six of those names and `omarchy-settings-monarchy` the other six, so the set is complete without a clone. `bin/` is not a symlink. Apply then explodes `shell/` and `default/` so lock QML, the power panel and `omarchy-menu.jsonc` can be patched copies — a pacman-owned path is not somewhere to write, because the next upgrade would silently revert them.
 
 env-bootstrap and `envs.lua` both prepend `$OMARCHY_PATH/bin`. That directory is the overlay: a full mirror of the packaged `bin/`, with Monarchy's stubs and wraps over the names we override.
 
@@ -123,7 +123,7 @@ Wraps:
 - `omarchy-snapshot` → `zfs-snapshot-pre-update.sh` for `create`; `restore` points at ZFSBootMenu and exits 2. Stock drives snapper and `limine-snapper-restore`, and would exit 127 here because `monarchy-boot-stub` ships no snapper binary. This is the one script `berenddeboer/omarchy` genuinely improved, kept without the fork.
 - `omarchy-version` / `omarchy-version-branch` / `omarchy-version-channel` → Fastfetch About. Version is `pacman -Q omarchy`. Stock does the same, but only when `OMARCHY_PATH` is `/usr/share/omarchy`; against a working prefix it decides it is a dev-link and prints `dev`. `$OMARCHY_PATH/version` is not the answer either: the 4.0.2 package still ships a version file reading `4.0.0.alpha`. Branch exits 1 — there is no branch when you track a package, and Fastfetch omits the line, which is what stock does with no dev-link git branch. Channel is the `[omarchy]` pkg repo.
 - `omarchy-voxtype-config` → the bar's Dictate indicator. Stock opens `voxtype configure` and restarts the shell even when voxtype is not installed. Apply also marks first-run done without the voxtype invitation, so a fresh session always hits that path. The wrap sends the click to `omarchy-voxtype-install` instead.
-- `omarchy-battery-status` → packaged binary, then fill in a blank time estimate from `$OMARCHY_POWER_SUPPLY_PATH`. Stock takes "time to empty" from `upower -i` alone, and UPower has no time to give when it has no energy-rate. The ZBook's EC reports ACPI `_BST` Present Rate as unknown while discharging, so the panel's "Time left" row is an em dash on battery and a real figure on AC. `hardware/hp-zbook` already publishes a synthetic `power_now`; the wrap does the division UPower cannot. It fires only on an empty field, so on a machine where UPower answers the output is byte-identical to stock.
+- `omarchy-battery-status` → packaged binary, then fill in a blank time estimate from `$OMARCHY_POWER_SUPPLY_PATH`, and word it "to full" when that tree says the pack is charging. Stock takes the wording from UPower's state and gives "left" to anything that is not `charging`, which includes the `pending-charge` an EC that pulses the charge sits in most of the time. Stock takes "time to empty" from `upower -i` alone, and UPower has no time to give when it has no energy-rate. The ZBook's EC reports ACPI `_BST` Present Rate as unknown while discharging, so the panel's "Time left" row is an em dash on battery and a real figure on AC. `hardware/hp-zbook` already publishes a synthetic `power_now`; the wrap does the division UPower cannot. It fires only on an empty field, so on a machine where UPower answers the output is byte-identical to stock.
 
 `omarchy-refresh-pacman` stays in `bin.deny`. Its contract is "replace pacman.conf". Redirecting it to `--update` would hide that.
 
@@ -252,6 +252,7 @@ lib/monarchy/
   denylist.sh            # loads packages.deny, bin.*, migrations.deny, applications.drop
   overlay.sh             # rebuild overlay bin, hazard scan, explode-and-patch
   overlay-lock.py        # Super+Ctrl+U hunks; --check fails if upstream drifted
+  overlay-power.py       # power panel: "Holding" needs a charge limit to exist
   switch-user.sh         # /usr/local/bin/monarchy-switch-user
   packages.sh            # filtered install, writes packages.installed
   pkgbuild.sh            # build+install the two local packages, then omarchy
@@ -327,8 +328,10 @@ the tests drive the real functions against temp prefixes through
 The suite covers the bricking surface only — see `brick` in `CONTEXT.md`.
 Greeter, session desktop, lock PAM, switch-user, overlay `bin/` classification,
 the initramfs HOOKS rewrite and the ZBM cmdline. Branding, version strings,
-settings file lists and the battery helper are deliberately uncovered; those
-tests are recoverable from `8fcaa34^` if that judgement changes.
+settings file lists are deliberately uncovered; those tests are recoverable
+from `8fcaa34^` if that judgement changes. The ZBook battery helper's
+arithmetic is covered through its `--compute` entry point: not a bricking
+surface, but a number the panel presents as fact.
 
 ### Guards
 

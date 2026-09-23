@@ -9,9 +9,9 @@ set -e
 # =========================================================================
 # Scope of THIS script:
 #   - DMI-gated. Skip on anything that is not an HP ZBook.
-#   - Publish a synthetic BAT0/power_now so Omarchy can show watts, beside
-#     symlinks to the kernel's charge/energy, voltage and status attributes
-#     so a consumer can turn that rate into a time remaining.
+#   - Publish a synthetic BAT0/power_now so Omarchy can show watts, and a
+#     synthetic BAT0/status so a consumer knows which way to count, beside
+#     symlinks to the kernel's charge/energy and voltage attributes.
 #   - Relax RAPL energy_uj so wheel can read package/psys counters.
 # What this script deliberately does NOT do:
 #   - Install TLP / tlp-pd (conflicts with power-profiles-daemon).
@@ -39,6 +39,19 @@ set -e
 #   energy-rate; 0 leaves it nothing to divide, history-time-empty has only
 #   ever held 0, and the panel shows a real "Time to full" on AC against an
 #   em dash on battery.
+#
+#   That is the discharging half. Charging, current_now reads and is a
+#   sawtooth: the EC pulse-charges, ramping 0 -> ~2.9A over ~12s, dropping
+#   out, and repeating, with BAT0/status alternating Charging / Not charging
+#   across the cycle. The mean is honest -- measured over 98s, current_now x
+#   voltage_now averaged 15.8W against the charge counter's own 15.8W -- but
+#   a single sample lands anywhere in 0-44.6W and the panel samples every 5s.
+#   UPower turns the "Not charging" half into state: pending-charge, which
+#   the power panel reads as a hold at a charge limit. This machine has no
+#   charge_control_* at all, so that row rendered "Charge limit -" and
+#   "Battery state: Holding" while the pack was filling at 27%. The panel
+#   half of that is lib/monarchy/overlay-power.py; the helper half is a rate
+#   and a status averaged over a window that spans several pulses.
 # =========================================================================
 # Lessons learned (dead ends) — DO NOT REDO.
 # (A) TLP. tlp-stat does not create current_now either. tlp-pd Provides
@@ -54,6 +67,18 @@ set -e
 #     Ultra G1a (Strix Halo). This G6 is a different KBC. Dump the EC
 #     read-only (modprobe ec_sys, no write_support) and correlate 16-bit
 #     fields with UPower's energy-rate before ever writing those regs.
+# (E) Trusting BAT0/status, or current_now, while the charger is attached.
+#     Both flip with the pulse. The charge counter over a minute is the only
+#     thing on this EC that does not. Discharging is the one status this
+#     firmware never gets wrong -- it is not reported on AC -- so that one is
+#     taken at its word.
+# (F) Deriving the rate from two absolute energy readings (charge x voltage).
+#     voltage_now swings ~0.3V across a pulse, and 0.3V against a 1.2Ah pack
+#     is 0.36Wh of apparent energy -- larger than the 0.26Wh a minute the
+#     pack is actually taking on. It read 68W. Convert the delta, not the
+#     readings, and measure it between counter steps: charge_now jumps a few
+#     mAh every ~15s, and a window that does not line up with those jumps is
+#     +-25% on the rate.
 # =========================================================================
 
 HW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

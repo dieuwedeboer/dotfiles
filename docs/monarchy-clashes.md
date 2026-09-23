@@ -82,6 +82,17 @@ Omarchy-first: a name that is neither wrapped nor denied is mirrored into the ov
 
 `omarchy-settings-monarchy` installs the settings tree; `settings.skip` is that package's exclude list, not a copy filter. See "Packages" in `docs/monarchy.md`.
 
+## Overlay QML
+
+Patched copies, each with a `--check` that fails apply if the upstream anchors
+moved: the lock plugin and `omarchy-menu.jsonc` (`overlay-lock.py`,
+Super+Ctrl+U) and the power panel (`overlay-power.py`). The power panel one
+makes "Holding" require a charge limit to exist. UPower reports
+`pending-charge` for any kernel `Not charging`, and an EC that pulses the
+charge reports that at any charge level, so the panel called a filling pack
+held at a limit the machine does not have. A machine with `charge_control_*`
+decides exactly as upstream does.
+
 ## New upstream binaries
 
 There is nothing to regenerate. `monarchy_check_bin_hazards` greps the package

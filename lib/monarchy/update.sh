@@ -164,11 +164,13 @@ monarchy_overlay_check() {
     [ -f "$monarchy_lib_dir/user-setup.sh" ] || monarchy_die "missing user-setup.sh"
     [ -f "$monarchy_lib_dir/stubs/wrap-update.sh" ] || monarchy_die "missing wrap-update.sh"
     monarchy_check_session_lock_overlay
+    monarchy_check_power_panel_overlay
 }
 
 monarchy_overlay_apply() {
     monarchy_rebuild_overlay
     monarchy_overlay_session_lock
+    monarchy_overlay_power_panel
     monarchy_install_switch_user
     monarchy_install_user_setup
 }

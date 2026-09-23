@@ -35,6 +35,7 @@ printf 'Discharging\n' >"$tree/BAT0/status"
 # The extra line is spliced in for the case where UPower does answer.
 write_upower() {
     local extra=${1:-}
+    local state=${2:-discharging}
     cat >"$bin/upower" <<UPOWER
 #!/usr/bin/env bash
 case "\$1" in
@@ -44,7 +45,7 @@ case "\$1" in
   native-path:          BAT0
   battery
     present:             yes
-    state:               discharging
+    state:               $state
     energy:              42.0 Wh
     energy-full:         48.0 Wh
     energy-rate:         0 W
@@ -92,7 +93,29 @@ printf 'Charging\n' >"$tree/BAT0/status"
 out=$(run --shell)
 [ "$(field time "$out")" = "30m" ] \
     || fail "charging estimate: wanted '30m', got '$(field time "$out")'"
+
+# --- charging, but UPower calls it pending-charge --------------------------
+# An EC that pulses the charge spends most of a charge in pending-charge, and
+# stock words anything that is not "charging" as "left". A time to full under
+# that label is worse than the em dash it replaces, so the wrapper takes the
+# wording from the same tree the estimate came from.
+write_upower "" "pending-charge"
+line=$(run)
+case "$line" in
+    *"·  30m to full  ·"*) ;;
+    *"left"*) fail "pending-charge while charging still reads 'left': $line" ;;
+    *) fail "pending-charge line not filled in: $line" ;;
+esac
+
+# The tree, not the UPower state, is what decides that. A pack the tree says
+# is discharging keeps stock's wording whatever UPower calls it.
 printf 'Discharging\n' >"$tree/BAT0/status"
+line=$(run)
+case "$line" in
+    *"·  3h 30m left  ·"*) ;;
+    *) fail "discharging wording changed: $line" ;;
+esac
+write_upower
 
 # --- UPower answering wins; the wrapper must not touch it ------------------
 write_upower "    time to empty:       3.2 hours"
@@ -102,6 +125,30 @@ out=$(run --shell)
 stock=$(MONARCHY_SRC="$SRC" OMARCHY_POWER_SUPPLY_PATH="$tree" PATH="$bin:$PATH" \
     "$SRC/bin/omarchy-battery-status" --shell)
 [ "$out" = "$stock" ] || fail "wrapper is not byte-identical to stock when UPower answers"
+write_upower
+
+# --- a UPower time that contradicts the rate beside it ---------------------
+# UPower divides by its own energy-rate; the panel prints sysfs power_now.
+# Where the two disagree by a factor, the row and the watts next to it cannot
+# both be true. 42Wh at 12W is 3.5 hours, so "8h 5m" is UPower dividing by
+# 1.5W -- a sample of a pulse, not a rate. Ours replaces it.
+write_upower "    time to empty:       8.1 hours"
+out=$(run --shell)
+[ "$(field time "$out")" = "3h 30m" ] \
+    || fail "contradictory UPower time survived: '$(field time "$out")'"
+line=$(run)
+case "$line" in
+    *"·  3h 30m left  ·"*) ;;
+    *) fail "contradictory time not replaced in the human form: $line" ;;
+esac
+
+# Merely stale is not contradictory. UPower lagging the instantaneous rate is
+# what upstream's own comment describes, and it is not ours to overrule: 42Wh
+# over 3.2h implies 13.1W against 12W showing.
+write_upower "    time to empty:       3.2 hours"
+out=$(run --shell)
+[ "$(field time "$out")" = "3h 12m" ] \
+    || fail "a merely stale UPower time was overwritten: '$(field time "$out")'"
 write_upower
 
 # --- no rate to divide by: say nothing rather than guess -------------------
