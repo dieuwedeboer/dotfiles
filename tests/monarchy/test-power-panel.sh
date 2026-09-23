@@ -47,6 +47,12 @@ grep -q 'triggeredOnStart: true' "$tmp/Panel.qml" || fail "the seed timer does n
 grep -q 'running: root.opened; repeat: true' "$tmp/Panel.qml" \
     || fail "the stock open-only refresh timer is gone; the seed may now be redundant"
 
+# The overlay is dead on disk until the running shell is restarted.
+grep -q 'monarchy_restart_shell' "$LIB/overlay.sh" || fail "no shell restart helper"
+grep -q 'MONARCHY_SHELL_DIRTY=1' "$LIB/overlay.sh" || fail "the power panel overlay does not mark the shell stale"
+grep -q 'monarchy_restart_shell' "$LIB/update.sh" || fail "apply never restarts the shell"
+grep -q 'monarchy_restart_shell' "$LIB/splash.sh" || fail "splash-only never restarts the shell"
+
 # Applying to already-patched files must fail rather than double-patch.
 if python3 "$py" apply "$tmp" 2>/dev/null; then
     fail "overlay applied twice without complaining"

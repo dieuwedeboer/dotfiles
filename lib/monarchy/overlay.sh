@@ -265,6 +265,7 @@ monarchy_overlay_session_lock() {
         monarchy_die "lock QML overlay failed"
     }
     monarchy_overlay_replace_dir "$MONARCHY_PATH/shell/plugins" "$plugins_tmp"
+    MONARCHY_SHELL_DIRTY=1
     monarchy_log "overlaid $MONARCHY_PATH/shell/plugins/lock"
 
     monarchy_explode_symlink_dir "$MONARCHY_PATH/default"
@@ -278,6 +279,45 @@ monarchy_overlay_session_lock() {
     }
     monarchy_overlay_replace_file "$menu_dest" "$menu_tmp"
     monarchy_log "overlaid $menu_dest"
+}
+
+# ---- the running shell --------------------------------------------------
+#
+# quickshell reads its QML once, at launch, and this session's log says
+# "Configuration Loaded" exactly once no matter how long it runs. Rewriting
+# $MONARCHY_PATH/shell therefore changes nothing a user can see until the
+# shell is restarted -- which is how a corrected power panel sat on disk for a
+# day while the bar went on showing the bug it had already fixed.
+#
+# Stock ends every `omarchy-update` with `omarchy-update-restart`, whose own
+# comment gives the reason: "a stale process can lazy-load new files into old
+# code". monarchy-update replaces that command, so it inherits the duty.
+#
+# Set by the two overlay steps that write under shell/, cleared by the
+# restart, so --only on an unrelated unit never touches the shell.
+MONARCHY_SHELL_DIRTY=0
+
+monarchy_restart_shell() {
+    [ "${MONARCHY_SHELL_DIRTY:-0}" = 1 ] || return 0
+    MONARCHY_SHELL_DIRTY=0
+
+    command -v omarchy-restart-shell >/dev/null 2>&1 || return 0
+    # Only restart a shell that is up. omarchy-restart-shell launches one
+    # through Hyprland when it finds none, which is wrong for an install run
+    # from a TTY or over ssh: the session that owns the bar is not this one.
+    OMARCHY_SHELL_IPC_TIMEOUT=0.5s omarchy-shell shell ping >/dev/null 2>&1 || {
+        monarchy_log "no running shell; the overlay applies at next login"
+        return 0
+    }
+
+    # Best-effort. A locked session refuses by design, and the next login gets
+    # a fresh shell regardless -- neither is a reason to fail the apply.
+    if omarchy-restart-shell; then
+        monarchy_log "restarted the omarchy shell"
+    else
+        monarchy_log "shell restart declined; the overlay applies at next login"
+    fi
+    return 0
 }
 
 # ---- power panel --------------------------------------------------------
@@ -321,6 +361,7 @@ monarchy_overlay_power_panel() {
         monarchy_overlay_replace_file "$dir/$name" "$tmp/$name"
     done
     rmdir "$tmp"
+    MONARCHY_SHELL_DIRTY=1
     monarchy_log "overlaid $dir"
 }
 

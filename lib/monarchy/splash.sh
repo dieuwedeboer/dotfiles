@@ -248,5 +248,6 @@ monarchy_splash_only() {
     monarchy_pkg_installed plymouth || monarchy_die "plymouth is not installed"
     monarchy_splash
     monarchy_splash_maybe_theme
+    monarchy_restart_shell
     monarchy_log "splash-only complete"
 }

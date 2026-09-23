@@ -348,6 +348,9 @@ monarchy_apply() {
         "monarchy_${u}_apply"
         "monarchy_${u}_check"
     done
+    # After every unit, not inside the overlay one: the shell is restarted
+    # once, against a tree that has finished settling, rather than mid-apply.
+    monarchy_restart_shell
     monarchy_log "apply complete${MONARCHY_ONLY:+ (only $MONARCHY_ONLY)}"
 }
 
