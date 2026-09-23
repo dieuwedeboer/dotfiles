@@ -1,0 +1,13 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  Claude Code rewrites this file itself (/model, /config, auto mode setup,
+  herdr's hook), so chezmoi owns only the top-level keys in
+  .chezmoitemplates/claude-settings.json and replaces each one whole. Every
+  other key stays as the machine has it and never reaches git. Dropping a key
+  from the template does not remove it from machines that already have it.
+*/ -}}
+{{- $live := dict -}}
+{{- with .chezmoi.stdin }}{{ $live = fromJson . }}{{ end -}}
+{{- $owned := includeTemplate "claude-settings.json" . | fromJson -}}
+{{- range $key, $value := $owned }}{{ $live = setValueAtPath $key $value $live }}{{ end -}}
+{{ toPrettyJson "  " $live -}}
