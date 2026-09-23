@@ -20,11 +20,19 @@ CachyOS owns the OS: kernel, ZFS modules, repos, Plasma, `cachy-update`, sanoid,
 
 The desktop comes from the official `omarchy` package, plus two packages built here: `monarchy-boot-stub` and `omarchy-settings-monarchy`. There is no fork and no clone.
 
-It used to be a pinned git clone of `berenddeboer/omarchy` branch `quattro-on-zfs`. Measured against official Omarchy 4.0.2, that fork was 403 of 428 shared `bin/` names byte-identical, 25 changed, 14 added, and 0 official names missing. Of the changes, exactly two carried ZFS logic: `omarchy-upgrade-to-quattro` and `omarchy-snapshot`. The first was already denied; the second is now `monarchy/bin.wrap` + `stubs/wrap-snapshot.sh`. Everything else the fork changed was personal preference, and everything it encodes about ZFS (`zroot/ROOT/default`, Limine, archzfs, a `pacman.conf` replacement) these machines refuse anyway.
+### Where the desktop comes from
+
+The `[omarchy]` repository, channel **stable**. `monarchy/omarchy.lock` names `package=omarchy` and `channel=stable`, and pacman does the version pinning from there. Read that as: there is no git remote to follow, no commit pinned, and nothing to re-pin. `monarchy-update` installs whatever that channel currently carries and halts on a new binary or migration it cannot classify, which is the human step that used to be a pin bump.
+
+Anything describing how to move this repo onto a newer upstream *commit* — a note, a skill, a stale paragraph — is describing the arrangement below, which ended. Check `monarchy/omarchy.lock` before believing it.
+
+### What came before
+
+Until the move to the packages, it was a pinned git clone of `berenddeboer/omarchy` branch `quattro-on-zfs`. Measured against official Omarchy 4.0.2, that fork was 403 of 428 shared `bin/` names byte-identical, 25 changed, 14 added, and 0 official names missing. Of the changes, exactly two carried ZFS logic: `omarchy-upgrade-to-quattro` and `omarchy-snapshot`. The first was already denied; the second is now `monarchy/bin.wrap` + `stubs/wrap-snapshot.sh`. Everything else the fork changed was personal preference, and everything it encodes about ZFS (`zroot/ROOT/default`, Limine, archzfs, a `pacman.conf` replacement) these machines refuse anyway.
 
 `berenddeboer/omarchy-zfs-pkgs` does not help either: its `omarchy-settings-dev.install` is upstream's byte-for-byte where it matters (`rm -f /etc/os-release` and the five unconditional `cp -f` into `/etc`), and its `omarchy-dev` hard-depends on all four of limine, limine-mkinitcpio-hook, limine-snapper-sync and snapper. That is correct for a box where Omarchy *is* the OS. It is the opposite of what this repo needs.
 
-Do not vendor-fork Omarchy. Do not re-add a clone. The overlay in this repo is what we maintain.
+Do not vendor-fork Omarchy. Do not re-add a clone. Do not re-add a pin. The overlay in this repo is what we maintain, on top of whatever `[omarchy]` stable ships.
 
 ## Architecture
 

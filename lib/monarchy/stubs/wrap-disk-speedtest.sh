@@ -12,7 +12,7 @@
 # So put a findmnt shim ahead of the real one on PATH and let it answer that
 # one question with the pool's backing device. Every other findmnt call passes
 # through. A patched copy of the script would be one more thing to re-check at
-# every re-pin; this only has to keep matching how the script asks.
+# every upstream release; this only has to keep matching how the script asks.
 set -euo pipefail
 
 original="${MONARCHY_SRC:-/usr/local/src/monarchy/omarchy}/bin/omarchy-disk-speedtest"
