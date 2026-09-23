@@ -109,6 +109,13 @@ a file edit. That judgement stays human: `monarchy_check_migrations` and
 reason, and there is no canary box. `monarchy-update` is what then moves a box
 onto the new package.
 
+Deny is for damage, not for disappointment. A command that merely fails here —
+nothing to talk to, no snapper, no Limine — is still mirrored untouched and
+needs no row. Deny when running it would break the host. Wrap when the box
+still needs what the name does by another route, as `omarchy-snapshot` needs a
+ZFS snapshot instead of snapper; a wrap is a script that has to keep matching
+how upstream calls it, so it earns that cost or it is a deny.
+
 Deleted rows are the ones to act on. Apply installs files and never reconciles
 them, so a `sudoers.d` rule upstream removed for security stays on the box, and
 a package dropped from `omarchy-base.packages` stays installed, until a person
