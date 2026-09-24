@@ -1,362 +1,106 @@
 #!/usr/bin/env bash
-# Greeter overlay and SDDM policy. No sudo, no systemctl enable.
+# The two ways the greeter strands someone. No sudo, no systemctl.
+#
+# 1. A stock Hyprland session marked Hidden=true instead of NoDisplay=true.
+#    `uwsm start … hyprland.desktop` refuses a Hidden entry, so the session
+#    the greeter launches exits immediately and there is no way forward.
+# 2. A username that reaches the generated QML unquotable. The SDDM theme
+#    reads no files at runtime, so the Plasma list is written into Main.qml
+#    at apply time; a name carrying a quote is a syntax error in the theme,
+#    and a greeter whose theme will not parse cannot be logged in on.
+#
+# Everything else about the greeter -- which drop-in wins, what colour the
+# background is, whose logo is on it -- is cosmetic. A breeze greeter is ugly
+# and still lets you in. See CODING_STANDARDS.md.
 set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../helpers.sh
 source "$TEST_DIR/../helpers.sh"
-
-
-
-qml="$MISC/sddm/Main.qml"
-conf="$MISC/sddm/zz-omarchy-sddm.conf"
-[ -f "$qml" ] || fail "missing $qml"
-[ -f "$conf" ] || fail "missing $conf"
-[ ! -f "$MISC/sddm/99-omarchy-sddm.conf" ] \
-    || fail "stale 99-omarchy-sddm.conf still in the repo; it loses to kde_settings.conf"
-
-grep -q '#1a1b26' "$qml" || fail "Main.qml missing #1a1b26 token"
-grep -q '#ffffff' "$qml" || fail "Main.qml missing #ffffff token"
-grep -q 'cycleUser' "$qml" || fail "Main.qml missing cycleUser"
-grep -q 'cycleSession' "$qml" || fail "Main.qml missing cycleSession"
-grep -q 'isStockHyprlandSession' "$qml" || fail "Main.qml missing isStockHyprlandSession"
-grep -q 'hyprland-uwsm.desktop' "$qml" || fail "Main.qml does not skip hyprland-uwsm.desktop"
-if grep -q 'blob.indexOf("hyprland")' "$qml"; then
-    fail "Main.qml must not hide Omarchy by matching the word hyprland"
-fi
-grep -q 'prefersPlasma' "$qml" || fail "Main.qml missing prefersPlasma"
-# The greeter's Plasma list is generated at apply time from
-# /etc/monarchy/users.conf. This SDDM theme reads no files at runtime, so the
-# list is written into the deployed QML rather than read by it.
-grep -q 'property var plasmaUsers' "$qml" || fail "Main.qml has no plasmaUsers property"
-grep -qE '^[[:space:]]*property var plasmaUsers: \[\]' "$qml" \
-    || fail "the repo copy of Main.qml must ship an empty plasmaUsers list"
-grep -qE 'user === "[a-z]' "$qml" \
-    && fail "Main.qml hardcodes a username; the list is generated"
-grep -q 'monarchy_sddm_write_plasma_users' "$LIB/sddm.sh" \
-    || fail "sddm.sh does not generate the greeter plasma list"
-printf '%s\n' "$(awk '/^monarchy_sddm_write_qml\(\)/,/^}$/' "$LIB/sddm.sh")" \
-    | grep -q 'monarchy_sddm_write_plasma_users' \
-    || fail "the plasma list is not regenerated when Main.qml is deployed"
-
-# sessions.sh must drive AccountsService from the roles file, not from names.
-printf '%s\n' "$(awk '/^monarchy_install_omarchy_session\(\)/,/^}$/' "$LIB/sessions.sh")" \
-    | grep -q 'monarchy_users' \
-    || fail "sessions.sh does not read roles from users.conf"
-
-grep -q 'Qt.Key_Tab' "$qml" || fail "Main.qml missing Tab user cycle"
-grep -q 'Qt.Key_Down' "$qml" || fail "Main.qml missing Down session cycle"
-grep -q 'background.jpg' "$qml" || fail "Main.qml missing optional background.jpg overlay"
-if grep -q 'name.indexOf("uwsm")' "$qml"; then
-    fail "Main.qml still auto-picks the first uwsm session"
-fi
-
-grep -q '^Current=omarchy$' "$conf" || fail "conf Current is not omarchy"
-grep -q 'start-hyprland' "$conf" || fail "conf missing start-hyprland"
-hypr="$MISC/sddm/hyprland.lua"
-[ -f "$hypr" ] || fail "missing $hypr"
-grep -q 'background_color' "$hypr" || fail "greeter hyprland.lua missing background_color"
-grep -q 'rgb(26, 27, 38)' "$hypr" || fail "greeter hyprland.lua missing Unlock rgb"
-boot_color="$MISC/hypr/boot-color.lua"
-[ -f "$boot_color" ] || fail "missing $boot_color"
-grep -q 'rgb(26, 27, 38)' "$boot_color" || fail "boot-color.lua missing Unlock rgb"
-if grep -q '^SessionCommand=' "$conf"; then
-    fail "conf must not set SessionCommand"
-fi
-grep -q '^DisplayServer=wayland$' "$conf" || fail "conf missing DisplayServer=wayland"
-if grep -Eq '^[[:space:]]*User=[[:space:]]*[^[:space:]]+' "$conf"; then
-    fail "conf sets Autologin User"
-fi
-conf_name=$(basename "$conf")
-[ "$conf_name" = "zz-omarchy-sddm.conf" ] || fail "conf must be zz-omarchy-sddm.conf, got $conf_name"
-LC_ALL=C awk -v n="$conf_name" 'BEGIN { exit !(n > "kde_settings.conf") }' \
-    || fail "$conf_name sorts before kde_settings.conf; Theme.Current=breeze would win"
-LC_ALL=C awk -v n="99-omarchy-sddm.conf" 'BEGIN { exit !(n < "kde_settings.conf") }' \
-    || fail "lexicographic fixture broken: 99-omarchy should lose to kde_settings.conf"
-
-grep -qx 'sddm' "$MISC/packages.deny" && fail "sddm is still in packages.deny"
-grep -qx 'plasma-login-manager' "$MISC/packages.deny" \
-    || fail "plasma-login-manager missing from packages.deny"
-grep -qx 'omarchy-refresh-sddm' "$MISC/bin.wrap" \
-    || fail "omarchy-refresh-sddm missing from bin.wrap"
-if grep -qx 'omarchy-refresh-sddm' "$MISC/bin.deny"; then
-    fail "omarchy-refresh-sddm is still denied"
-fi
-
-apply_body=$(monarchy_reaches apply)
-printf '%s\n' "$apply_body" | grep -qx 'monarchy_keep_sddm' \
-    || fail "monarchy_apply does not call monarchy_keep_sddm"
-install_body=$(awk '/^monarchy_install_omarchy_session\(\)/,/^}$/' "$LIB/sessions.sh")
-echo "$install_body" | grep -q 'monarchy_hide_stock_hyprland_sessions' \
-    || fail "omarchy session install does not hide stock Hyprland sessions"
-grep -q 'print "NoDisplay=true"' "$LIB/sessions.sh" \
-    || fail "hide stock Hyprland sessions must write NoDisplay=true"
-if grep -q 'print "Hidden=true"' "$LIB/sessions.sh"; then
-    fail "must not set Hidden=true; uwsm start … hyprland.desktop would refuse it"
-fi
-grep -q 'is Hidden=true' "$LIB/sessions.sh" \
-    || fail "hide must refuse a Hidden=true hyprland.desktop"
-printf '%s\n' "$apply_body" | grep -qx 'monarchy_splash_maybe_theme' \
-    || fail "monarchy_apply does not call monarchy_splash_maybe_theme"
-printf '%s\n' "$apply_body" | grep -qx 'monarchy_keep_plasmalogin' \
-    && fail "monarchy_apply still calls monarchy_keep_plasmalogin"
-
-check_body=$(monarchy_reaches check)
-printf '%s\n' "$check_body" | grep -qx 'monarchy_assert_sddm_runtime' \
-    || fail "check does not reach monarchy_assert_sddm_runtime"
-printf '%s\n' "$check_body" | grep -qx 'monarchy_check_hidden_hyprland_sessions' \
-    || fail "check does not assert stock Hyprland sessions are hidden"
-printf '%s\n' "$check_body" | grep -qx 'monarchy_keep_plasmalogin' \
-    && fail "check still reaches monarchy_keep_plasmalogin"
-
-grep -q 'monarchy_sddm_sync_assets' "$LIB/splash.sh" \
-    || fail "plymouth-set does not sync SDDM"
-grep -q 'skipped SDDM' "$LIB/splash.sh" \
-    && fail "splash.sh still skips SDDM"
-grep -q 'monarchy_refresh_sddm' "$LIB/splash.sh" \
-    || fail "plymouth-reset / splash does not refresh SDDM"
-
-refresh_body=$(awk '/^monarchy_refresh_sddm\(\)/,/^monarchy_keep_sddm\(\)/' "$LIB/sddm.sh")
-echo "$refresh_body" | grep -q 'monarchy_sddm_follow_unlock' \
-    && fail "monarchy_refresh_sddm must stay stock overlay (Unlock default)"
-echo "$refresh_body" | grep -q 'monarchy_sddm_apply_theme' \
-    && fail "monarchy_refresh_sddm must stay stock overlay (Unlock default)"
-if grep -q 'current/theme.name' "$LIB/sddm.sh"; then
-    fail "sddm.sh still restyles the greeter from the session theme"
-fi
-if grep -q 'current/theme.name' "$LIB/splash.sh"; then
-    fail "splash.sh still restyles Unlock from the session theme"
-fi
-
-maybe_body=$(awk '/^monarchy_splash_maybe_theme\(\)/,/^monarchy_splash\(\)/' "$LIB/splash.sh")
-echo "$maybe_body" | grep -q 'monarchy_sddm_follow_unlock' \
-    || fail "splash_maybe_theme does not follow Style > Unlock"
-echo "$maybe_body" | grep -q 'plymouth-set-by-theme' \
-    && fail "splash_maybe_theme still applies desktop theme to plymouth"
-
-[ -f "$LIB/stubs/wrap-sddm.sh" ] || fail "missing wrap-sddm.sh"
-grep -q 'omarchy-refresh-sddm' "$LIB/overlay.sh" \
-    || fail "overlay wrap_stub_for missing omarchy-refresh-sddm"
-
 # shellcheck source=../../lib/monarchy/common.sh
 source "$LIB/common.sh"
+# shellcheck source=../../lib/monarchy/users.sh
+source "$LIB/users.sh"
 # shellcheck source=../../lib/monarchy/sessions.sh
 source "$LIB/sessions.sh"
 # shellcheck source=../../lib/monarchy/sddm.sh
-source "$LIB/users.sh"
-# shellcheck source=../../lib/monarchy/sddm.sh
 source "$LIB/sddm.sh"
-# shellcheck source=../../lib/monarchy/splash.sh
-source "$LIB/splash.sh"
 
-monarchy_sudo() { "$@"; }
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+export MONARCHY_LOG=$tmp/log
 
-merge_tmp=$(mktemp -d)
-cleanup_merge() { rm -rf "$merge_tmp"; }
-trap cleanup_merge EXIT
-mkdir -p "$merge_tmp/sys" "$merge_tmp/etc"
-printf '[Theme]\nCurrent=breeze\n' >"$merge_tmp/sys/general.conf"
-printf '[Theme]\nCurrent=breeze\n' >"$merge_tmp/etc/kde_settings.conf"
-printf '[Theme]\nCurrent=omarchy\n' >"$merge_tmp/etc/99-omarchy-sddm.conf"
-export MONARCHY_SDDM_SYS_CONF_DIR="$merge_tmp/sys"
-export MONARCHY_SDDM_USER_CONF_DIR="$merge_tmp/etc"
-export MONARCHY_SDDM_LEGACY_CONF="$merge_tmp/missing-sddm.conf"
-[ "$(monarchy_sddm_effective_current)" = breeze ] \
-    || fail "99-omarchy-sddm.conf must lose to kde_settings.conf (the live bug)"
-rm -f "$merge_tmp/etc/99-omarchy-sddm.conf"
-install -m 644 "$conf" "$merge_tmp/etc/zz-omarchy-sddm.conf"
-[ "$(monarchy_sddm_effective_current)" = omarchy ] \
-    || fail "zz-omarchy-sddm.conf did not beat kde_settings.conf"
-printf '[Theme]\nCurrent=breeze\n' >"$merge_tmp/legacy.conf"
-export MONARCHY_SDDM_LEGACY_CONF="$merge_tmp/legacy.conf"
-[ "$(monarchy_sddm_effective_current)" = breeze ] \
-    || fail "/etc/sddm.conf must still override drop-ins"
-rm -f "$merge_tmp/legacy.conf"
-export MONARCHY_SDDM_LEGACY_CONF="$merge_tmp/missing-sddm.conf"
-export MONARCHY_SDDM_CONF="$merge_tmp/etc/zz-omarchy-sddm.conf"
-printf '[Theme]\nCurrent=omarchy\n' >"$merge_tmp/etc/99-omarchy-sddm.conf"
-monarchy_sddm_install_conf
-[ ! -e "$merge_tmp/etc/99-omarchy-sddm.conf" ] \
-    || fail "install_conf left stale 99-omarchy-sddm.conf"
-[ "$(monarchy_sddm_effective_current)" = omarchy ] \
-    || fail "install_conf did not leave effective Current=omarchy"
+# --- hiding the stock Hyprland sessions ----------------------------------
 
-overlay_misc=$(mktemp -d)
-mkdir -p "$overlay_misc/sddm" "$merge_tmp/theme"
-printf 'asset\n' >"$overlay_misc/sddm/background.jpg"
-printf 'keep\n' >"$overlay_misc/sddm/Main.qml"
-printf '[Theme]\nCurrent=omarchy\n' >"$overlay_misc/sddm/zz-omarchy-sddm.conf"
-printf '[Unit]\nDescription=x\n' >"$overlay_misc/sddm/monarchy-sddm-resume.service"
-export MONARCHY_MISC="$overlay_misc"
-export MONARCHY_SDDM_THEME_DIR="$merge_tmp/theme"
-monarchy_sddm_install_overlay_assets
-[ -f "$merge_tmp/theme/background.jpg" ] \
-    || fail "overlay did not copy background.jpg"
-[ ! -e "$merge_tmp/theme/Main.qml" ] \
-    || fail "overlay copied Main.qml (write_qml owns that)"
-[ ! -e "$merge_tmp/theme/zz-omarchy-sddm.conf" ] \
-    || fail "overlay copied the drop-in conf into the theme dir"
-[ ! -e "$merge_tmp/theme/monarchy-sddm-resume.service" ] \
-    || fail "overlay copied the resume unit into the theme dir"
-export MONARCHY_MISC="$MISC"
-rm -rf "$overlay_misc"
-unset MONARCHY_SDDM_SYS_CONF_DIR MONARCHY_SDDM_USER_CONF_DIR \
-    MONARCHY_SDDM_LEGACY_CONF MONARCHY_SDDM_CONF MONARCHY_SDDM_THEME_DIR
-trap - EXIT
-cleanup_merge
-cleanup_merge() { :; }
-
-sess=$merge_tmp/wayland-sessions
+sess=$tmp/wayland-sessions
 mkdir -p "$sess"
-cat >"$sess/hyprland.desktop" <<'EOF'
+write_session() {
+    cat >"$sess/$1.desktop" <<EOF
 [Desktop Entry]
-Name=Hyprland
-Exec=/usr/bin/start-hyprland
+Name=$1
+Exec=$2
 DesktopNames=Hyprland
 EOF
-cat >"$sess/hyprland-uwsm.desktop" <<'EOF'
-[Desktop Entry]
-Name=Hyprland (uwsm-managed)
-Exec=uwsm start -e -D Hyprland hyprland.desktop
-TryExec=uwsm
-DesktopNames=Hyprland
-EOF
-cat >"$sess/omarchy.desktop" <<'EOF'
-[Desktop Entry]
-Name=Omarchy (Hyprland uwsm)
-Exec=uwsm start -g -1 -e -D Hyprland hyprland.desktop
-TryExec=uwsm
-DesktopNames=Hyprland
-EOF
-cat >"$sess/plasma.desktop" <<'EOF'
-[Desktop Entry]
-Name=Plasma (Wayland)
-Exec=/usr/bin/startplasma-wayland
-DesktopNames=KDE
-EOF
+}
+write_session hyprland /usr/bin/start-hyprland
+write_session hyprland-uwsm 'uwsm start -e -D Hyprland hyprland.desktop'
+write_session omarchy 'uwsm start -g -1 -e -D Hyprland hyprland.desktop'
+write_session plasma /usr/bin/startplasma-wayland
 export MONARCHY_WAYLAND_SESSIONS_DIR=$sess
-export MONARCHY_LOG=$merge_tmp/log
+
+# The whole visibility state of the directory, as one value. Asserting on
+# this rather than on "Hidden is not present" means a third key with the same
+# effect would show up here too, and a rename of the function under test
+# cannot leave the assertion passing for nothing.
+visibility() {
+    local f
+    for f in "$sess"/*.desktop; do
+        printf '%s:%s\n' "$(basename "$f" .desktop)" \
+            "$(grep -E '^(NoDisplay|Hidden)=' "$f" | paste -sd, - || true)"
+    done | LC_ALL=C sort
+}
+
+before_omarchy=$(cat "$sess/omarchy.desktop")
+before_plasma=$(cat "$sess/plasma.desktop")
+
 monarchy_hide_stock_hyprland_sessions
-grep -q '^NoDisplay=true' "$sess/hyprland.desktop" \
-    || fail "did not set NoDisplay on hyprland.desktop"
-grep -q '^NoDisplay=true' "$sess/hyprland-uwsm.desktop" \
-    || fail "did not set NoDisplay on hyprland-uwsm.desktop"
-if grep -q '^Hidden=' "$sess/hyprland.desktop"; then
-    fail "set Hidden on hyprland.desktop (uwsm would refuse it)"
-fi
-if grep -q '^NoDisplay=' "$sess/omarchy.desktop"; then
-    fail "hid omarchy.desktop"
-fi
-if grep -q '^NoDisplay=' "$sess/plasma.desktop"; then
-    fail "hid plasma.desktop"
-fi
+want='hyprland-uwsm:NoDisplay=true
+hyprland:NoDisplay=true
+omarchy:
+plasma:'
+[ "$(visibility)" = "$want" ] || fail "visibility after hiding is:
+$(visibility)"
+
+# The two sessions a person actually picks must come out byte-identical.
+[ "$(cat "$sess/omarchy.desktop")" = "$before_omarchy" ] \
+    || fail "hiding rewrote omarchy.desktop"
+[ "$(cat "$sess/plasma.desktop")" = "$before_plasma" ] \
+    || fail "hiding rewrote plasma.desktop"
+
+# An apply runs on every update, so twice has to equal once.
 monarchy_hide_stock_hyprland_sessions
-n=$(grep -c '^NoDisplay=true' "$sess/hyprland.desktop")
-[ "$n" -eq 1 ] || fail "NoDisplay seed is not idempotent ($n)"
+[ "$(visibility)" = "$want" ] || fail "hiding is not idempotent:
+$(visibility)"
 monarchy_check_hidden_hyprland_sessions
 
+# Hidden=true is the brick: uwsm refuses the entry the greeter would launch.
+# Refusing to proceed is the only safe answer, so the function must exit
+# non-zero rather than carry on.
 printf '\nHidden=true\n' >>"$sess/hyprland.desktop"
 if ( monarchy_hide_stock_hyprland_sessions ) 2>/dev/null; then
-    fail "hide did not refuse Hidden=true on hyprland.desktop"
+    fail "hiding accepted a Hidden=true hyprland.desktop"
 fi
 unset MONARCHY_WAYLAND_SESSIONS_DIR
-rm -rf "$merge_tmp"
 
-# require_omarchy_tree, not $MONARCHY_SRC: common.sh defaults that to
-# /usr/share/omarchy, so on a box where the omarchy package is not installed
-# yet this block silently skipped and the test still printed "passed".
-CLONE=$(require_omarchy_tree)
-if [ -d "$CLONE/default/sddm/omarchy" ] && [ -f "$CLONE/themes/osaka-jade/unlock.png" ]; then
-    tmp=$(mktemp -d)
-    cleanup_tmp() { rm -rf "$tmp"; }
-    trap cleanup_tmp EXIT
+# --- the generated Plasma list -------------------------------------------
 
-    export HOME="$tmp/home"
-    export OMARCHY_PATH="$CLONE"
-    export MONARCHY_SRC="$CLONE"
-    export MONARCHY_SDDM_THEME_DIR="$tmp/sddm"
-    export MONARCHY_SDDM_HYPR="$tmp/hyprland.lua"
-    export MONARCHY_PLYMOUTH_THEME_DIR="$tmp/plymouth"
-    export MONARCHY_LOG="$tmp/log"
+gen=$tmp/gen
+mkdir -p "$gen"
+cp "$MISC/sddm/Main.qml" "$gen/Main.qml"
+default_line=$(grep -E '^[[:space:]]*property var plasmaUsers:' "$gen/Main.qml")
+[ "$default_line" = '  property var plasmaUsers: []' ] \
+    || fail "the repo copy of Main.qml must ship an empty list, has: $default_line"
 
-    mkdir -p "$HOME/.local/state/omarchy/current" \
-        "$HOME/.config/omarchy/themes/jade-test" \
-        "$MONARCHY_PLYMOUTH_THEME_DIR"
-    printf 'jade-test\n' >"$HOME/.local/state/omarchy/current/theme.name"
-    cat >"$HOME/.config/omarchy/themes/jade-test/colors.toml" <<'EOF'
-background = "#111c18"
-foreground = "#C1C497"
-EOF
-    cp "$CLONE/themes/osaka-jade/unlock.png" \
-        "$HOME/.config/omarchy/themes/jade-test/unlock.png"
-
-    monarchy_refresh_sddm
-    grep -q 'background_color' "$MONARCHY_SDDM_HYPR" \
-        || fail "refresh_sddm did not install greeter hyprland.lua overlay"
-    grep -q 'rgb(26, 27, 38)' "$MONARCHY_SDDM_HYPR" \
-        || fail "refresh_sddm greeter hyprland.lua missing Unlock background"
-    [ ! -f "$MONARCHY_SDDM_THEME_DIR/hyprland.lua" ] \
-        || fail "hyprland.lua overlay leaked into the QML theme dir"
-    grep -q '#1a1b26' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        || fail "refresh_sddm should keep stock overlay tokens"
-    grep -q 'cycleUser' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        || fail "refresh_sddm did not overlay multi-user Main.qml"
-    cmp -s "$MONARCHY_SDDM_THEME_DIR/logo.png" \
-        "$CLONE/default/sddm/omarchy/logo.png" \
-        || fail "refresh_sddm should keep the stock clone logo"
-
-    # Desktop theme.name is osaka-jade/jade-test, Unlock is still default.
-    # Stock Omarchy does not restyle the greeter from the session theme.
-    : >"$MONARCHY_PLYMOUTH_THEME_DIR/omarchy.plymouth"
-    cp "$CLONE/default/plymouth/logo.png" "$MONARCHY_PLYMOUTH_THEME_DIR/logo.png"
-    monarchy_splash_maybe_theme
-    grep -q '#1a1b26' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        || fail "maybe_theme restyled stock Unlock from desktop theme.name"
-    grep -q '#111c18' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        && fail "maybe_theme applied jade colours while Unlock is default"
-    cmp -s "$MONARCHY_SDDM_THEME_DIR/logo.png" \
-        "$CLONE/default/sddm/omarchy/logo.png" \
-        || fail "maybe_theme replaced the stock greeter logo while Unlock is default"
-
-    # Re-apply recopies stock SDDM after Style > Unlock already set plymouth.
-    rm -rf "$MONARCHY_SDDM_THEME_DIR"
-    mkdir -p "$MONARCHY_SDDM_THEME_DIR"
-    cp -a "$CLONE/default/sddm/omarchy/." "$MONARCHY_SDDM_THEME_DIR/"
-    install -m 644 "$MISC/sddm/Main.qml" "$MONARCHY_SDDM_THEME_DIR/Main.qml"
-    cp "$HOME/.config/omarchy/themes/jade-test/unlock.png" \
-        "$MONARCHY_PLYMOUTH_THEME_DIR/logo.png"
-    cmp -s "$HOME/.config/omarchy/themes/jade-test/unlock.png" \
-        "$MONARCHY_PLYMOUTH_THEME_DIR/logo.png" \
-        || fail "setup: plymouth logo should already match Unlock"
-    grep -q '#1a1b26' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        || fail "setup: stock overlay QML missing #1a1b26"
-
-    monarchy_splash_maybe_theme
-    grep -q '#111c18' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        || fail "maybe_theme did not follow Unlock after a stock greeter copy"
-    grep -q '#1a1b26' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        && fail "maybe_theme left stock #1a1b26 on a themed Unlock"
-    cmp -s "$MONARCHY_SDDM_THEME_DIR/logo.png" \
-        "$HOME/.config/omarchy/themes/jade-test/unlock.png" \
-        || fail "maybe_theme did not copy the Unlock logo"
-
-    export HOME="$tmp/home-empty"
-    mkdir -p "$HOME"
-    rm -rf "$MONARCHY_SDDM_THEME_DIR"
-    cp "$CLONE/default/plymouth/logo.png" "$MONARCHY_PLYMOUTH_THEME_DIR/logo.png"
-    monarchy_refresh_sddm
-    monarchy_sddm_follow_unlock
-    grep -q '#1a1b26' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        || fail "follow_unlock on default plymouth should leave stock tokens"
-    grep -q '#111c18' "$MONARCHY_SDDM_THEME_DIR/Main.qml" \
-        && fail "follow_unlock on default plymouth restyled the greeter"
-else
-    echo "test-sddm: skip live theme restyle (no $CLONE/default/sddm/omarchy)" >&2
-fi
-
-
-# Generation itself: a temp users.conf in, the right QML line out.
-gen=$(mktemp -d)
 cat >"$gen/users.conf" <<'CONF'
 # comment
 someking   king
@@ -364,16 +108,12 @@ somequeen  queen
 somekid    kid
 nosuchuser kid
 CONF
-cp "$qml" "$gen/Main.qml"
 (
-    # Read by monarchy_users, which is called via monarchy_plasma_users.
-    # shellcheck disable=SC2034
+    # shellcheck disable=SC2034  # read by monarchy_users
     MONARCHY_USERS_CONF="$gen/users.conf"
-    # Only accounts that exist on the box may reach the greeter list, so stub
-    # getent to accept two of them.
+    # Only accounts that exist on the box may reach the list. someking exists
+    # too, so the result tests the role filter and not just this stub.
     # shellcheck disable=SC2329
-    # someking exists too, so the assertion below tests the ROLE filter and
-    # not just this stub. Only nosuchuser is absent from the box.
     getent() { case "$2" in someking|somequeen|somekid) return 0 ;; *) return 1 ;; esac; }
     # shellcheck disable=SC2329
     monarchy_sudo() { "$@"; }
@@ -382,26 +122,23 @@ cp "$qml" "$gen/Main.qml"
 line=$(grep -E '^[[:space:]]*property var plasmaUsers:' "$gen/Main.qml")
 [ "$line" = '  property var plasmaUsers: ["somekid", "somequeen"]' ] \
     || fail "generated plasma list is: $line"
-grep -q 'someking' "$gen/Main.qml" && fail "king reached the Plasma list"
-grep -q 'nosuchuser' "$gen/Main.qml" && fail "an account with no passwd entry reached the greeter list"
-rm -rf "$gen"
 
-# users.conf is hand-edited. A CRLF file must not demote every account to serf,
-# and a name that would break the generated QML must never reach it.
-hard=$(mktemp -d)
-printf 'aking king\r\naqueen queen\r\n' >"$hard/crlf.conf"
-roles=$(MONARCHY_USERS_CONF="$hard/crlf.conf" monarchy_users | awk '{print $2}' | paste -sd, -)
-[ "$roles" = "king,queen" ] || fail "CRLF users.conf parsed roles as: $roles"
-
-printf '%s queen\n' 'bad"name' >"$hard/quote.conf"
+# users.conf is hand-edited and unvalidated. A name carrying a quote would
+# close the QML string and break the theme, so the file must come back
+# untouched rather than half-written.
+printf '%s queen\n' 'bad"name' >"$gen/hostile.conf"
+cp "$MISC/sddm/Main.qml" "$gen/Hostile.qml"
 (
     # shellcheck disable=SC2034
-    MONARCHY_USERS_CONF="$hard/quote.conf"
+    MONARCHY_USERS_CONF="$gen/hostile.conf"
     # shellcheck disable=SC2329
     getent() { return 0; }
-    out=$(monarchy_plasma_users 2>/dev/null)
-    [ -z "$out" ] || { echo "quoted name reached the greeter list: $out" >&2; exit 1; }
-) || fail "a username containing a quote reached the generated QML"
-rm -rf "$hard"
+    # shellcheck disable=SC2329
+    monarchy_sudo() { "$@"; }
+    monarchy_sddm_write_plasma_users "$gen/Hostile.qml" >/dev/null 2>&1 || true
+)
+cmp -s "$gen/Hostile.qml" "$MISC/sddm/Main.qml" \
+    || fail "a username containing a quote changed the generated QML:
+$(grep -E '^[[:space:]]*property var plasmaUsers:' "$gen/Hostile.qml")"
 
 echo "sddm tests passed"

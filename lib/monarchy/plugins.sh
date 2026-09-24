@@ -90,7 +90,7 @@ monarchy_seed_shell_json() {
     src=$(monarchy_plugin_default_shell_json)
     mkdir -p "$(dirname "$dest")"
     cp -a "$src" "$dest"
-    monarchy_log "seeded $dest from $src"
+    monarchy_changed "seeded $dest from $src"
 }
 
 # A whole replacement bar, rather than a widget that takes a place in one.
@@ -208,21 +208,57 @@ monarchy_enable_plugin() {
             monarchy_die "failed to place widget $id in $dest"
         fi
         mv "$tmp" "$dest"
-        monarchy_log "placed widget $id in the $section of the bar"
+        monarchy_changed "placed widget $id in the $section of the bar"
     else
         if ! monarchy_shell_json_add_plugin "$id" <"$dest" >"$tmp"; then
             rm -f "$tmp"
             monarchy_die "failed to enable plugin $id in $dest"
         fi
         mv "$tmp" "$dest"
-        monarchy_log "enabled plugin $id"
+        monarchy_changed "enabled plugin $id"
     fi
 }
 
+# True when shell.json records this plugin anywhere it can be recorded: a
+# plugins[] row for a panel, overlay, menu or service, or a bar.layout entry
+# for a widget. False is what `omarchy plugin disable` produces, because
+# absence is the only way the shell has of saying off.
+monarchy_plugin_in_shell_json() {
+    local id=$1
+    local dest
+    dest=$(monarchy_plugin_shell_json)
+    [ -f "$dest" ] || return 1
+    # shellcheck disable=SC2016  # $id is jq's own, bound by --arg
+    jq -e --arg id "$id" '
+def entry_id: if type == "object" then (.id // "") else . end;
+([ (.plugins[]? | entry_id),
+   (.bar.layout.left[]? | entry_id),
+   (.bar.layout.center[]? | entry_id),
+   (.bar.layout.right[]? | entry_id) ] | index($id)) != null
+' "$dest" >/dev/null 2>&1
+}
+
+# --enable means "enable this when monarchy adds it", not "keep this enabled".
+#
+# `omarchy plugin disable <id>` leaves no record of the decision: it removes
+# the row and absence *is* disabled. So an enable that ran on every apply
+# could not tell "never enabled" from "switched off on purpose", and put a
+# widget back every update until someone noticed.
+#
+# The plugin directory is the marker. It exists, so the seeding has already
+# happened, so the enable is not the repo's call any more. That is the same
+# rule monarchy_shell_json_place_widget already followed for placement -- an
+# apply must not undo a hand placement -- extended from where a widget sits
+# to whether it is there at all.
+#
+# The way back on is `omarchy plugin enable <id>`. The way to be rid of it
+# for good is to drop the row from monarchy/plugins and
+# `omarchy plugin remove <id>`; while the row is there a removed plugin is
+# cloned again, because that much the repo does still assert.
 monarchy_install_one_plugin() {
     local url=$1
-    local enable=${2:-0}
-    local plugins_dir dest stage id dir
+    local want_enable=${2:-0}
+    local plugins_dir dest stage id dir added=0
     plugins_dir=$(monarchy_plugin_user_dir)
     mkdir -p "$plugins_dir"
 
@@ -240,18 +276,24 @@ monarchy_install_one_plugin() {
         monarchy_validate_plugin_dir "$stage"
         id=$(monarchy_plugin_id_from_dir "$stage")
         dest="$plugins_dir/$id"
+        # A directory already standing under the plugin's own id, with a
+        # different origin or none: someone put it there. Not ours to enable.
         if [ -e "$dest" ] || [ -L "$dest" ]; then
             rm -rf "$stage"
             monarchy_log "plugin $id already installed"
         else
             mv "$stage" "$dest"
-            monarchy_log "added plugin $id from $url"
+            added=1
+            monarchy_changed "added plugin $id"
         fi
         dir="$dest"
     fi
 
-    if [ "$enable" = 1 ]; then
+    [ "$want_enable" = 1 ] || return 0
+    if [ "$added" = 1 ]; then
         monarchy_enable_plugin "$id" "$dir"
+    elif ! monarchy_plugin_in_shell_json "$id"; then
+        monarchy_left_alone "$id — installed, switched off in shell.json"
     fi
 }
 

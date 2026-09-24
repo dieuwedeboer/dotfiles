@@ -183,17 +183,31 @@ monarchy_install_emacs_theme() {
     monarchy_log "omarchy-emacs-theme hooked (themed/ + theme-set.d)"
 }
 
+# One package, installed once. An absent package was either never installed
+# or removed on purpose, and pacman keeps no record of which, so the ledger
+# does. Installed already is itself the record: nothing was removed, so mark
+# it and there is nothing to decide next time.
 monarchy_omarchy_pkg_add() {
     local pkg=$1
     if monarchy_pkg_installed "$pkg"; then
+        monarchy_mark_seeded pkg "$pkg"
+        return 0
+    fi
+    if monarchy_seeded pkg "$pkg"; then
+        monarchy_left_alone "$pkg — removed by hand"
         return 0
     fi
     if ! command -v omarchy-pkg-add >/dev/null 2>&1; then
-        monarchy_log "warning: omarchy-pkg-add missing; skipped $pkg"
+        monarchy_warn "omarchy-pkg-add missing; skipped $pkg"
         return 0
     fi
     monarchy_log "omarchy-pkg-add $pkg"
-    omarchy-pkg-add "$pkg" || monarchy_log "warning: omarchy-pkg-add $pkg failed"
+    if omarchy-pkg-add "$pkg"; then
+        monarchy_mark_seeded pkg "$pkg"
+        monarchy_changed "installed $pkg"
+    else
+        monarchy_warn "omarchy-pkg-add $pkg failed"
+    fi
 }
 
 monarchy_user_emacs() {
@@ -226,11 +240,10 @@ monarchy_user_omarchy_defaults() {
         bash "$MONARCHY_SRC/install/user/mise.sh"
     fi
     monarchy_drop_webapps
-    monarchy_omarchy_pkg_add spotify
-    monarchy_omarchy_pkg_add signal-desktop
-    monarchy_omarchy_pkg_add cursor-bin
-    monarchy_omarchy_pkg_add cursor-cli
-    monarchy_omarchy_pkg_add omakade
+    local pkg
+    for pkg in "${MONARCHY_SEEDED_PKGS[@]}"; do
+        monarchy_omarchy_pkg_add "$pkg"
+    done
     if ! monarchy_pkg_installed google-chrome; then
         if command -v omarchy-install-browser >/dev/null 2>&1; then
             monarchy_log "omarchy-install-browser chrome"
@@ -464,6 +477,7 @@ monarchy_user_git() {
 
 monarchy_setup_user() {
     [ "$USER" != "root" ] || monarchy_die "user setup must not run as root"
+    monarchy_seed_ledger_bootstrap
     monarchy_seed_hyprland_config
     monarchy_assert_chezmoi_hypr
     monarchy_seed_branding

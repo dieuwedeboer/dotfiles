@@ -20,6 +20,12 @@ separate matter and are not in scope.
 
 Use `king`, `queen`, `kid`, `serf` in examples and placeholders.
 
+## Coding standards
+
+`CODING_STANDARDS.md` at the repo root. It governs what is worth a test — the
+bar is "could this leave someone stranded, or is it irreversible?" — and
+forbids tests that grep a source file or assert that a string is absent.
+
 ## Agent skills
 
 ### Issue tracker

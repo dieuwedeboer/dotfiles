@@ -1,50 +1,25 @@
 #!/usr/bin/env bash
-# Resume an open Wayland session from the greeter. Must not go through
-# sddm.login() / SessionCommand (that starts a second compositor).
+# Resuming an open Wayland session from the greeter. Two failures here are
+# critical and the rest of this path is not:
+#
+#   * resuming somebody else's session, which hands whoever is standing at
+#     the greeter a live logged-in desktop and cannot be undone afterwards;
+#   * a username taken from the query string reaching a shell.
+#
+# Going through sddm.login() instead would start a second compositor on top
+# of the running one, which is the greeter launching a session nobody can
+# use. That is why the helper exists; what it must never do is resume the
+# wrong one.
+#
+# No sudo, no real logind: loginctl is a stub over fixture session files.
 set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../helpers.sh
 source "$TEST_DIR/../helpers.sh"
 
-
-
 cmd="$LIB/sddm-resume.sh"
-qml="$MISC/sddm/Main.qml"
-conf="$MISC/sddm/zz-omarchy-sddm.conf"
-unit="$MISC/sddm/monarchy-sddm-resume.service"
-
-[ -f "$cmd" ] || fail "missing sddm-resume.sh"
 [ -x "$cmd" ] || fail "sddm-resume.sh is not executable"
-[ -f "$unit" ] || fail "missing monarchy-sddm-resume.service"
-
-if grep -q '^SessionCommand=' "$conf"; then
-    fail "zz-omarchy-sddm.conf must not set SessionCommand (re-login crash)"
-fi
-grep -q 'monarchy-wayland-session' "$conf" \
-    && fail "zz-omarchy-sddm.conf still points SessionCommand at monarchy-wayland-session"
-grep -q '127.0.0.1:17621/resume' "$qml" || fail "Main.qml missing resume URL"
-grep -q 'function attemptEnter' "$qml" || fail "Main.qml missing attemptEnter"
-grep -q 'sddm.login' "$qml" || fail "Main.qml dropped sddm.login fallback"
-grep -q 'resumeImg' "$qml" || fail "Main.qml missing resume Image"
-if grep -q 'sddm.login(root.currentUser, password.text, root.sessionIndex)' "$qml"; then
-    # Direct login on Enter is the crash: greeter must try resume first.
-    awk '
-        /Key_Return|Key_Enter/ { hit=1 }
-        hit && /attemptEnter/ { ok=1 }
-        hit && /sddm.login\(root.currentUser, password.text/ { bad=1 }
-        END { exit !(ok && !bad) }
-    ' "$qml" || fail "Enter still calls sddm.login directly"
-fi
-grep -q 'monarchy_install_sddm_resume' "$LIB/sddm.sh" \
-    || fail "sddm.sh does not install the resume helper"
-awk '/^monarchy_keep_sddm\(\)/,/^}$/' "$LIB/sddm.sh" \
-    | grep -q 'monarchy_install_sddm_resume' \
-    || fail "monarchy_keep_sddm does not install the resume helper"
-grep -q 'sddm-resume.sh' "$LIB/update.sh" \
-    || fail "check/apply does not require sddm-resume.sh"
-grep -q 'monarchy-sddm-resume.service' "$LIB/sddm.sh" \
-    || fail "sddm.sh does not install the resume unit"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -81,6 +56,11 @@ write_session() {
     cat >"$state/session-$sid"
 }
 
+# What the helper actually handed over, as a value rather than as the absence
+# of a file. "none" is the answer that matters for every case below except
+# the two where a resume is correct.
+activated() { cat "$state/activated" 2>/dev/null || echo none; }
+
 run_resume() {
     local user=$1
     : >"$state/loginctl.log"
@@ -105,7 +85,7 @@ TimestampMonotonic=100
 VTNr=2
 EOF
 run_resume king || fail "did not resume king's open session"
-[ "$(cat "$state/activated")" = 2 ] || fail "did not activate session 2"
+[ "$(activated)" = 2 ] || fail "activated $(activated), expected session 2"
 
 printf '5 1000 king seat0 43623 user tty3 no -\n' >"$state/list"
 write_session 5 <<'EOF'
@@ -121,7 +101,7 @@ EOF
 if run_resume queen >/dev/null 2>&1; then
     fail "queen with no session still resumed"
 fi
-[ ! -e "$state/activated" ] || fail "queen with no session called activate"
+[ "$(activated)" = none ] || fail "queen with no session activated $(activated)"
 
 printf '2 1000 king seat0 1152 user tty2 no -\n' >"$state/list"
 write_session 2 <<'EOF'
@@ -137,6 +117,7 @@ EOF
 if run_resume king >/dev/null 2>&1; then
     fail "closing session was resumed"
 fi
+[ "$(activated)" = none ] || fail "a closing session was activated: $(activated)"
 
 printf '2 1001 queen seat0 2000 user tty2 no -\n' >"$state/list"
 write_session 2 <<'EOF'
@@ -152,10 +133,13 @@ EOF
 if run_resume king >/dev/null 2>&1; then
     fail "resumed another user's session"
 fi
+[ "$(activated)" = none ] \
+    || fail "the greeter handed over another account's session: $(activated)"
 
 if run_resume 'king;rm -rf /' >/dev/null 2>&1; then
     fail "accepted a junk username"
 fi
+[ "$(activated)" = none ] || fail "a junk username activated $(activated)"
 
 # Oldest Wayland session wins when several exist.
 printf '2 1000 king seat0 1152 user tty2 no -\n8 1000 king seat0 9000 user tty4 no -\n' >"$state/list"
@@ -180,7 +164,7 @@ TimestampMonotonic=900
 VTNr=4
 EOF
 run_resume king || fail "did not resume when two sessions exist"
-[ "$(cat "$state/activated")" = 2 ] || fail "did not pick the oldest session"
+[ "$(activated)" = 2 ] || fail "activated $(activated), expected the oldest session 2"
 
 if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
     cat >"$stub/monarchy-sddm-resume" <<'SH'

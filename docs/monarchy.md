@@ -189,7 +189,20 @@ Upstream's `post_install`/`post_upgrade` is destructive by design, and says so i
 
 ## Apply
 
-Entry point: `install.sh`. bash, `set -e`, idempotent, sudo only where needed. One pipeline: household refresh (packages, chezmoi, hardware, ZFS), then Monarchy. `--check`, `--splash-only`, and `--only` skip the household refresh; `--update` does not.
+Entry point: `install.sh` — argument parsing and dispatch only; the household half is `lib/household.sh`. bash, `set -e`, idempotent, sudo only where needed. One pipeline: household refresh (packages, chezmoi, hardware, ZFS), then Monarchy. `--check`, `--splash-only`, and `--only` skip the household refresh; `--update` does not.
+
+A run prints one step per household stage and per Monarchy unit (`[ 7/12] sddm`), detail lines indented beneath, and an elapsed figure for any unit over five seconds. `-v` restores the timestamped `monarchy_log` form. It ends with a summary from an `EXIT` trap — so a run that dies partway still reports it — listing what changed, what was **left alone**, and what warned. `NO_COLOR` and a missing tty both drop the escapes.
+
+Two things the household half does exactly once per run. **One transaction per
+package manager**: the absent set is worked out first and handed to `pacman`,
+`paru` or `flatpak` in a single call, so a step that is usually a no-op stops
+costing forty dependency resolutions and forty screens of output. The summary
+bullet names the first six and counts the rest; the log line has them all.
+**One `chezmoi apply`**: `lib/zfs.sh` used to run a second one for the zpool
+sensor `household_chezmoi` had already written, which doubled the slowest step
+and gave a menu-driven update a second chance to hang on a prompt. It now
+checks for `~/.local/share/ksystemstats-scripts/ZFS` and restarts ksystemstats
+only when that apply actually wrote something.
 
 ```bash
 ./install.sh           # first run: household refresh, then Monarchy apply
@@ -254,7 +267,7 @@ a pacman-owned path now, so check and apply read the same tree and every
 function check reaches also runs during apply. Units whose input is not yet on
 disk return early instead.
 
-King-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, Super+Ctrl+U bind, Super+Shift+E emacsclient (replaces HEY), unbind leftover HEY calendar/compose chords, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), drop `monarchy/applications.drop` (Basecamp, HEY), `omarchy-pkg-add` of spotify, signal-desktop, cursor-bin, cursor-cli, omakade, `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland` plus `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
+King-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, Super+Ctrl+U bind, Super+Shift+E emacsclient (replaces HEY), unbind leftover HEY calendar/compose chords, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), drop `monarchy/applications.drop` (Basecamp, HEY), `omarchy-pkg-add` of `MONARCHY_SEEDED_PKGS` (spotify, signal-desktop, cursor-bin, cursor-cli, omakade), `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland` plus `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
 
 `lib/packages.sh` installs the shared set before apply. After apply or `--update` it strips competing copies (pacman emacs/bun/gh, Spotify/Discord flatpaks, curl-pipe cursor-agent, python-pipx, omarchy-emacs, AUR zoom) once `/etc/omarchy.conf` exists, so a box that has not finished apply is still usable. Zoom is the Omarchy webapp (`zoommtg://`), not AUR `zoom`.
 
@@ -263,9 +276,11 @@ King-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing
 
 ```text
 install.sh
+lib/household.sh         # packages, chezmoi, rEFInd, services, hardware, ZFS
 lib/monarchy.sh          # sources the library
 lib/monarchy/
-  common.sh              # logging, snapshot-first, layout guards
+  ui.sh                  # one voice, and the changed/left-alone/warned ledger
+  common.sh              # logging, snapshot-first, layout guards, seed ledger
   pacman.sh              # preserve CachyOS, append [omarchy]
   denylist.sh            # loads packages.deny, bin.*, migrations.deny, applications.drop,
                          #   launcher.unhides
@@ -275,7 +290,7 @@ lib/monarchy/
   switch-user.sh         # /usr/local/bin/monarchy-switch-user
   packages.sh            # filtered install, writes packages.installed
   pkgbuild.sh            # build+install the two local packages, then omarchy
-  plugins.sh             # third-party omarchy plugin clone+enable
+  plugins.sh             # third-party omarchy plugin clone, enable on first sight
   prefix.sh              # working prefix out of /usr/share/omarchy
   sessions.sh            # omarchy.desktop, AccountsService, hide stock Hyprland
   settings.sh            # omarchy-settings file tree minus settings.skip
@@ -337,21 +352,63 @@ not where to add that. The repo's `Main.qml` ships an empty list.
 fails if any appears under `lib/`, `monarchy/`, `docs/` or `tests/`. The test
 holds no names itself, so it works in a fork.
 
+### Seeding, and what apply will not undo
+
+Apply may turn on a thing that has never been on. It may not turn back on a
+thing that was on and is now off. See
+`docs/adr/0002-apply-seeds-it-does-not-reverse.md`.
+
+| What | What says the seeding already happened |
+| --- | --- |
+| Shell plugins | the directory under `~/.config/omarchy/plugins/<id>` |
+| Hyprland config, branding | the destination file (`monarchy_copy_if_missing`) |
+| systemd `--user` units | `~/.local/state/monarchy/seeded/units/<unit>` |
+| `omarchy-pkg-add` packages | `~/.local/state/monarchy/seeded/pkg/<pkg>`, or the package being installed |
+
+`--enable` in `monarchy/plugins` is honoured on the apply that clones the
+plugin and never again: `omarchy plugin disable` records itself only as absence
+from `shell.json`, so an enable on every apply overturns it every update.
+`omarchy plugin enable <id>` is the way back on. The last two rows need a
+ledger because nothing on disk distinguishes "off on purpose" from "never
+touched" — `systemctl --user is-enabled` says `disabled` for both.
+`monarchy_seed_ledger_bootstrap` records an established box as already seeded
+so the first apply after this rule arrived does not re-impose everything once.
+
+None of this reaches the bricking surface. Guards, the overlay, the session
+`Exec=`, the greeter and the lock PAM are re-imposed on every apply.
+
 ### Tests
 
-`./tests/run.sh` before any apply. No sudo, no writes under `/etc` or `/usr`:
-the tests drive the real functions against temp prefixes through
-`MONARCHY_SRC`, `MONARCHY_PATH`, `MONARCHY_INSTALL_SUDO_STUBS=0`,
-`MONARCHY_LOG` and `ZBOOK_DMI`. It also runs shellcheck over `lib/`, `tests/`,
-`hardware/` and `install.sh`, and skips that arm if shellcheck is absent.
+`./tests/run.sh` before any apply. No sudo, no network, no writes under `/etc`
+or `/usr`: the tests drive the real functions against temp prefixes and
+stubbed commands through `MONARCHY_SRC`, `MONARCHY_PATH`,
+`MONARCHY_INSTALL_SUDO_STUBS=0` and `MONARCHY_LOG`. It also runs
+`shellcheck -x` over `lib/`, `tests/`, `hardware/` and `install.sh`; a finding
+at any level fails the suite, and shellcheck is in `PACMAN_PACKAGES` because a
+skipped lint arm reads as a pass.
 
-The suite covers the bricking surface only — see `brick` in `CONTEXT.md`.
-Greeter, session desktop, lock PAM, switch-user, overlay `bin/` classification,
-the initramfs HOOKS rewrite and the ZBM cmdline. Branding, version strings,
-settings file lists are deliberately uncovered; those tests are recoverable
-from `8fcaa34^` if that judgement changes. The ZBook battery helper's
-arithmetic is covered through its `--compute` entry point: not a bricking
-surface, but a number the panel presents as fact.
+What is worth a test is `CODING_STANDARDS.md`. In short: a test earns its
+place only if the failure it catches leaves someone unable to reach a desktop,
+or does something that cannot be undone. Tests assert on what a function
+produced, never on what a source file says, and never on the absence of a
+string.
+
+Eight files remain, and each one names the failure it exists for:
+
+| Test | The failure |
+| --- | --- |
+| `test-sddm.sh` | A stock Hyprland session marked `Hidden=true` (uwsm refuses it), or a username reaching the generated greeter QML unquotable |
+| `test-sddm-resume.sh` | The greeter resuming somebody else's live session, or a query-string username reaching a shell |
+| `test-overlay.sh` | A needed command missing from `$OMARCHY_PATH/bin`, replaced by a deny stub, or an unclassified binary that drives limine |
+| `test-pkgbuild.sh` | A bootloader package landing; overwrite planning following the legacy symlink out of the install root |
+| `test-splash.sh` | Plymouth before zfs with no keyfile in the initramfs: a splash screen that cannot be typed into |
+| `test-migrations.sh` | A denied migration still offered by `omarchy-migrate` |
+| `test-boot.sh` | A kernel or ZBM command line that does not boot |
+| `test-no-names.sh` | A household member's name committed to a public repository |
+
+Everything else is uncovered on purpose. Branding, themes, the bar, battery
+arithmetic, launcher hides, plugin placement, switch-user, logging, the shape
+of `install.sh` — all recoverable from `c4214b4^` if that judgement changes.
 
 ### Guards
 

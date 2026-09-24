@@ -6,7 +6,7 @@
 agents_materialize_home() {
     local src tmp
     if [ -L "$HOME/.agents" ]; then
-        echo "Replacing ~/.agents repo symlink with a directory"
+        monarchy_changed "replaced the ~/.agents repo symlink with a directory"
         src=$(readlink -f "$HOME/.agents")
         tmp=$(mktemp -d)
         if [ -d "$src/skills" ]; then
@@ -27,16 +27,20 @@ agents_materialize_home() {
 agents_restore_skills() {
     local lock=$HOME/.agents/.skill-lock.json
     if [ ! -f "$lock" ]; then
-        echo "  no $lock, skipping skill restore"
+        monarchy_log "no $lock; skill restore skipped"
         return 0
     fi
     if ! command -v npx >/dev/null 2>&1; then
-        echo "  npx not found, skip skill restore (install node, re-run)"
+        monarchy_warn "npx not found; skill restore skipped (install node, re-run)"
         return 0
     fi
 
-    echo "Restoring global skills from lock..."
-    python3 - "$lock" "$HOME/.agents/skills" <<'PY' | while IFS= read -r line; do
+    monarchy_log "restoring global skills from $lock"
+    # The plan is captured before the loop rather than piped into it. A pipe
+    # runs the loop in a subshell, where monarchy_changed appends to a copy of
+    # the ledger that dies with it, and the summary loses every restore.
+    local plan
+    plan=$(python3 - "$lock" "$HOME/.agents/skills" <<'PY'
 import json, sys
 from pathlib import Path
 lock = json.loads(Path(sys.argv[1]).read_text())
@@ -52,11 +56,13 @@ for name, entry in lock.get("skills", {}).items():
 for source, names in sorted(by_source.items()):
     print(source + "\t" + " ".join(sorted(names)))
 PY
+)
+    while IFS= read -r line; do
         [ -n "$line" ] || continue
         source=${line%%$'\t'*}
         names=${line#*$'\t'}
-        echo "  npx skills add $source -g -y --skill $names"
         # shellcheck disable=SC2086
         npx --yes skills add "$source" -g -y --skill $names
-    done
+        monarchy_changed "restored skills from $source: $names"
+    done <<<"$plan"
 }

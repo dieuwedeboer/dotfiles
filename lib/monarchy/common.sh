@@ -2,6 +2,11 @@
 # Shared logging, paths, and guards. Sourced from install.sh via lib/monarchy.sh.
 
 monarchy_lib_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# The one voice every line below speaks in. Sourced here rather than only from
+# lib/monarchy.sh so a test that pulls in this file alone still formats and
+# still collects warnings; ui.sh loads once however many callers ask.
+# shellcheck source=ui.sh
+source "$monarchy_lib_dir/ui.sh"
 MONARCHY_DOTFILES=$(cd "$monarchy_lib_dir/../.." && pwd)
 MONARCHY_MISC="${MONARCHY_MISC:-$MONARCHY_DOTFILES/monarchy}"
 MONARCHY_SETUP="${MONARCHY_SETUP:-$MONARCHY_DOTFILES/install.sh}"
@@ -34,10 +39,24 @@ MONARCHY_MKINITCPIO_CONF="${MONARCHY_MKINITCPIO_CONF:-/etc/mkinitcpio.conf}"
 # for an existing unwritable file, where the append cannot open the file at
 # all. The parent only matters when the file is not there yet. And the
 # `2>/dev/null` sat on `[`, which writes nothing to stderr, so it hid nothing.
+# The durable copy keeps its timestamp; the copy a person reads does not.
+# A screenful of ISO-8601 in front of every sentence is what made the three
+# voices unreadable, and the file is where you go when you need the clock.
+#
+# A line that starts `warning:` also lands in the ledger, so the nineteen
+# call sites that already wrote that prefix get a summary entry without any
+# of them having to call a second function.
 monarchy_log() {
     local line
     line="$(date -Iseconds) $*"
-    echo "$line"
+    case "$*" in
+        warning:*) monarchy_ui_note_warning "$*" ;;
+    esac
+    if [ "${VERBOSE:-0}" = 1 ]; then
+        echo "$line"
+    else
+        printf '      %s%s%s\n' "${MONARCHY_UI_DIM:-}" "$*" "${MONARCHY_UI_OFF:-}"
+    fi
     if [ -w "$MONARCHY_LOG" ] \
         || { [ ! -e "$MONARCHY_LOG" ] && [ -w "$(dirname "$MONARCHY_LOG")" ]; }; then
         printf '%s\n' "$line" >>"$MONARCHY_LOG" 2>/dev/null && return 0
@@ -65,10 +84,14 @@ monarchy_log() {
 monarchy_ensure_log() {
     [ -d "$(dirname "$MONARCHY_LOG")" ] || return 0
     [ ! -w "$MONARCHY_LOG" ] || return 0
-    monarchy_sudo touch "$MONARCHY_LOG" \
+    # if/else rather than a && b || c: any one of the three failing has to
+    # reach the warning, and the chain form reads as if-then-else when it is
+    # not one.
+    if ! { monarchy_sudo touch "$MONARCHY_LOG" \
         && monarchy_sudo chown "$(id -u):$(id -g)" "$MONARCHY_LOG" \
-        && monarchy_sudo chmod 0644 "$MONARCHY_LOG" \
-        || monarchy_log "warning: cannot write $MONARCHY_LOG; logging to journald only"
+        && monarchy_sudo chmod 0644 "$MONARCHY_LOG"; }; then
+        monarchy_log "warning: cannot write $MONARCHY_LOG; logging to journald only"
+    fi
     return 0
 }
 
@@ -296,4 +319,91 @@ monarchy_keep_family_mime() {
         monarchy_die "Omarchy mimeapps landed in /usr/share/applications/mimeapps.list"
     fi
     return 0
+}
+
+# --- the seed ledger ------------------------------------------------------
+#
+# Apply seeds. It may turn on a thing that has never been on; it may not turn
+# back on a thing that was on and is now off. See
+# docs/adr/0002-apply-seeds-it-does-not-reverse.md.
+#
+# Most of the user unit needs no ledger for this, because the thing it would
+# create is its own marker: monarchy_copy_if_missing looks at the destination,
+# and a plugin directory under ~/.config/omarchy/plugins says the plugin has
+# already been seeded. Two cases have no such marker, because "off" and "never
+# touched" are the same state on disk:
+#
+#   units  a systemd --user unit reports `disabled` whether the operator
+#          disabled it or it has simply never been enabled
+#   pkg    an absent package was either never installed or removed on purpose
+#
+# For those the ledger is the marker. It lives in the user's state directory,
+# next to the migration markers Omarchy itself keeps, because which widgets
+# and packages this person wants is a fact about this account -- not about
+# this repo, which holds only what each role gets.
+# The two inventories the ledger governs, named here rather than inline at
+# their call sites so the bootstrap below and the seeding itself cannot drift
+# into disagreeing about what a seeded box has had done to it.
+#
+# Units: the Omarchy user units a fresh account gets switched on once. A unit
+# upstream adds later is not in this list, gets no bootstrap marker, and so
+# still gets its one seeding on the next apply.
+MONARCHY_SEEDED_UNITS=(
+    bt-agent.service
+    omarchy-recover-internal-monitor.service
+    omarchy-sleep-lock.service
+    omarchy-migrate-notify.service
+    omarchy-fcitx5.service
+    omarchy-crash-watch.service
+)
+
+# Packages installed through omarchy-pkg-add on a fresh account. Leaf
+# packages from omarchy-base.packages are not here: those are pacman's, and
+# monarchy_install_packages owns that list.
+MONARCHY_SEEDED_PKGS=(
+    spotify
+    signal-desktop
+    cursor-bin
+    cursor-cli
+    omakade
+)
+
+monarchy_seed_dir() {
+    printf '%s\n' "$HOME/.local/state/monarchy/seeded/${1:?seed kind is required}"
+}
+
+monarchy_seeded() {
+    local kind=$1 name=$2
+    [ -e "$(monarchy_seed_dir "$kind")/$name" ]
+}
+
+monarchy_mark_seeded() {
+    local kind=$1 name=$2 dir
+    dir=$(monarchy_seed_dir "$kind")
+    mkdir -p "$dir"
+    : >"$dir/$name"
+}
+
+# A box that has already been through user setup has had every seeding this
+# ledger governs done to it, long before the ledger existed. Without this it
+# would get exactly one more unwanted re-impose -- the disabled unit switched
+# back on, the removed package reinstalled -- and only then start behaving.
+#
+# The signal is Omarchy's own first-run marker, which monarchy_mark_first_run_done
+# writes at the end of every user apply. Ledger absent and that marker present
+# means an established box, so everything is recorded as seeded without
+# anything being enabled or installed to record it.
+monarchy_seed_ledger_bootstrap() {
+    local root="$HOME/.local/state/monarchy/seeded"
+    local first_run="$HOME/.local/state/omarchy/first-run-user"
+    [ ! -d "$root" ] || return 0
+    [ -f "$first_run" ] || return 0
+    local name
+    for name in "${MONARCHY_SEEDED_UNITS[@]}"; do
+        monarchy_mark_seeded units "$name"
+    done
+    for name in "${MONARCHY_SEEDED_PKGS[@]}"; do
+        monarchy_mark_seeded pkg "$name"
+    done
+    monarchy_log "recorded an established box as already seeded; nothing re-imposed"
 }

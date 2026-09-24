@@ -30,6 +30,9 @@ PACMAN_PACKAGES=(
     extra-cmake-modules
     aws-cli-v2
     glab
+    # tests/run.sh lints lib/, tests/, hardware/ and install.sh with this, and
+    # skips that arm when it is absent -- which reads as a pass.
+    shellcheck
 )
 
 AUR_PACKAGES=(
@@ -81,45 +84,57 @@ RETIRED_PACMAN=(
     zoom
 )
 
+# Already installed is the ordinary case and says nothing. What a reader
+# wants from a package step is the handful that were not there a minute ago,
+# and the summary collects exactly those.
+#
+# One transaction per manager, not one per package. Installing forty packages
+# forty times over meant forty dependency resolutions, forty download batches
+# and forty screens of pacman output for a step that is usually a no-op. The
+# absent set is worked out first and handed over in a single call.
 packages_install() {
-    echo "=== Installing pacman packages ==="
-    local pkg
-    for pkg in "${PACMAN_PACKAGES[@]}"; do
-        if pacman -Q "$pkg" &> /dev/null; then
-            echo "  $pkg already installed"
-        else
-            echo "  Installing $pkg..."
-            sudo pacman -S --noconfirm "$pkg"
-        fi
-    done
+    local pkg installed
+    local -a missing=()
 
-    echo "=== Installing AUR packages ==="
-    if command -v paru &> /dev/null; then
-        for pkg in "${AUR_PACKAGES[@]}"; do
-            if paru -Q "$pkg" &> /dev/null; then
-                echo "  $pkg already installed"
-            else
-                echo "  Installing $pkg..."
-                paru -S --noconfirm "$pkg"
-            fi
-        done
-    else
-        echo "  paru not found, skipping AUR packages"
+    monarchy_step "pacman packages"
+    for pkg in "${PACMAN_PACKAGES[@]}"; do
+        pacman -Q "$pkg" &> /dev/null || missing+=("$pkg")
+    done
+    if [ "${#missing[@]}" -gt 0 ]; then
+        monarchy_sudo pacman -S --noconfirm "${missing[@]}"
+        monarchy_changed_many installed "pacman packages" "${missing[@]}"
     fi
 
-    echo "=== Installing flatpak packages ==="
-    for pkg in "${FLATPAK_PACKAGES[@]}"; do
-        if flatpak list --app | grep -q "$pkg"; then
-            echo "  $pkg already installed"
-        else
-            echo "  Installing $pkg..."
-            flatpak install -y "$pkg"
+    monarchy_step "AUR packages"
+    if command -v paru &> /dev/null; then
+        missing=()
+        for pkg in "${AUR_PACKAGES[@]}"; do
+            paru -Q "$pkg" &> /dev/null || missing+=("$pkg")
+        done
+        if [ "${#missing[@]}" -gt 0 ]; then
+            paru -S --noconfirm "${missing[@]}"
+            monarchy_changed_many installed "AUR packages" "${missing[@]}"
         fi
-    done
+    else
+        monarchy_warn "paru not found; AUR packages skipped"
+    fi
 
-    echo "=== Uninstalling unwanted packages ==="
+    monarchy_step "flatpak packages"
+    # One `flatpak list`, not one per name: it is the slow part of this step.
+    installed=$(flatpak list --app --columns=application 2>/dev/null || true)
+    missing=()
+    for pkg in "${FLATPAK_PACKAGES[@]}"; do
+        grep -Fqx "$pkg" <<<"$installed" || missing+=("$pkg")
+    done
+    if [ "${#missing[@]}" -gt 0 ]; then
+        flatpak install -y "${missing[@]}"
+        monarchy_changed_many installed "flatpak packages" "${missing[@]}"
+    fi
+
+    monarchy_step "unwanted packages"
     if pacman -Q cachyos-wallpapers &> /dev/null; then
-        sudo pacman -R --noconfirm cachyos-wallpapers
+        monarchy_sudo pacman -R --noconfirm cachyos-wallpapers
+        monarchy_changed "removed cachyos-wallpapers"
     fi
 
     # Curl-pipe grok used ~/.grok/bin and stole the `agent` name from Cursor.
@@ -127,8 +142,8 @@ packages_install() {
         grok_target=$(readlink -f "$HOME/.local/bin/grok" 2>/dev/null || true)
         case "$grok_target" in
             */.grok/*)
-                echo "  removing curl-pipe grok symlink"
                 rm -f "$HOME/.local/bin/grok"
+                monarchy_changed "removed the curl-pipe grok symlink"
                 ;;
         esac
     fi
@@ -136,8 +151,8 @@ packages_install() {
         agent_target=$(readlink -f "$HOME/.local/bin/agent" 2>/dev/null || true)
         case "$agent_target" in
             */.grok/*)
-                echo "  removing grok-as-agent symlink"
                 rm -f "$HOME/.local/bin/agent"
+                monarchy_changed "removed the grok-as-agent symlink"
                 ;;
         esac
     fi
@@ -152,15 +167,15 @@ packages_link_omarchy_share() {
     local link=/usr/share/omarchy
     if [ -L "$link" ]; then
         [ "$(readlink "$link")" = "$MONARCHY_PATH" ] && return 0
-        echo "  warning: $link points elsewhere, leaving it" >&2
+        monarchy_warn "$link points elsewhere, leaving it"
         return 1
     fi
     if [ -e "$link" ]; then
-        echo "  warning: $link is not a symlink, leaving it" >&2
+        monarchy_warn "$link is not a symlink, leaving it"
         return 1
     fi
-    echo "  linking $link -> $MONARCHY_PATH"
     monarchy_sudo ln -sT "$MONARCHY_PATH" "$link"
+    monarchy_changed "linked $link -> $MONARCHY_PATH"
 }
 
 # Runs after apply, not with the rest of the packages: the version file and
@@ -168,33 +183,34 @@ packages_link_omarchy_share() {
 packages_install_omarchy_aur() {
     [ "${#OMARCHY_AUR_PACKAGES[@]}" -gt 0 ] || return 0
     if [ "${MONARCHY_NO_PACKAGES:-0}" = 1 ]; then
-        echo "  skipping Omarchy AUR packages (--no-packages)"
+        monarchy_log "Omarchy AUR packages skipped (--no-packages)"
         return 0
     fi
     if ! command -v paru &> /dev/null; then
-        echo "  paru not found, skipping Omarchy AUR packages"
+        monarchy_warn "paru not found; Omarchy AUR packages skipped"
         return 0
     fi
 
     local version
     version=$(cat "$MONARCHY_PATH/version" 2>/dev/null || true)
     if [ -z "$version" ]; then
-        echo "  no $MONARCHY_PATH/version, skipping Omarchy AUR packages"
+        monarchy_log "no $MONARCHY_PATH/version; Omarchy AUR packages skipped"
         return 0
     fi
     packages_link_omarchy_share || return 0
 
-    echo "=== Installing Omarchy AUR packages ==="
+    monarchy_step "Omarchy AUR packages"
     local pkg
+    local -a missing=()
     for pkg in "${OMARCHY_AUR_PACKAGES[@]}"; do
-        if paru -Q "$pkg" &> /dev/null; then
-            echo "  $pkg already installed"
-        else
-            echo "  Installing $pkg (assuming omarchy=$version)..."
-            paru -S --noconfirm "$pkg" --assume-installed "omarchy=$version" \
-                || echo "  warning: paru -S $pkg failed"
-        fi
+        paru -Q "$pkg" &> /dev/null || missing+=("$pkg")
     done
+    [ "${#missing[@]}" -gt 0 ] || return 0
+    if paru -S --noconfirm "${missing[@]}" --assume-installed "omarchy=$version"; then
+        monarchy_changed_many installed "Omarchy AUR packages" "${missing[@]}"
+    else
+        monarchy_warn "paru -S failed for ${missing[*]}"
+    fi
 }
 
 packages_strip_curl_pipe_cursor() {
@@ -203,9 +219,9 @@ packages_strip_curl_pipe_cursor() {
         target=$(readlink -f "$HOME/.local/bin/cursor-agent" 2>/dev/null || true)
         case "$target" in
             */.local/share/cursor-agent/*)
-                echo "  removing curl-pipe cursor-agent"
                 rm -f "$HOME/.local/bin/cursor-agent"
                 rm -rf "$HOME/.local/share/cursor-agent"
+                monarchy_changed "removed the curl-pipe cursor-agent"
                 ;;
         esac
     fi
@@ -215,7 +231,7 @@ packages_strip_omarchy_owned() {
     local pkg
     local -a remove=()
     if [ ! -f /etc/omarchy.conf ]; then
-        echo "  leaving emacs/bun/gh/spotify/discord/cursor-agent/pipx until Monarchy apply writes /etc/omarchy.conf"
+        monarchy_log "leaving emacs/bun/gh/spotify/discord/cursor-agent/pipx until Monarchy apply writes /etc/omarchy.conf"
         return 0
     fi
 
@@ -225,21 +241,22 @@ packages_strip_omarchy_owned() {
         fi
     done
     if [ "${#remove[@]}" -gt 0 ]; then
-        echo "=== Removing packages Omarchy now owns ==="
-        for pkg in "${remove[@]}"; do
-            echo "  removing $pkg (Omarchy/mise owns this)"
-        done
-        monarchy_sudo pacman -R --noconfirm "${remove[@]}" \
-            || echo "  warning: pacman -R failed for ${remove[*]}"
+        monarchy_step "packages Omarchy now owns"
+        if monarchy_sudo pacman -R --noconfirm "${remove[@]}"; then
+            monarchy_changed_many removed "packages Omarchy now owns" "${remove[@]}"
+        else
+            monarchy_warn "pacman -R failed for ${remove[*]}"
+        fi
     fi
 
     if command -v flatpak &> /dev/null; then
         for pkg in "${OMARCHY_OWNED_FLATPAKS[@]}"; do
             if flatpak list --app | grep -q "$pkg"; then
-                echo "  removing flatpak $pkg (Omarchy owns this)"
-                if ! flatpak uninstall -y "$pkg" 2>/dev/null; then
-                    monarchy_sudo flatpak uninstall -y "$pkg" \
-                        || echo "  warning: flatpak uninstall failed for $pkg"
+                if flatpak uninstall -y "$pkg" 2>/dev/null \
+                    || monarchy_sudo flatpak uninstall -y "$pkg"; then
+                    monarchy_changed "removed flatpak $pkg (Omarchy owns it)"
+                else
+                    monarchy_warn "flatpak uninstall failed for $pkg"
                 fi
             fi
         done
@@ -254,15 +271,15 @@ packages_strip_omarchy_owned() {
         fi
     done
     if [ "${#remove[@]}" -gt 0 ]; then
-        echo "=== Removing retired household packages ==="
-        for pkg in "${remove[@]}"; do
-            echo "  removing $pkg"
-        done
-        monarchy_sudo pacman -R --noconfirm "${remove[@]}" \
-            || echo "  warning: pacman -R failed for ${remove[*]}"
+        monarchy_step "retired household packages"
+        if monarchy_sudo pacman -R --noconfirm "${remove[@]}"; then
+            monarchy_changed_many removed "retired household packages" "${remove[@]}"
+        else
+            monarchy_warn "pacman -R failed for ${remove[*]}"
+        fi
     fi
     if [ -d "$HOME/.local/share/pipx/venvs" ] && \
         [ -n "$(ls -A "$HOME/.local/share/pipx/venvs" 2>/dev/null)" ]; then
-        echo "  leftover pipx venvs in $HOME/.local/share/pipx/venvs (not removing)"
+        monarchy_log "leftover pipx venvs in $HOME/.local/share/pipx/venvs (not removing)"
     fi
 }

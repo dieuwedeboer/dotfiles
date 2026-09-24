@@ -48,6 +48,11 @@ usage: install.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
   omarchy-update (Omarchy menu) wraps monarchy-update. That path has no
   terminal, so chezmoi apply is skipped rather than hanging on a prompt.
 
+  Every run ends with a summary: what changed, what was left alone, what
+  warned. Left alone is a decision, not a failure -- apply seeds, and never
+  switches back on what was switched off on this box. -v restores the
+  timestamped log lines; NO_COLOR drops the escapes.
+
   MONARCHY_TRUST_OMARCHY_KEY=1 skips the packaging-key prompt.
 EOF
             exit 0
@@ -78,6 +83,14 @@ fi
 source "$LIB_DIR/monarchy.sh"
 # shellcheck source=lib/packages.sh
 source "$LIB_DIR/packages.sh"
+# shellcheck source=lib/household.sh
+source "$LIB_DIR/household.sh"
+
+# Printed from a trap, so a run that dies partway still says what it managed
+# to change and what it deliberately left alone before it stopped. That is the
+# half of the report that used to be missing entirely: silence read the same
+# whether monarchy had looked at something and declined, or never looked.
+trap monarchy_summary EXIT
 
 monarchy_cli() {
     case "$1" in
@@ -100,117 +113,6 @@ monarchy_cli() {
     esac
 }
 
-# Household packages, chezmoi-managed dotfiles, rEFInd, services, hardware,
-# ZFS. Idempotent. Runs on first install and on every --update so the two
-# entry points cannot drift. --only skips it: that flag is for iterating on
-# one overlay unit, not for refreshing the box.
-#
-# chezmoi apply prompts when a target has been modified. The Omarchy menu
-# wraps omarchy-update with no terminal, so that path reports drift and
-# continues rather than hanging. An interactive ./install.sh or a hand-run
-# monarchy-update has a tty and just applies. See ADR 0001.
-household_refresh() {
-    echo "Installing system packages..."
-    packages_install
-
-    # shellcheck source=lib/agents.sh
-    source "$LIB_DIR/agents.sh"
-    echo "=== Agent home (~/.agents) ==="
-    agents_materialize_home
-
-    echo "=== Applying dotfiles via chezmoi ==="
-    if [ ! -L "$HOME/.local/share/chezmoi" ]; then
-        if [ -d "$HOME/.local/share/chezmoi" ]; then
-            echo "Moving existing chezmoi to ~/.local/share/chezmoi.bk..."
-            mv "$HOME/.local/share/chezmoi" "$HOME/.local/share/chezmoi.bk"
-        fi
-        echo "Linking dotfiles via chezmoi..."
-        ln -s "$DOTFILES_DIR/chezmoi" "$HOME/.local/share/chezmoi"
-    else
-        echo "Chezmoi already linked."
-    fi
-
-    if command -v chezmoi &> /dev/null; then
-        if monarchy_can_prompt; then
-            echo "Applying chezmoi..."
-            chezmoi apply
-        else
-            local status
-            status=$(chezmoi status 2>/dev/null || true)
-            if [ -n "$status" ]; then
-                echo "chezmoi has drifted (no terminal to apply). Run: chezmoi apply"
-            else
-                echo "Chezmoi already applied (non-interactive)."
-            fi
-        fi
-    else
-        echo "Warning: chezmoi not installed, skipped dotfiles setup"
-    fi
-
-    echo "=== Restoring agent skills from lock ==="
-    agents_restore_skills
-
-    echo "=== Configuring rEFInd theme ==="
-    "$LIB_DIR/refind.sh"
-
-    echo "=== Enabling services ==="
-    if command -v systemctl &> /dev/null; then
-        if ! systemctl is-enabled docker.socket &> /dev/null; then
-            sudo systemctl enable docker.socket
-        else
-            echo "  docker.socket already enabled"
-        fi
-
-        if ! systemctl is-enabled sshd &> /dev/null; then
-            sudo systemctl enable sshd
-        else
-            echo "  sshd already enabled"
-        fi
-    fi
-
-    echo "=== Configuring user groups ==="
-    if command -v getent &> /dev/null; then
-        if ! getent group docker | grep -q "$USER"; then
-            sudo usermod -aG docker "$USER"
-        else
-            echo "  user already in docker group"
-        fi
-    fi
-
-    echo "=== Configuring firewall ==="
-    # shellcheck source=lib/ufw.sh
-    source "$LIB_DIR/ufw.sh"
-    if command -v ufw &> /dev/null; then
-        ufw_apply_rules
-        echo "  rules written; not toggling enable/disable (ufw enable|disable persists)"
-    else
-        echo "  ufw not installed, skipping"
-    fi
-
-    echo "=== System tweaks ==="
-    if [ -f /etc/mkinitcpio.conf ]; then
-        if grep -q "^HOOKS.*fsck" /etc/mkinitcpio.conf; then
-            sudo sed -i '/^HOOKS/s/fsck//' /etc/mkinitcpio.conf
-        else
-            echo "  fsck hook already removed"
-        fi
-    fi
-
-    if [ -f /etc/vconsole.conf ]; then
-        if ! grep -q "KEYMAP=en" /etc/vconsole.conf; then
-            echo "KEYMAP=en" | sudo tee /etc/vconsole.conf
-        else
-            echo "  vconsole.conf already configured"
-        fi
-    fi
-
-    echo "=== Hardware quirks ==="
-    "$DOTFILES_DIR/hardware/apply.sh"
-
-    echo "=== Configuring ZFS monitoring and snapshots ==="
-    "$LIB_DIR/zfs.sh"
-}
-
 case "$MODE" in
     check|splash)
         monarchy_cli "$MODE"
@@ -218,12 +120,11 @@ case "$MODE" in
         ;;
 esac
 
-echo "=== Welcome back, commander ==="
+printf '%sWelcome back, commander.%s\n' "$MONARCHY_UI_BOLD" "$MONARCHY_UI_OFF"
 if [ -z "${MONARCHY_ONLY:-}" ]; then
     household_refresh
 fi
 
-echo "=== Monarchy (Omarchy session on this CachyOS box) ==="
 case "$MODE" in
     update) monarchy_cli update ;;
     apply|full) monarchy_cli apply ;;
@@ -233,6 +134,6 @@ case "$MODE" in
         ;;
 esac
 
-echo "=== System installation complete ==="
-echo "Reboot so SDDM is the greeter. Plasma stays the family default."
-echo "The king's user defaults to Omarchy. See docs/monarchy-install.md"
+monarchy_section "Done"
+printf '  Reboot so SDDM is the greeter. Plasma stays the family default.\n'
+printf '  The king'"'"'s user defaults to Omarchy. See docs/monarchy-install.md\n' 

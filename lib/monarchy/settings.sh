@@ -122,15 +122,35 @@ monarchy_run_omarchy_config() {
     monarchy_enable_omarchy_services
 }
 
+# One unit, switched on once. `systemctl --user is-enabled` answers
+# `disabled` both for a unit the operator turned off and for one that has
+# never been on, so the state on disk cannot tell them apart and the ledger
+# has to. See the seed ledger in common.sh.
+#
+# The unit has to exist before it is recorded: a unit a later Omarchy release
+# adds gets no marker now, so it still gets its one seeding when it arrives.
+monarchy_seed_user_unit() {
+    local unit=$1
+    systemctl --user list-unit-files "$unit" >/dev/null 2>&1 || return 0
+    if monarchy_seeded units "$unit"; then
+        if [ "$(systemctl --user is-enabled "$unit" 2>/dev/null)" = disabled ]; then
+            monarchy_left_alone "$unit — switched off by hand"
+        fi
+        return 0
+    fi
+    if systemctl --user enable --now "$unit" >/dev/null 2>&1; then
+        monarchy_mark_seeded units "$unit"
+        monarchy_changed "enabled $unit"
+    else
+        monarchy_warn "could not enable $unit"
+    fi
+}
+
 monarchy_enable_user_units() {
     command -v systemctl >/dev/null 2>&1 || return 0
     systemctl --user daemon-reload >/dev/null 2>&1 || true
-    systemctl --user enable --now \
-        bt-agent.service \
-        omarchy-recover-internal-monitor.service \
-        omarchy-sleep-lock.service \
-        omarchy-migrate-notify.service \
-        omarchy-fcitx5.service \
-        omarchy-crash-watch.service >/dev/null 2>&1 || true
-    monarchy_log "enabled Omarchy user units (missing units ignored)"
+    local unit
+    for unit in "${MONARCHY_SEEDED_UNITS[@]}"; do
+        monarchy_seed_user_unit "$unit"
+    done
 }

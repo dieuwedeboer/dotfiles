@@ -289,11 +289,26 @@ monarchy_assert_only_valid() {
         || monarchy_die "--only=$MONARCHY_ONLY is not a unit. Units: ${MONARCHY_UNITS[*]}"
 }
 
+# How many units this run will walk, for the progress counter. Guards are not
+# counted: they are the floor every run stands on, not a step --only can drop,
+# and they run before the loop rather than inside it.
+monarchy_unit_total() {
+    local u n=0
+    for u in "${MONARCHY_UNITS[@]}"; do
+        [ "$u" = guards ] && continue
+        [ -z "${MONARCHY_ONLY:-}" ] || [ "$u" = "$MONARCHY_ONLY" ] || continue
+        n=$((n + 1))
+    done
+    printf '%s\n' "$n"
+}
+
 monarchy_check() {
-    local u
+    local u n=0 total
     monarchy_assert_only_valid
     monarchy_load_lock
     monarchy_load_inventories
+    total=$(monarchy_unit_total)
+    monarchy_section "Monarchy — check${MONARCHY_ONLY:+ (only $MONARCHY_ONLY)}"
     # There is no clone to fall back on any more: MONARCHY_SRC is a
     # pacman-owned path, so a dry run either has the omarchy package or the
     # units that need it return early.
@@ -303,6 +318,8 @@ monarchy_check() {
     for u in "${MONARCHY_UNITS[@]}"; do
         [ "$u" = guards ] && continue
         [ -z "${MONARCHY_ONLY:-}" ] || [ "$u" = "$MONARCHY_ONLY" ] || continue
+        n=$((n + 1))
+        monarchy_step "$u" "$n" "$total"
         "monarchy_${u}_check"
     done
     monarchy_log "check passed${MONARCHY_ONLY:+ (only $MONARCHY_ONLY)}"
@@ -324,7 +341,7 @@ monarchy_apply_lock() {
 }
 
 monarchy_apply() {
-    local u
+    local u n=0 total started
     monarchy_ensure_log
     monarchy_assert_only_valid
     monarchy_load_lock
@@ -341,12 +358,18 @@ monarchy_apply() {
     # Host preconditions live in the guards unit, whose apply is a no-op, so
     # they still run before anything is touched.
     # Same floor for apply: the guards run whatever --only says.
+    total=$(monarchy_unit_total)
+    monarchy_section "Monarchy${MONARCHY_ONLY:+ — only $MONARCHY_ONLY}"
     monarchy_guards_check
     for u in "${MONARCHY_UNITS[@]}"; do
         [ "$u" = guards ] && continue
         [ -z "${MONARCHY_ONLY:-}" ] || [ "$u" = "$MONARCHY_ONLY" ] || continue
+        n=$((n + 1))
+        started=$SECONDS
+        monarchy_step "$u" "$n" "$total"
         "monarchy_${u}_apply"
         "monarchy_${u}_check"
+        monarchy_step_took "$((SECONDS - started))"
     done
     # After every unit, not inside the overlay one: the shell is restarted
     # once, against a tree that has finished settling, rather than mid-apply.

@@ -36,16 +36,18 @@ STATE="$HOME/.local/state/omarchy/migrations"
 for m in 1000000001.sh 1000000002.sh 1000000003.sh; do
     printf 'echo %s\n' "$m" >"$MONARCHY_SRC/migrations/$m"
 done
+# shellcheck disable=SC2034  # read by monarchy_mark_denied_migrations
 MONARCHY_MIGRATE_DENY=(1000000001.sh 1000000003.sh 1999999999.sh)
 
 monarchy_mark_denied_migrations >/dev/null
 
-[ -e "$STATE/1000000001.sh" ] || fail "denied migration 1000000001.sh was not marked complete"
-[ -e "$STATE/1000000003.sh" ] || fail "denied migration 1000000003.sh was not marked complete"
-[ ! -e "$STATE/1000000002.sh" ] \
-    || fail "1000000002.sh is not denied; marking it would skip a migration nobody classified"
-[ ! -e "$STATE/1999999999.sh" ] \
-    || fail "marked a deny row this tree does not ship; a stale row must stay visible to monarchy_check_migrations"
+# The whole marker set as one value. 1000000002.sh is shipped and not denied,
+# so marking it would skip a migration nobody classified; 1999999999.sh is
+# denied and not shipped, and marking that would hide a stale deny row from
+# monarchy_check_migrations. Both show up here as the set being wrong.
+markers=$(cd "$STATE" && printf '%s\n' * | LC_ALL=C sort | paste -sd' ' -)
+[ "$markers" = "1000000001.sh 1000000003.sh" ] \
+    || fail "marked migrations are: $markers"
 
 # The postcondition passes once the apply has run...
 monarchy_assert_denied_migrations_marked || fail "assert failed on a correctly marked tree"

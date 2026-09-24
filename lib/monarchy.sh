@@ -2,6 +2,10 @@
 # Load the Monarchy library. Sourced from install.sh.
 
 _monarchy_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/monarchy" && pwd)
+# First: every line below speaks in the voice it sets, and monarchy_log
+# formats its stdout copy with its escapes.
+# shellcheck source=monarchy/ui.sh
+source "$_monarchy_dir/ui.sh"
 # shellcheck source=monarchy/common.sh
 source "$_monarchy_dir/common.sh"
 # shellcheck source=monarchy/users.sh

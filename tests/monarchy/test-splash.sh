@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-# Pure HOOKS rewrite tests. No sudo, no mkinitcpio.
+# Where plymouth sits in the initramfs HOOKS line, and when that is allowed.
+#
+# This is a boot-or-not question, not a cosmetic one. Plymouth before zfs on a
+# box whose pool key is not in the initramfs means nothing is left to prompt
+# for the passphrase, and the machine stops at a splash screen that cannot be
+# typed into. Everything else about the splash -- which theme, which logo --
+# is cosmetic and uncovered. See CODING_STANDARDS.md.
+#
+# Pure string arithmetic plus one fixture mkinitcpio.conf. No sudo, no
+# mkinitcpio.
 set -euo pipefail
 
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -60,15 +69,5 @@ fi
 printf 'FILES=(%s)\nHOOKS=(base zfs filesystems)\n' "$key" >"$conf"
 MONARCHY_ZFS_KEYFILE=$key monarchy_zfs_keyfile_in_initramfs "$conf" \
     || fail "keyfile in FILES should count"
-
-retain="$MISC/plymouth-quit-retain.conf"
-[ -f "$retain" ] || fail "missing $retain"
-grep -q 'quit --retain-splash' "$retain" || fail "retain drop-in missing --retain-splash"
-grep -q '^ExecStart=$' "$retain" || fail "retain drop-in must clear ExecStart first"
-
-grep -q 'monarchy_splash_retain' "$LIB/splash.sh" \
-    || fail "splash.sh does not install retain-splash"
-grep -q 'monarchy_plymouth_side' "$LIB/splash.sh" \
-    || fail "splash.sh does not choose plymouth side from keyfile"
 
 echo "splash hook tests passed"
