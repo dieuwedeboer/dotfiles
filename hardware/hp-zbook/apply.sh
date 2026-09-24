@@ -149,12 +149,12 @@ install_file() {
 }
 
 if [ "${1:-}" = "--check" ]; then
-    echo "=== ZBook power probe (read-only) ==="
+    printf '      ZBook power probe (read-only)\n'
     zbook_print_probe
     exit 0
 fi
 
-echo "=== ZBook-specific setup ==="
+printf '      ZBook-specific setup\n'
 zbook_print_probe
 
 if ! zbook_detected; then
@@ -188,7 +188,6 @@ echo "Installing UWSM env for Omarchy battery path..."
 sudo mkdir -p "$(dirname "$UWSM_ENV")"
 install_file "$HW_DIR/20-zbook-battery" "$UWSM_ENV" 644
 
-echo "=== ZBook setup complete ==="
 echo "Log out of Omarchy and back in so UWSM picks up OMARCHY_POWER_SUPPLY_PATH."
 echo "omarchy-restart-shell is not enough on the first apply."
 echo "Immediate check: OMARCHY_POWER_SUPPLY_PATH=/run/zbook-battery/power_supply omarchy-battery-status"

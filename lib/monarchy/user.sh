@@ -194,7 +194,7 @@ monarchy_omarchy_pkg_add() {
         return 0
     fi
     if monarchy_seeded pkg "$pkg"; then
-        monarchy_left_alone "$pkg — removed by hand"
+        monarchy_left_alone "$pkg — not installed; add it with: omarchy-pkg-add $pkg"
         return 0
     fi
     if ! command -v omarchy-pkg-add >/dev/null 2>&1; then

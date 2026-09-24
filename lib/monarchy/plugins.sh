@@ -193,7 +193,7 @@ monarchy_enable_plugin() {
     [ -n "$id" ] || monarchy_die "plugin id is required"
     [ -n "$dir" ] || monarchy_die "plugin directory is required for $id"
     if monarchy_plugin_is_bar "$dir"; then
-        monarchy_die "plugin $id replaces the bar rather than taking a place in one; switch to it from a live session with: omarchy bar use $id"
+        monarchy_die "plugin $id replaces the bar rather than taking a place in one; drop its --enable from monarchy/plugins, then from a live session: omarchy plugin add <url> && omarchy bar use $id"
     fi
     section=$(monarchy_plugin_bar_section "$dir")
     monarchy_seed_shell_json
@@ -258,7 +258,7 @@ def entry_id: if type == "object" then (.id // "") else . end;
 monarchy_install_one_plugin() {
     local url=$1
     local want_enable=${2:-0}
-    local plugins_dir dest stage id dir added=0
+    local plugins_dir dest stage id dir
     plugins_dir=$(monarchy_plugin_user_dir)
     mkdir -p "$plugins_dir"
 
@@ -281,18 +281,26 @@ monarchy_install_one_plugin() {
         if [ -e "$dest" ] || [ -L "$dest" ]; then
             rm -rf "$stage"
             monarchy_log "plugin $id already installed"
+            dir="$dest"
         else
+            # Enable from the stage, and move into place only once that has
+            # worked. The directory is the marker that says the seeding
+            # happened, so it must not exist until the seeding has: an enable
+            # that died after the move -- a plugin that replaces the whole
+            # bar, a jq failure, an interrupted run -- would leave a plugin
+            # no later apply ever enables, reported for ever as one somebody
+            # switched off on purpose.
+            if [ "$want_enable" = 1 ]; then
+                monarchy_enable_plugin "$id" "$stage"
+            fi
             mv "$stage" "$dest"
-            added=1
             monarchy_changed "added plugin $id"
+            return 0
         fi
-        dir="$dest"
     fi
 
     [ "$want_enable" = 1 ] || return 0
-    if [ "$added" = 1 ]; then
-        monarchy_enable_plugin "$id" "$dir"
-    elif ! monarchy_plugin_in_shell_json "$id"; then
+    if ! monarchy_plugin_in_shell_json "$id"; then
         monarchy_left_alone "$id — installed, switched off in shell.json"
     fi
 }
@@ -303,6 +311,12 @@ monarchy_install_plugins() {
     export OMARCHY_PATH
     export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
     monarchy_check_plugins
+    # Once, before the loop. Its only caller used to be monarchy_enable_plugin,
+    # which a box whose plugins are all already cloned no longer reaches -- so
+    # a missing shell.json was never re-seeded, every plugin read as absent
+    # from it, and the summary reported the lot as switched off on purpose.
+    # Seeding is itself seed-once: it returns early when the file is there.
+    monarchy_seed_shell_json
     while IFS= read -r line; do
         read -r url rest <<<"$line"
         [ -n "$url" ] || continue

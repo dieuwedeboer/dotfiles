@@ -184,7 +184,7 @@ if ! bonw9_detected; then
     exit 0
 fi
 
-echo "=== bonw9 (System76 Bonobo WS) setup ==="
+printf '      bonw9 (System76 Bonobo WS) setup\n'
 
 # -------------------------------------------------------------------------
 # AUR packages: Tuxedo Control Center for the EC fan curve.
@@ -269,7 +269,6 @@ fi
 echo "  Restarting tccd..."
 sudo systemctl start tccd
 
-echo "=== bonw9 setup complete ==="
 echo "Reboot recommended for tccd to apply profile on next boot."
 echo "After reboot, verify:"
 echo "  systemctl status tccd"

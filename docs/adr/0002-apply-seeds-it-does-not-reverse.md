@@ -38,7 +38,7 @@ it is used and no state is written.
 | --- | --- |
 | Shell plugins | the plugin directory under `~/.config/omarchy/plugins/<id>` |
 | Hyprland config, branding | the destination file (`monarchy_copy_if_missing`) |
-| systemd `--user` units | the seed ledger |
+| systemd `--user` units | the seed ledger, for units this box already has |
 | `omarchy-pkg-add` packages | the seed ledger, or the package being installed |
 
 `systemctl --user is-enabled` answers `disabled` both for a unit the operator
@@ -54,6 +54,21 @@ markers Omarchy keeps in `~/.local/state/omarchy/`.
 cloned has no effect, because the directory already says seeded. The
 alternative is a fourth ledger for a case that arises about once a year, and
 `omarchy plugin enable <id>` costs one command.
+
+**A marker is written only once the thing it marks is true.** This is what
+makes the gap above the only one. The plugin is enabled from its staging
+directory and moved into place afterwards, so an enable that dies — a plugin
+that replaces the whole bar, a jq failure, an interrupted run — leaves no
+directory and the next apply tries again. The ledger bootstrap marks only
+units this box actually has, so a unit a later Omarchy release ships still
+gets its one seeding when it arrives.
+
+**One thing cannot be verified, and the report says so.** An absent package
+was either removed on purpose or is one whose install has been failing, and
+pacman keeps no record of which. The ledger marks it either way, because not
+marking it re-imposes the removal this decision exists to respect. So the
+summary claims only that the package is not installed, and names the command
+to add it — never that somebody removed it.
 
 **Deleting a row from `monarchy/plugins` stops nothing already installed.**
 The row still asserts that the plugin is cloned, so removal is two steps: drop

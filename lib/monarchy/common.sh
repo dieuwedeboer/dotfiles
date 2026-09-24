@@ -43,14 +43,17 @@ MONARCHY_MKINITCPIO_CONF="${MONARCHY_MKINITCPIO_CONF:-/etc/mkinitcpio.conf}"
 # A screenful of ISO-8601 in front of every sentence is what made the three
 # voices unreadable, and the file is where you go when you need the clock.
 #
-# A line that starts `warning:` also lands in the ledger, so the nineteen
-# call sites that already wrote that prefix get a summary entry without any
-# of them having to call a second function.
+# A line that starts `warning:` or `error:` also lands in the ledger, so the
+# call sites that already wrote those prefixes get a summary entry without any
+# of them having to call a second function. The error case matters most: a run
+# that monarchy_die kills still fires the summary trap, and a summary that
+# said "Nothing changed." directly under a fatal error would be the same
+# silence this exists to remove.
 monarchy_log() {
     local line
     line="$(date -Iseconds) $*"
     case "$*" in
-        warning:*) monarchy_ui_note_warning "$*" ;;
+        warning:*|error:*) monarchy_ui_note_warning "$*" ;;
     esac
     if [ "${VERBOSE:-0}" = 1 ]; then
         echo "$line"
@@ -399,9 +402,22 @@ monarchy_seed_ledger_bootstrap() {
     [ ! -d "$root" ] || return 0
     [ -f "$first_run" ] || return 0
     local name
-    for name in "${MONARCHY_SEEDED_UNITS[@]}"; do
-        monarchy_mark_seeded units "$name"
-    done
+    # Only units this box actually has. A unit a later Omarchy release adds is
+    # not on disk yet, so a marker for it now would cancel the one seeding it
+    # is owed when it arrives -- which is exactly what monarchy_seed_user_unit
+    # takes care not to do.
+    if command -v systemctl >/dev/null 2>&1; then
+        for name in "${MONARCHY_SEEDED_UNITS[@]}"; do
+            systemctl --user list-unit-files "$name" >/dev/null 2>&1 || continue
+            monarchy_mark_seeded units "$name"
+        done
+    fi
+    # Packages are marked whether or not they are installed, and that is the
+    # point: an absent one on an established box is the case this whole ledger
+    # exists for. It is also the one thing here that cannot be verified --
+    # "removed on purpose" and "the install has been failing" look identical
+    # from outside -- so the report says only that it is not installed, and
+    # names the command to add it. See ADR 0002.
     for name in "${MONARCHY_SEEDED_PKGS[@]}"; do
         monarchy_mark_seeded pkg "$name"
     done

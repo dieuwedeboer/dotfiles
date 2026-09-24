@@ -206,11 +206,26 @@ packages_install_omarchy_aur() {
         paru -Q "$pkg" &> /dev/null || missing+=("$pkg")
     done
     [ "${#missing[@]}" -gt 0 ] || return 0
+    # One transaction, then one retry each. These are AUR builds and this is
+    # the step that fails: batching them meant a single unbuildable package
+    # took the whole set down, where the old per-package loop installed
+    # everything else and warned about the one. The batch keeps the common
+    # case to one dependency resolution; the fallback keeps the bad case from
+    # costing four packages instead of one.
     if paru -S --noconfirm "${missing[@]}" --assume-installed "omarchy=$version"; then
         monarchy_changed_many installed "Omarchy AUR packages" "${missing[@]}"
-    else
-        monarchy_warn "paru -S failed for ${missing[*]}"
+        return 0
     fi
+    monarchy_log "batch install failed; retrying ${#missing[@]} packages one at a time"
+    local -a done_pkgs=()
+    for pkg in "${missing[@]}"; do
+        if paru -S --noconfirm "$pkg" --assume-installed "omarchy=$version"; then
+            done_pkgs+=("$pkg")
+        else
+            monarchy_warn "paru -S $pkg failed"
+        fi
+    done
+    monarchy_changed_many installed "Omarchy AUR packages" "${done_pkgs[@]}"
 }
 
 packages_strip_curl_pipe_cursor() {

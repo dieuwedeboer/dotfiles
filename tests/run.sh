@@ -41,7 +41,12 @@ if command -v shellcheck >/dev/null 2>&1; then
         failed+=(shellcheck)
     fi
 else
-    printf '  skip  shellcheck (not installed)\n'
+    # Not a skip. A lint arm that quietly stands down reads as a pass, which
+    # is how four real findings sat unnoticed for as long as shellcheck was
+    # missing from this box. It is in PACMAN_PACKAGES; install it.
+    printf '  FAIL  shellcheck (not installed: sudo pacman -S shellcheck)\n'
+    fail=$((fail + 1))
+    failed+=(shellcheck)
 fi
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"

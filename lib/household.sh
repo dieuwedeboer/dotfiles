@@ -23,8 +23,8 @@ household_chezmoi() {
     monarchy_step "dotfiles (chezmoi)"
     if [ ! -L "$HOME/.local/share/chezmoi" ]; then
         if [ -d "$HOME/.local/share/chezmoi" ]; then
-            monarchy_changed "moved an existing chezmoi aside to ~/.local/share/chezmoi.bk"
             mv "$HOME/.local/share/chezmoi" "$HOME/.local/share/chezmoi.bk"
+            monarchy_changed "moved an existing chezmoi aside to ~/.local/share/chezmoi.bk"
         fi
         ln -s "$DOTFILES_DIR/chezmoi" "$HOME/.local/share/chezmoi"
         monarchy_changed "linked ~/.local/share/chezmoi at $DOTFILES_DIR/chezmoi"
@@ -35,21 +35,60 @@ household_chezmoi() {
         return 0
     fi
 
-    local status
-    status=$(chezmoi status 2>/dev/null || true)
-    if [ -z "$status" ]; then
-        monarchy_log "chezmoi already applied"
+    # A failing `chezmoi status` must not read as clean. chezmoi writes its
+    # errors to stderr and leaves stdout empty when the source directory is
+    # missing or a template will not render, so testing only whether stdout
+    # was empty turns a broken tree into "already applied" -- nothing applied,
+    # nothing reported. ADR 0001 records the same trap for the hypr assert;
+    # this is the household half of it.
+    local status rc=0
+    status=$(chezmoi status 2>&1) || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        printf '%s\n' "$status" >&2
+        monarchy_warn "chezmoi status failed; dotfiles not applied. Run: chezmoi apply"
         return 0
     fi
-    if monarchy_can_prompt; then
-        chezmoi apply
-        # Read by lib/zfs.sh, which restarts ksystemstats only when there is
-        # something new for it to load. It runs as a subprocess, so this is
-        # the only way the fact reaches it.
-        export MONARCHY_CHEZMOI_APPLIED=1
+
+    # `run_after_` scripts are listed by every status and re-run by every
+    # apply, so on this tree status is never empty and "has anything actually
+    # drifted" is what is left once those rows are dropped. Without this the
+    # no-terminal path warned about drift on every single run, and the
+    # interactive path reported a change it had not made.
+    local drift
+    drift=$(printf '%s\n' "$status" | grep -vE '^ R ' || true)
+
+    if ! monarchy_can_prompt; then
+        [ -z "$drift" ] || monarchy_warn \
+            "chezmoi has drifted and there is no terminal to apply on. Run: chezmoi apply"
+        return 0
+    fi
+    chezmoi apply
+    if [ -n "$drift" ]; then
+        # Read by household_ksystemstats below. Only a real change is worth a
+        # Plasma service restart.
+        MONARCHY_CHEZMOI_APPLIED=1
         monarchy_changed "applied chezmoi-managed dotfiles"
+    fi
+}
+
+# The zpool sensor is chezmoi's, and lib/zfs.sh used to run a second
+# `chezmoi apply` of its own to get it. That check lives here rather than
+# there because zfs.sh runs as a subprocess: a warning it raises dies with the
+# process and never reaches the summary, and a missing sensor nobody is told
+# about is the whole failure mode.
+household_ksystemstats() {
+    monarchy_step "zpool sensor"
+    local sensor="$HOME/.local/share/ksystemstats-scripts/ZFS"
+    if [ ! -e "$sensor" ]; then
+        monarchy_warn "no $sensor; the zpool sensor is chezmoi's. Run: chezmoi apply"
+        return 0
+    fi
+    [ "${MONARCHY_CHEZMOI_APPLIED:-0}" = 1 ] || return 0
+    command -v systemctl >/dev/null 2>&1 || return 0
+    if systemctl restart --user plasma-ksystemstats.service 2>/dev/null; then
+        monarchy_changed "restarted ksystemstats to load the zpool sensor"
     else
-        monarchy_warn "chezmoi has drifted and there is no terminal to apply on. Run: chezmoi apply"
+        monarchy_log "plasma-ksystemstats.service is not running; nothing to reload"
     fi
 }
 
@@ -124,4 +163,6 @@ household_refresh() {
 
     monarchy_step "ZFS monitoring and snapshots"
     "$LIB_DIR/zfs.sh"
+
+    household_ksystemstats
 }

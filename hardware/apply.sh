@@ -8,6 +8,6 @@ HW_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 for apply in "$HW_ROOT"/*/apply.sh; do
     [ -f "$apply" ] || continue
     name=$(basename "$(dirname "$apply")")
-    echo "=== Hardware: $name ==="
+    printf '  hardware: %s\n' "$name"
     bash "$apply"
 done

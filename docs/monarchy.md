@@ -362,7 +362,7 @@ thing that was on and is now off. See
 | --- | --- |
 | Shell plugins | the directory under `~/.config/omarchy/plugins/<id>` |
 | Hyprland config, branding | the destination file (`monarchy_copy_if_missing`) |
-| systemd `--user` units | `~/.local/state/monarchy/seeded/units/<unit>` |
+| systemd `--user` units | `~/.local/state/monarchy/seeded/units/<unit>`, written only for units the box already has |
 | `omarchy-pkg-add` packages | `~/.local/state/monarchy/seeded/pkg/<pkg>`, or the package being installed |
 
 `--enable` in `monarchy/plugins` is honoured on the apply that clones the

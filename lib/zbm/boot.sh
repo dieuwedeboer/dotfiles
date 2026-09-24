@@ -131,7 +131,7 @@ zbm_apply_image_cmdline() {
 }
 
 zbm_apply_quiet_boot() {
-    echo "=== Quiet ZFSBootMenu and host cmdline ==="
+    printf '      quiet ZFSBootMenu and host cmdline\n'
     zbm_apply_host_cmdline
     zbm_apply_image_cmdline
 }
