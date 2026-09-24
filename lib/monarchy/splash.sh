@@ -242,9 +242,7 @@ monarchy_splash_only() {
     monarchy_assert_source_tree
     monarchy_link_working_prefix
     monarchy_rebuild_overlay
-    monarchy_overlay_session_lock
-    monarchy_overlay_power_panel
-    monarchy_overlay_agent_marks
+    monarchy_overlay_shell
     export OMARCHY_PATH
     monarchy_pkg_installed plymouth || monarchy_die "plymouth is not installed"
     monarchy_splash

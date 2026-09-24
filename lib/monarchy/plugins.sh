@@ -2,6 +2,10 @@
 # Sourced into one shell by lib/monarchy.sh; common.sh state is in scope.
 # shellcheck disable=SC2153
 
+# Whether this run put a plugin on disk that the running shell has not seen.
+# Nothing else is a reason to make it rescan.
+MONARCHY_PLUGINS_ADDED=0
+
 monarchy_plugin_user_dir() {
     printf '%s\n' "$HOME/.config/omarchy/plugins"
 }
@@ -265,7 +269,7 @@ monarchy_install_one_plugin() {
     dir=""
     if dir=$(monarchy_plugin_dir_for_url "$url"); then
         id=$(monarchy_plugin_id_from_dir "$dir")
-        monarchy_log "plugin $id already installed"
+        monarchy_trace "plugin $id already installed"
     else
         stage=$(mktemp -d)
         export GIT_TERMINAL_PROMPT=0
@@ -280,7 +284,7 @@ monarchy_install_one_plugin() {
         # different origin or none: someone put it there. Not ours to enable.
         if [ -e "$dest" ] || [ -L "$dest" ]; then
             rm -rf "$stage"
-            monarchy_log "plugin $id already installed"
+            monarchy_trace "plugin $id already installed"
             dir="$dest"
         else
             # Enable from the stage, and move into place only once that has
@@ -294,6 +298,7 @@ monarchy_install_one_plugin() {
                 monarchy_enable_plugin "$id" "$stage"
             fi
             mv "$stage" "$dest"
+            MONARCHY_PLUGINS_ADDED=1
             monarchy_changed "added plugin $id"
             return 0
         fi
@@ -311,6 +316,7 @@ monarchy_install_plugins() {
     export OMARCHY_PATH
     export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
     monarchy_check_plugins
+    MONARCHY_PLUGINS_ADDED=0
     # Once, before the loop. Its only caller used to be monarchy_enable_plugin,
     # which a box whose plugins are all already cloned no longer reaches -- so
     # a missing shell.json was never re-seeded, every plugin read as absent
@@ -330,8 +336,15 @@ monarchy_install_plugins() {
         monarchy_install_one_plugin "$url" "$enable"
     done < <(monarchy_load_list "$file")
     # A live shell reloads shell.json on its own, so the offline write above
-    # is all a running session needs; the rescan is for a plugin directory
-    # that appeared since the shell last looked.
+    # is all a running session needs; the rescan is only for a plugin
+    # directory that appeared since the shell last looked. On a run where
+    # none did, rescanning makes the bar redraw for nothing -- which, next to
+    # the shell restart, is the second of the two blinks an ordinary update
+    # used to cost.
+    if [ "$MONARCHY_PLUGINS_ADDED" = 0 ]; then
+        monarchy_trace "no plugin added; shell rescan not needed"
+        return 0
+    fi
     if [ -x "$MONARCHY_PATH/bin/omarchy-shell" ]; then
         "$MONARCHY_PATH/bin/omarchy-shell" -q shell rescanPlugins || true
     fi

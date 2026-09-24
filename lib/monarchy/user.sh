@@ -35,7 +35,7 @@ monarchy_seed_hyprland_config() {
         monarchy_copy_if_missing "$f" "$dest/$base"
     done
     monarchy_seed_hypr_boot_color
-    monarchy_log "seeded $dest (existing files left in place)"
+    monarchy_trace "seeded $dest (existing files left in place)"
 }
 
 # First Hyprland frame matches Unlock #1a1b26 instead of the default grey.
@@ -50,7 +50,7 @@ monarchy_seed_hypr_boot_color() {
     monarchy_seed_block "$hypr" boot-color '^require[(]"hypr[.]boot-color"[)]$' <<'EOF'
 require("hypr.boot-color")
 EOF
-    monarchy_log "required hypr.boot-color from $hypr"
+    monarchy_trace "required hypr.boot-color from $hypr"
 }
 
 monarchy_seed_block() {
@@ -148,7 +148,7 @@ monarchy_drop_omarchy_emacs_package() {
     rm -f "$HOME/.config/omarchy/hooks/theme-set.d/omarchy-emacs"
     rm -f "$HOME/.config/omarchy/hooks/font-set.d/omarchy-emacs"
     if monarchy_pkg_exactly omarchy-emacs; then
-        monarchy_log "removing omarchy-emacs (Quattro uses omarchy-emacs-theme)"
+        monarchy_changed "removing omarchy-emacs (Quattro uses omarchy-emacs-theme)"
         monarchy_sudo pacman -R --noconfirm omarchy-emacs \
             || monarchy_log "warning: could not remove omarchy-emacs"
     fi
@@ -161,7 +161,11 @@ monarchy_sync_emacs_theme_repo() {
     if [ -d "$dest/.git" ]; then
         if ! { git -C "$dest" fetch --quiet origin \
             && git -C "$dest" pull --ff-only --quiet; }; then
-            monarchy_log "warning: could not update $dest"
+            # Offline, or the remote is down. The checkout on disk is still
+            # the one in use and nothing is broken, so this is a note rather
+            # than a warning -- an update that cannot reach GitHub is not a
+            # problem with the box.
+            monarchy_trace "could not update $dest; using the checkout on disk"
         fi
         return 0
     fi
@@ -172,15 +176,26 @@ monarchy_sync_emacs_theme_repo() {
         || monarchy_die "failed to clone $MONARCHY_EMACS_THEME_URL"
 }
 
+# The setup script is idempotent but not quiet: it reinstalls its hook and
+# prints three lines about it every time. Run it when the hook it installs is
+# missing, or when the checkout it copies from has moved.
 monarchy_install_emacs_theme() {
     local setup="$MONARCHY_EMACS_THEME_DIR/bin/omarchy-emacs-theme-setup"
+    local hook="$HOME/.config/omarchy/hooks/theme-set.d/omarchy-emacs-theme"
+    local before after
+    before=$(git -C "$MONARCHY_EMACS_THEME_DIR" rev-parse HEAD 2>/dev/null || true)
     monarchy_sync_emacs_theme_repo
+    after=$(git -C "$MONARCHY_EMACS_THEME_DIR" rev-parse HEAD 2>/dev/null || true)
     [ -x "$setup" ] || monarchy_die "missing $setup"
-    if ! "$setup"; then
-        monarchy_log "warning: omarchy-emacs-theme-setup failed"
+    if [ -e "$hook" ] && [ "$before" = "$after" ]; then
+        monarchy_trace "omarchy-emacs-theme already hooked at ${after:0:7}"
         return 0
     fi
-    monarchy_log "omarchy-emacs-theme hooked (themed/ + theme-set.d)"
+    if ! "$setup"; then
+        monarchy_warn "omarchy-emacs-theme-setup failed"
+        return 0
+    fi
+    monarchy_changed "hooked omarchy-emacs-theme (themed/ + theme-set.d)"
 }
 
 # One package, installed once. An absent package was either never installed
@@ -210,22 +225,44 @@ monarchy_omarchy_pkg_add() {
     fi
 }
 
+# Every step here asks first. This used to run `sudo pacman -S --needed`, a
+# git fetch, a setup script and `systemctl enable --now` on every apply, none
+# of which had anything to do on a box where emacs was already sorted -- four
+# actions, a password prompt's worth of sudo, and half a dozen lines of
+# output, to arrive where it started.
 monarchy_user_emacs() {
     export OMARCHY_PATH
     export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
     if monarchy_pkg_exactly emacs; then
-        monarchy_sudo pacman -R --noconfirm emacs \
-            || monarchy_log "warning: could not remove emacs (conflicts with emacs-wayland)"
+        if monarchy_sudo pacman -R --noconfirm emacs; then
+            monarchy_changed "removed emacs (conflicts with emacs-wayland)"
+        else
+            monarchy_warn "could not remove emacs (conflicts with emacs-wayland)"
+        fi
     fi
     # Keep emacs-wayland as explicit so dropping omarchy-emacs does not
-    # leave it as an unused dependency.
-    monarchy_sudo pacman -S --needed --noconfirm --asexplicit emacs-wayland \
-        || monarchy_log "warning: could not install emacs-wayland"
+    # leave it as an unused dependency. `pacman -Qe` is that question asked
+    # directly, so the install only runs when the answer is no.
+    if ! pacman -Qe emacs-wayland >/dev/null 2>&1; then
+        if monarchy_sudo pacman -S --needed --noconfirm --asexplicit emacs-wayland; then
+            monarchy_changed "installed emacs-wayland"
+        else
+            monarchy_warn "could not install emacs-wayland"
+        fi
+    fi
     monarchy_drop_omarchy_emacs_package
     monarchy_prefer_xdg_emacs
     monarchy_install_emacs_theme
-    systemctl --user enable --now emacs.service 2>/dev/null \
-        || monarchy_log "warning: could not enable emacs.service"
+    if [ "$(systemctl --user is-enabled emacs.service 2>/dev/null)" = enabled ] \
+        && systemctl --user is-active emacs.service >/dev/null 2>&1; then
+        monarchy_trace "emacs.service already enabled and running"
+        return 0
+    fi
+    if systemctl --user enable --now emacs.service 2>/dev/null; then
+        monarchy_changed "enabled emacs.service"
+    else
+        monarchy_warn "could not enable emacs.service"
+    fi
 }
 
 # Webapp launchers, mise agent stubs, and the tools that used to be competing
@@ -339,11 +376,11 @@ monarchy_user_theme() {
     fi
     # Pi theme is optional; tokyo-night only has pi.json after templates run.
     omarchy-theme-set-pi --activate >/dev/null 2>&1 || true
-    monarchy_log "theme $(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null)"
+    monarchy_trace "theme $(cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null)"
 }
 
 monarchy_drop_webapps() {
-    local name desktop icon_slug
+    local name desktop icon_slug dropped=0
     local app_dir="$HOME/.local/share/applications"
     local icon_dir="$HOME/.local/share/icons/hicolor/256x256/apps"
     local old_icon_dir="$HOME/.local/share/applications/icons"
@@ -354,9 +391,10 @@ monarchy_drop_webapps() {
         icon_slug=$(printf '%s\n' "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^[:alnum:]]\+/-/g; s/^-//; s/-$//')
         rm -f "$desktop"
         rm -f "$icon_dir/${icon_slug}.png" "$icon_dir/${name}.png" "$old_icon_dir/${name}.png"
-        monarchy_log "dropped webapp $name"
+        monarchy_changed "dropped webapp $name"
+        dropped=1
     done
-    if command -v update-desktop-database >/dev/null 2>&1; then
+    if [ "$dropped" = 1 ] && command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "$app_dir" >/dev/null 2>&1 || true
     fi
 }
@@ -466,7 +504,7 @@ monarchy_assert_chezmoi_hypr() {
         status=$(monarchy_hypr_drop_block_drift "$status")
         [ -z "$status" ] || monarchy_die "$dir still differs after chezmoi apply"
     fi
-    monarchy_log "chezmoi owns $dir"
+    monarchy_trace "chezmoi owns $dir"
 }
 
 monarchy_user_git() {
@@ -501,6 +539,6 @@ monarchy_setup_user() {
     if [ -f "$HOME/.config/mimeapps.list" ] && grep -qi omarchy "$HOME/.config/mimeapps.list"; then
         monarchy_die "Omarchy mimeapps landed in $HOME/.config/mimeapps.list"
     fi
-    monarchy_log "user config seeded for $USER"
+    monarchy_trace "user config seeded for $USER"
     return 0
 }

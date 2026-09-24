@@ -30,7 +30,7 @@ monarchy_record_packages() {
 
 monarchy_install_packages() {
     if [ "${MONARCHY_NO_PACKAGES:-0}" = 1 ]; then
-        monarchy_log "skipping packages (--no-packages)"
+        monarchy_trace "skipping packages (--no-packages)"
         return 0
     fi
 
@@ -61,11 +61,11 @@ monarchy_install_packages() {
     local -a need=()
     mapfile -t need < <(pacman -T "${pkgs[@]}" || true)
     if [ "${#need[@]}" -eq 0 ]; then
-        monarchy_log "filtered leaf packages already installed (${#pkgs[@]})"
+        monarchy_trace "filtered leaf packages already installed (${#pkgs[@]})"
     else
         monarchy_log "pacman -S --needed ${#need[@]} of ${#pkgs[@]} filtered leaf packages"
         monarchy_sudo pacman -S --needed --noconfirm "${need[@]}"
-        monarchy_log "packages installed"
+        monarchy_trace "packages installed"
     fi
     monarchy_record_packages
     monarchy_skip_os_release_clobber

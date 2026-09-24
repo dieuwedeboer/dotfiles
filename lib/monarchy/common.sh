@@ -49,7 +49,15 @@ MONARCHY_MKINITCPIO_CONF="${MONARCHY_MKINITCPIO_CONF:-/etc/mkinitcpio.conf}"
 # that monarchy_die kills still fires the summary trap, and a summary that
 # said "Nothing changed." directly under a fatal error would be the same
 # silence this exists to remove.
-monarchy_log() {
+#
+# monarchy_trace is the same line without the terminal copy. See below.
+# $1 is 1 for a line that belongs in the durable record but not on a quiet
+# terminal. Everything else is shared: the timestamp is for the file, the
+# journald fallback is for when the file cannot be written, and a `warning:`
+# or `error:` prefix feeds the summary ledger either way.
+monarchy_log_line() {
+    local quiet=$1
+    shift
     local line
     line="$(date -Iseconds) $*"
     case "$*" in
@@ -57,7 +65,7 @@ monarchy_log() {
     esac
     if [ "${VERBOSE:-0}" = 1 ]; then
         echo "$line"
-    else
+    elif [ "$quiet" != 1 ]; then
         printf '      %s%s%s\n' "${MONARCHY_UI_DIM:-}" "$*" "${MONARCHY_UI_OFF:-}"
     fi
     if [ -w "$MONARCHY_LOG" ] \
@@ -70,33 +78,13 @@ monarchy_log() {
     return 0
 }
 
-# Take ownership of the log once, at the top of an apply, rather than
-# elevating on every monarchy_log call. Self-healing: it re-runs whenever the
-# file is not writable by whoever is running, so a change of administrator
-# fixes itself on the next apply.
-#
-# touch before chown, never `install /dev/null`, which would truncate the
-# history this exists to keep. Failure to elevate is not fatal: monarchy_log
-# falls back to journald, and refusing to apply because a log file could not
-# be chowned would be the wrong trade.
-#
-# This only fixes the file for the administrator. A deny stub run by another
-# account still cannot write it, and does not need to: deny.sh calls
-# `logger -t monarchy` first and unconditionally, so a block is recorded for
-# every account no matter who runs it.
-monarchy_ensure_log() {
-    [ -d "$(dirname "$MONARCHY_LOG")" ] || return 0
-    [ ! -w "$MONARCHY_LOG" ] || return 0
-    # if/else rather than a && b || c: any one of the three failing has to
-    # reach the warning, and the chain form reads as if-then-else when it is
-    # not one.
-    if ! { monarchy_sudo touch "$MONARCHY_LOG" \
-        && monarchy_sudo chown "$(id -u):$(id -g)" "$MONARCHY_LOG" \
-        && monarchy_sudo chmod 0644 "$MONARCHY_LOG"; }; then
-        monarchy_log "warning: cannot write $MONARCHY_LOG; logging to journald only"
-    fi
-    return 0
-}
+monarchy_log() { monarchy_log_line 0 "$*"; }
+
+# For the ordinary case. "Already installed", "already correct", "nothing to
+# do" -- true, worth keeping, and not worth a line on the terminal of someone
+# watching an update they expect to be a no-op. -v brings them back, and the
+# log has them regardless.
+monarchy_trace() { monarchy_log_line 1 "$*"; }
 
 monarchy_die() {
     monarchy_log "error: $*"
@@ -133,6 +121,22 @@ monarchy_write_to() {
     else
         monarchy_sudo "$@"
     fi
+}
+
+# install(1), but only when the destination is not already the file it should
+# be. Returns 0 when it wrote and 1 when there was nothing to do, so a caller
+# can report a change it actually made. Elevates the way monarchy_write_to
+# does: by asking the destination directory, not the caller.
+monarchy_install_if_changed() {
+    local mode=$1 src=$2 dest=$3
+    local parent
+    parent=$(dirname "$dest")
+    if [ -f "$dest" ] && cmp -s "$src" "$dest"; then
+        return 1
+    fi
+    monarchy_write_to "$parent" mkdir -p "$parent"
+    monarchy_write_to "$parent" install -m "$mode" "$src" "$dest"
+    return 0
 }
 
 monarchy_load_lock() {
@@ -173,7 +177,7 @@ monarchy_snapshot_first() {
     if ! monarchy_sudo test -x "$helper"; then
         monarchy_die "missing $helper"
     fi
-    monarchy_log "snapshot via $helper"
+    monarchy_trace "snapshot via $helper"
     monarchy_sudo "$helper"
     monarchy_assert_root_pre_update_snapshot
     MONARCHY_SNAPSHOT_DONE=1
@@ -421,5 +425,5 @@ monarchy_seed_ledger_bootstrap() {
     for name in "${MONARCHY_SEEDED_PKGS[@]}"; do
         monarchy_mark_seeded pkg "$name"
     done
-    monarchy_log "recorded an established box as already seeded; nothing re-imposed"
+    monarchy_trace "recorded an established box as already seeded; nothing re-imposed"
 }

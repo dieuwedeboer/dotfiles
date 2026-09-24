@@ -211,7 +211,7 @@ monarchy_ensure_boot_stub() {
     want=$(monarchy_boot_stub_wanted_version)
     have=$(monarchy_installed_pkg_version monarchy-boot-stub)
     if [ "$have" = "$want" ]; then
-        monarchy_log "monarchy-boot-stub $have already installed"
+        monarchy_trace "monarchy-boot-stub $have already installed"
         return 0
     fi
     monarchy_assert_can_makepkg
@@ -267,7 +267,7 @@ monarchy_ensure_settings_pkg() {
     want="${ver}-1"
     have=$(monarchy_installed_pkg_version omarchy-settings-monarchy)
     if [ "$have" = "$want" ]; then
-        monarchy_log "omarchy-settings-monarchy $have already tracks omarchy-settings=$ver"
+        monarchy_trace "omarchy-settings-monarchy $have already tracks omarchy-settings=$ver"
         return 0
     fi
 
@@ -340,7 +340,7 @@ monarchy_ensure_omarchy_pkg() {
     # Idempotent; monarchy_build_packages already did this before the stub.
     monarchy_clear_legacy_prefix_symlink
     if monarchy_pkg_exactly omarchy; then
-        monarchy_log "omarchy $(monarchy_installed_pkg_version omarchy) already installed"
+        monarchy_trace "omarchy $(monarchy_installed_pkg_version omarchy) already installed"
         return 0
     fi
 

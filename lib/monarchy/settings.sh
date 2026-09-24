@@ -74,7 +74,7 @@ monarchy_assert_settings_assets() {
 monarchy_install_settings() {
     monarchy_assert_settings_assets
     monarchy_install_profile_d
-    monarchy_log "settings owned by omarchy-settings-monarchy; profile.d repointed at $MONARCHY_PATH"
+    monarchy_trace "settings owned by omarchy-settings-monarchy; profile.d repointed at $MONARCHY_PATH"
 }
 
 monarchy_enable_omarchy_services() {
@@ -107,7 +107,7 @@ monarchy_run_install_script() {
         bash "$script" && rc=0 || rc=$?
     fi
     if [ "$rc" -eq 0 ]; then
-        monarchy_log "ran $script"
+        monarchy_trace "ran $script"
     else
         monarchy_log "warning: $script exited $rc"
     fi
@@ -148,8 +148,16 @@ monarchy_seed_user_unit() {
 
 monarchy_enable_user_units() {
     command -v systemctl >/dev/null 2>&1 || return 0
-    systemctl --user daemon-reload >/dev/null 2>&1 || true
-    local unit
+    local unit pending=0
+    for unit in "${MONARCHY_SEEDED_UNITS[@]}"; do
+        monarchy_seeded units "$unit" || pending=1
+    done
+    # A daemon-reload is only owed when something is about to be enabled. On
+    # an established box every unit is seeded and there is nothing to reload
+    # for.
+    if [ "$pending" = 1 ]; then
+        systemctl --user daemon-reload >/dev/null 2>&1 || true
+    fi
     for unit in "${MONARCHY_SEEDED_UNITS[@]}"; do
         monarchy_seed_user_unit "$unit"
     done

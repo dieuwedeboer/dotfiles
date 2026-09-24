@@ -191,7 +191,32 @@ Upstream's `post_install`/`post_upgrade` is destructive by design, and says so i
 
 Entry point: `install.sh` — argument parsing and dispatch only; the household half is `lib/household.sh`. bash, `set -e`, idempotent, sudo only where needed. One pipeline: household refresh (packages, chezmoi, hardware, ZFS), then Monarchy. `--check`, `--splash-only`, and `--only` skip the household refresh; `--update` does not.
 
-A run prints one step per household stage and per Monarchy unit (`[ 7/12] sddm`), detail lines indented beneath, and an elapsed figure for any unit over five seconds. `-v` restores the timestamped `monarchy_log` form. It ends with a summary from an `EXIT` trap — so a run that dies partway still reports it — listing what changed, what was **left alone**, and what warned. `NO_COLOR` and a missing tty both drop the escapes.
+A run prints one step per household stage and per Monarchy unit (`[ 7/12] sddm`), detail lines indented beneath, and an elapsed figure for any unit over five seconds. `-v` restores the timestamped `monarchy_log` form. It ends with a summary from an `EXIT` trap — so a run that dies partway still reports it — listing what changed, what was **left alone**, and what warned. `NO_COLOR` and a missing tty both drop the escapes. Routine lines --
+"already installed", "already current", "nothing to do" -- go to the log
+through `monarchy_trace` and not to the terminal, so a run where nothing has
+changed prints its steps and its summary and little else. `-v` brings them all
+back.
+
+**Nothing is restarted or reloaded that has no reason to be.** An apply that
+changes nothing must cost nothing a person can see, and it used to cost two:
+quickshell restarted and the bar redrew, every single update.
+
+| Action | What earns it |
+| --- | --- |
+| quickshell restart | `monarchy_shell_fingerprint` differs across the overlay pair |
+| `shell rescanPlugins` | a plugin directory appeared this run |
+| ksystemstats restart | `chezmoi apply` wrote something, and the zpool sensor exists |
+| `systemctl --user daemon-reload` | a unit is about to be seeded |
+| `update-desktop-database` | a webapp `.desktop` was actually dropped |
+| `pacman -S emacs-wayland` | `pacman -Qe` says it is not installed as explicit |
+| `omarchy-emacs-theme-setup` | its hook is missing, or the checkout moved |
+
+The shell fingerprint is measured across both overlay steps rather than inside
+either, because `monarchy_overlay_session_lock` replaces the whole plugins
+tree from the package and `monarchy_overlay_power_panel` then re-applies its
+patch to it. Mid-sequence the tree differs from what was there by
+construction, so neither step can answer the question on its own — which is
+exactly why the restart fired unconditionally.
 
 Two things the household half does exactly once per run. **One transaction per
 package manager**: the absent set is worked out first and handed to `pacman`,

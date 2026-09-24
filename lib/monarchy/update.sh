@@ -171,9 +171,7 @@ monarchy_overlay_check() {
 
 monarchy_overlay_apply() {
     monarchy_rebuild_overlay
-    monarchy_overlay_session_lock
-    monarchy_overlay_power_panel
-    monarchy_overlay_agent_marks
+    monarchy_overlay_shell
     monarchy_overlay_launcher_hides
     monarchy_install_switch_user
     monarchy_install_user_setup
@@ -324,7 +322,7 @@ monarchy_check() {
         monarchy_step "$u" "$n" "$total"
         "monarchy_${u}_check"
     done
-    monarchy_log "check passed${MONARCHY_ONLY:+ (only $MONARCHY_ONLY)}"
+    monarchy_trace "check passed${MONARCHY_ONLY:+ (only $MONARCHY_ONLY)}"
 }
 
 # Quickshell lock refuses without /etc/pam.d/omarchy-lock-password.
@@ -376,7 +374,7 @@ monarchy_apply() {
     # After every unit, not inside the overlay one: the shell is restarted
     # once, against a tree that has finished settling, rather than mid-apply.
     monarchy_restart_shell
-    monarchy_log "apply complete${MONARCHY_ONLY:+ (only $MONARCHY_ONLY)}"
+    monarchy_trace "apply complete${MONARCHY_ONLY:+ (only $MONARCHY_ONLY)}"
 }
 
 # What a new upstream release can bring that a human has to classify before
@@ -407,7 +405,7 @@ monarchy_classify_check() {
     monarchy_check_packages_deny
     monarchy_check_applications_drop
     monarchy_check_launcher_unhides
-    monarchy_log "classification guards passed"
+    monarchy_trace "classification guards passed"
 }
 
 monarchy_update() {

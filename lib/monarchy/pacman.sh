@@ -118,7 +118,7 @@ monarchy_confirm_omarchy_key() {
 monarchy_trust_omarchy_key() {
     command -v pacman-key >/dev/null 2>&1 || monarchy_die "pacman-key is missing"
     if monarchy_omarchy_key_present && monarchy_omarchy_key_locally_signed; then
-        monarchy_log "Omarchy packaging key already locally signed"
+        monarchy_trace "Omarchy packaging key already locally signed"
         return 0
     fi
     if ! monarchy_omarchy_key_present; then
@@ -141,7 +141,7 @@ monarchy_trust_omarchy_key() {
 
 monarchy_install_omarchy_keyring() {
     if monarchy_pkg_installed omarchy-keyring; then
-        monarchy_log "omarchy-keyring already installed"
+        monarchy_trace "omarchy-keyring already installed"
         return 0
     fi
     monarchy_log "pacman -Sy then install omarchy-keyring"

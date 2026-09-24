@@ -75,7 +75,7 @@ monarchy_rebuild_overlay() {
     [ -d "$src_bin" ] || monarchy_die "omarchy package bin/ missing at $src_bin"
     [ -f "$stub" ] || monarchy_die "missing $stub"
 
-    monarchy_log "rebuild overlay $dest"
+    monarchy_trace "rebuild overlay $dest"
     parent=$(dirname "$dest")
     monarchy_write_to "$parent" mkdir -p "$dest"
     monarchy_write_to "$parent" find "$dest" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
@@ -214,13 +214,25 @@ monarchy_explode_symlink_dir() {
     rmdir "$tmp"
 }
 
+# Both helpers return 0 when the destination changed and 1 when it was
+# already byte-identical, and in that case they leave it alone entirely.
+#
+# This is what tells the shell restart apart from the apply that earned it.
+# Rewriting the tree unconditionally meant MONARCHY_SHELL_DIRTY was set on
+# every apply, so every update restarted quickshell to load QML it had
+# already loaded -- the bar blinking once an update for nothing.
 monarchy_overlay_replace_dir() {
     local dest=$1
     local src_copy=$2
     local parent
     parent=$(dirname "$dest")
+    if [ -d "$dest" ] && diff -rq "$dest" "$src_copy" >/dev/null 2>&1; then
+        rm -rf "$src_copy"
+        return 1
+    fi
     monarchy_write_to "$parent" rm -rf "$dest"
     monarchy_write_to "$parent" mv "$src_copy" "$dest"
+    return 0
 }
 
 monarchy_overlay_replace_file() {
@@ -228,8 +240,13 @@ monarchy_overlay_replace_file() {
     local src_copy=$2
     local parent
     parent=$(dirname "$dest")
+    if [ -f "$dest" ] && cmp -s "$dest" "$src_copy"; then
+        rm -f "$src_copy"
+        return 1
+    fi
     monarchy_write_to "$parent" rm -f "$dest"
     monarchy_write_to "$parent" mv "$src_copy" "$dest"
+    return 0
 }
 
 monarchy_check_session_lock_overlay() {
@@ -264,9 +281,8 @@ monarchy_overlay_session_lock() {
         rm -rf "$plugins_tmp"
         monarchy_die "lock QML overlay failed"
     }
-    monarchy_overlay_replace_dir "$MONARCHY_PATH/shell/plugins" "$plugins_tmp"
-    MONARCHY_SHELL_DIRTY=1
-    monarchy_log "overlaid $MONARCHY_PATH/shell/plugins/lock"
+    monarchy_overlay_replace_dir "$MONARCHY_PATH/shell/plugins" "$plugins_tmp" || true
+    monarchy_trace "overlaid $MONARCHY_PATH/shell/plugins/lock"
 
     monarchy_explode_symlink_dir "$MONARCHY_PATH/default"
     monarchy_explode_symlink_dir "$MONARCHY_PATH/default/omarchy"
@@ -277,8 +293,12 @@ monarchy_overlay_session_lock() {
         rm -f "$menu_tmp"
         monarchy_die "menu overlay failed"
     }
-    monarchy_overlay_replace_file "$menu_dest" "$menu_tmp"
-    monarchy_log "overlaid $menu_dest"
+    if monarchy_overlay_replace_file "$menu_dest" "$menu_tmp"; then
+        monarchy_changed "overlaid $menu_dest"
+    else
+        monarchy_trace "$menu_dest already current"
+    fi
+    return 0
 }
 
 # ---- the running shell --------------------------------------------------
@@ -293,9 +313,46 @@ monarchy_overlay_session_lock() {
 # comment gives the reason: "a stale process can lazy-load new files into old
 # code". monarchy-update replaces that command, so it inherits the duty.
 #
-# Set by the two overlay steps that write under shell/, cleared by the
-# restart, so --only on an unrelated unit never touches the shell.
+# Set by monarchy_overlay_shell, around the steps that write under shell/, and
+# only when they actually wrote something -- a rewrite that produced identical bytes is not a
+# reason to take somebody's bar away. Cleared by the restart, so --only on an
+# unrelated unit never touches the shell.
 MONARCHY_SHELL_DIRTY=0
+
+# Every file under the shell tree, content and all, as one value.
+#
+# No overlay step can answer "did this change anything" on its own:
+# monarchy_overlay_session_lock replaces the whole plugins tree from the
+# package, throwing away the power-panel patch and the agent marks, and the
+# steps after it put them back. Mid-sequence the tree differs from what was
+# there before by construction, every single time, which is how an apply that
+# changed nothing still restarted the shell. So the set is what gets measured,
+# from outside.
+monarchy_shell_fingerprint() {
+    local dir="$MONARCHY_PATH/shell"
+    [ -d "$dir" ] || { printf 'absent\n'; return 0; }
+    find "$dir" -type f -print0 2>/dev/null \
+        | LC_ALL=C sort -z \
+        | xargs -0 sha256sum 2>/dev/null \
+        | sha256sum | cut -d' ' -f1
+}
+
+# The steps that write under shell/, and the one honest answer about
+# whether the running shell has anything new to read.
+monarchy_overlay_shell() {
+    local before after
+    before=$(monarchy_shell_fingerprint)
+    monarchy_overlay_session_lock
+    monarchy_overlay_power_panel
+    monarchy_overlay_agent_marks
+    after=$(monarchy_shell_fingerprint)
+    if [ "$before" = "$after" ]; then
+        monarchy_trace "shell overlay already current"
+        return 0
+    fi
+    MONARCHY_SHELL_DIRTY=1
+    monarchy_changed "rewrote the shell overlay"
+}
 
 monarchy_restart_shell() {
     [ "${MONARCHY_SHELL_DIRTY:-0}" = 1 ] || return 0
@@ -306,14 +363,14 @@ monarchy_restart_shell() {
     # through Hyprland when it finds none, which is wrong for an install run
     # from a TTY or over ssh: the session that owns the bar is not this one.
     OMARCHY_SHELL_IPC_TIMEOUT=0.5s omarchy-shell shell ping >/dev/null 2>&1 || {
-        monarchy_log "no running shell; the overlay applies at next login"
+        monarchy_trace "no running shell; the overlay applies at next login"
         return 0
     }
 
     # Best-effort. A locked session refuses by design, and the next login gets
     # a fresh shell regardless -- neither is a reason to fail the apply.
     if omarchy-restart-shell; then
-        monarchy_log "restarted the omarchy shell"
+        monarchy_changed "restarted the omarchy shell"
     else
         monarchy_log "shell restart declined; the overlay applies at next login"
     fi
@@ -357,12 +414,18 @@ monarchy_overlay_power_panel() {
         rm -rf "$tmp"
         monarchy_die "power panel overlay failed"
     }
+    local changed=0
     for name in Model.js Panel.qml; do
-        monarchy_overlay_replace_file "$dir/$name" "$tmp/$name"
+        if monarchy_overlay_replace_file "$dir/$name" "$tmp/$name"; then
+            changed=1
+        fi
     done
     rmdir "$tmp"
-    MONARCHY_SHELL_DIRTY=1
-    monarchy_log "overlaid $dir"
+    if [ "$changed" = 1 ]; then
+        monarchy_trace "overlaid $dir"
+    else
+        monarchy_trace "$dir already current"
+    fi
 }
 
 # ---- agent marks ----------------------------------------------------------
@@ -401,8 +464,7 @@ monarchy_overlay_agent_marks() {
         [ -e "$mark" ] || continue
         monarchy_write_to "$dir" cp -f "$mark" "$dir/"
     done
-    MONARCHY_SHELL_DIRTY=1
-    monarchy_log "overlaid $dir"
+    monarchy_trace "overlaid $dir"
 }
 
 # ---- launcher.hides -----------------------------------------------------
@@ -452,27 +514,41 @@ monarchy_overlay_launcher_hides() {
     printf '%s\n' "${MONARCHY_LAUNCHER_UNHIDE[@]}" >"$pat"
     grep -vxF -f "$pat" "$src" >"$tmp" || :
     rm -f "$pat"
-    monarchy_overlay_replace_file "$dest" "$tmp"
-    monarchy_log "overlaid $dest (unhid ${#MONARCHY_LAUNCHER_UNHIDE[@]})"
+    if monarchy_overlay_replace_file "$dest" "$tmp"; then
+        monarchy_changed "rewrote $dest"
+    else
+        monarchy_trace "$dest already current"
+    fi
+    monarchy_trace "launcher.hides unhid ${#MONARCHY_LAUNCHER_UNHIDE[@]}"
 }
 
 monarchy_install_update() {
     [ -f "$MONARCHY_SETUP" ] || monarchy_die "missing $MONARCHY_SETUP"
-    monarchy_sudo ln -sfn "$MONARCHY_SETUP" /usr/local/bin/monarchy-update
     monarchy_sudo rm -f /usr/local/bin/setup-monarchy
-    monarchy_log "installed /usr/local/bin/monarchy-update"
+    if [ "$(readlink /usr/local/bin/monarchy-update 2>/dev/null)" = "$MONARCHY_SETUP" ]; then
+        monarchy_trace "/usr/local/bin/monarchy-update already points at $MONARCHY_SETUP"
+        return 0
+    fi
+    monarchy_sudo ln -sfn "$MONARCHY_SETUP" /usr/local/bin/monarchy-update
+    monarchy_changed "installed /usr/local/bin/monarchy-update"
 }
 
 monarchy_install_user_setup() {
     local src="$monarchy_lib_dir/user-setup.sh"
     [ -f "$src" ] || monarchy_die "missing $src"
-    monarchy_sudo install -m 755 "$src" /usr/local/bin/monarchy-user-setup
-    monarchy_log "installed /usr/local/bin/monarchy-user-setup"
+    if monarchy_install_if_changed 755 "$src" /usr/local/bin/monarchy-user-setup; then
+        monarchy_changed "installed /usr/local/bin/monarchy-user-setup"
+    else
+        monarchy_trace "/usr/local/bin/monarchy-user-setup already current"
+    fi
 }
 
 monarchy_install_switch_user() {
     local src="$monarchy_lib_dir/switch-user.sh"
     [ -f "$src" ] || monarchy_die "missing $src"
-    monarchy_sudo install -m 755 "$src" /usr/local/bin/monarchy-switch-user
-    monarchy_log "installed /usr/local/bin/monarchy-switch-user"
+    if monarchy_install_if_changed 755 "$src" /usr/local/bin/monarchy-switch-user; then
+        monarchy_changed "installed /usr/local/bin/monarchy-switch-user"
+    else
+        monarchy_trace "/usr/local/bin/monarchy-switch-user already current"
+    fi
 }
