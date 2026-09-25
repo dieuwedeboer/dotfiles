@@ -237,6 +237,16 @@ only when that apply actually wrote something.
 monarchy-update        # this file with --update
 ```
 
+`monarchy-update` brackets the real `omarchy-update` rather than replacing it:
+guards, a ZFS snapshot, the household refresh with chezmoi front-loaded, the
+local packages prepared, then the packaged `omarchy-update` in full, then
+classify and apply over the top, then `omarchy-migrate` and
+`omarchy-update-status`. `omarchy update` owns `pacman -Syu`. Three names are
+stubbed out of upstream's run by `monarchy/bin.skip` — a third answer next to
+deny and wrap, for a name upstream is right to call that has nothing to do
+here and must exit 0 rather than abort a `set -e` flow. See
+`docs/adr/0003-omarchy-owns-the-system-update.md`.
+
 `/usr/local/bin/monarchy-update` is a symlink to `install.sh`. Invoked by that name, a bare run is `--update`. Wrapped `omarchy-update` execs it so the Omarchy Update menu does not run stock Omarchy. That menu has no terminal, so chezmoi apply is skipped rather than hanging on a prompt; an interactive run applies.
 
 Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. That helper hard-codes `zpcachyos/ROOT/cos`. If it is missing or still has the varlog-only prune, apply installs the current copy from this repo, then asserts a `@pre-update-*` exists on `zpcachyos/ROOT/cos/root`. The pacman hook uses that installed helper.

@@ -11,6 +11,7 @@ monarchy_load_list() {
 monarchy_load_inventories() {
     mapfile -t MONARCHY_BIN_WRAP < <(monarchy_load_list "$MONARCHY_MISC/bin.wrap")
     mapfile -t MONARCHY_BIN_DENY < <(monarchy_load_list "$MONARCHY_MISC/bin.deny")
+    mapfile -t MONARCHY_BIN_SKIP < <(monarchy_load_list "$MONARCHY_MISC/bin.skip")
     mapfile -t MONARCHY_PKG_DENY < <(monarchy_load_list "$MONARCHY_MISC/packages.deny")
     mapfile -t MONARCHY_MIGRATE_DENY < <(monarchy_load_list "$MONARCHY_MISC/migrations.deny")
     mapfile -t MONARCHY_APP_DROP < <(monarchy_load_list "$MONARCHY_MISC/applications.drop")
@@ -33,5 +34,6 @@ monarchy_in_list() {
 monarchy_overrides() {
     local name=$1
     monarchy_in_list "$name" "${MONARCHY_BIN_WRAP[@]}" \
-        || monarchy_in_list "$name" "${MONARCHY_BIN_DENY[@]}"
+        || monarchy_in_list "$name" "${MONARCHY_BIN_DENY[@]}" \
+        || monarchy_in_list "$name" "${MONARCHY_BIN_SKIP[@]}"
 }

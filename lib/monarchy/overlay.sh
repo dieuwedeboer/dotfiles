@@ -5,7 +5,7 @@
 monarchy_wrap_stub_for() {
     local name=$1
     case "$name" in
-        omarchy-update|omarchy-update-system-pkgs)
+        omarchy-update)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-update.sh"
             ;;
         omarchy-plymouth-set|omarchy-plymouth-reset|omarchy-refresh-plymouth)
@@ -69,11 +69,13 @@ monarchy_rebuild_overlay() {
     local dest="$MONARCHY_PATH/bin"
     local src_bin="$MONARCHY_SRC/bin"
     local stub="$monarchy_lib_dir/stubs/deny.sh"
+    local skip="$monarchy_lib_dir/stubs/skip.sh"
     local yay="$monarchy_lib_dir/stubs/yay.sh"
     local name parent wrap_stub
 
     [ -d "$src_bin" ] || monarchy_die "omarchy package bin/ missing at $src_bin"
     [ -f "$stub" ] || monarchy_die "missing $stub"
+    [ -f "$skip" ] || monarchy_die "missing $skip"
 
     monarchy_trace "rebuild overlay $dest"
     parent=$(dirname "$dest")
@@ -82,6 +84,9 @@ monarchy_rebuild_overlay() {
     monarchy_write_to "$parent" cp -srT "$src_bin" "$dest"
     for name in "${MONARCHY_BIN_DENY[@]}"; do
         monarchy_write_to "$parent" install -m 755 "$stub" "$dest/$name"
+    done
+    for name in "${MONARCHY_BIN_SKIP[@]}"; do
+        monarchy_write_to "$parent" install -m 755 "$skip" "$dest/$name"
     done
     for name in "${MONARCHY_BIN_WRAP[@]}"; do
         wrap_stub=$(monarchy_wrap_stub_for "$name")
@@ -94,6 +99,9 @@ monarchy_rebuild_overlay() {
         monarchy_sudo mkdir -p /usr/local/bin
         for name in "${MONARCHY_BIN_DENY[@]}"; do
             monarchy_sudo install -m 755 "$stub" "/usr/local/bin/$name"
+        done
+        for name in "${MONARCHY_BIN_SKIP[@]}"; do
+            monarchy_sudo install -m 755 "$skip" "/usr/local/bin/$name"
         done
         for name in "${MONARCHY_BIN_WRAP[@]}"; do
             wrap_stub=$(monarchy_wrap_stub_for "$name")
@@ -174,7 +182,7 @@ monarchy_check_bin_hazards() {
 # stub for a binary that was removed is dead weight that hides a rename.
 monarchy_check_overrides_exist() {
     local name missing=0
-    for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}"; do
+    for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}" "${MONARCHY_BIN_SKIP[@]}"; do
         [ -e "$MONARCHY_SRC/bin/$name" ] && continue
         echo "overridden name no longer in the omarchy package: $name" >&2
         missing=1

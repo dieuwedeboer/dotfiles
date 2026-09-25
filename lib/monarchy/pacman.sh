@@ -41,7 +41,7 @@ monarchy_refuse_omarchy_zfs_repo() {
 # pacman -Sy refreshes every DB. Installing leaves after that without
 # upgrading already-installed dependents is a partial upgrade: ffmpeg 9
 # lands while chromaprint, vlc-plugin-ffmpeg, jellyfin-ffmpeg, gst-libav
-# still need the old sonames. CachyOS updater owns -Syu.
+# still need the old sonames. 'omarchy update' owns -Syu; see ADR 0003.
 #
 # Called from the `leaves` unit and from monarchy_install_packages, not from
 # the `pacman` unit: it guards installing leaves, and on the `pacman` unit it
@@ -51,7 +51,7 @@ monarchy_refuse_partial_upgrade() {
     pending=$(pacman -Qu 2>/dev/null || true)
     [ -n "$pending" ] || return 0
     n=$(printf '%s\n' "$pending" | grep -c .)
-    monarchy_die "pacman has $n pending upgrades. Run cachy-update (or sudo pacman -Syu), then re-run install.sh. Installing Omarchy leaves against a refreshed DB pulls new ffmpeg/gstreamer without their dependents"
+    monarchy_die "pacman has $n pending upgrades. Run 'omarchy update' (or sudo pacman -Syu), then re-run install.sh. Installing Omarchy leaves against a refreshed DB pulls new ffmpeg/gstreamer without their dependents"
 }
 
 monarchy_omarchy_key_present() {

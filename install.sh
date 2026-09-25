@@ -7,6 +7,7 @@
 set -e
 VERBOSE=0
 MODE=full
+OMARCHY_UPDATE_ARGS=()
 for arg in "$@"; do
     case "$arg" in
         -v|-r|--verbose) VERBOSE=1 ;;
@@ -21,6 +22,14 @@ for arg in "$@"; do
             fi
             ;;
         --splash-only) MODE=splash ;;
+        -y|--yes)
+            OMARCHY_UPDATE_ARGS+=(-y)
+            ;;
+        --no-omarchy-update)
+            # read below
+            # shellcheck disable=SC2034
+            MONARCHY_NO_OMARCHY_UPDATE=1
+            ;;
         --only=*)
             MONARCHY_ONLY=${arg#--only=}
             export MONARCHY_ONLY
@@ -34,16 +43,24 @@ usage: install.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
                   chezmoi, rEFInd glow, services, hardware, ZFS, then apply.
                   Once /etc/omarchy.conf exists, the same as --update.
   --check         Monarchy dry-run. Writes nothing under /etc or /usr/local.
-  --update        Household refresh, then snapshot, rebuild packages,
-                  classify, apply. After the first install this is the
-                  command; monarchy-update is this file with --update.
+  --update        Guards and a ZFS snapshot, household refresh (chezmoi
+                  front-loaded), then Omarchy's own `omarchy-update` in full,
+                  then rebuild packages, classify and apply over the top.
+                  After the first install this is the command; monarchy-update
+                  is this file with --update, and the overlay's omarchy-update
+                  is a wrapper onto it.
   --no-packages   Monarchy apply without pacman leaf packages. Still refreshes
                   chezmoi-managed dotfiles.
   --splash-only   Omarchy Plymouth theme, plymouth around zfs, retain-splash.
   --only=<unit>   Run one unit only. Combines with --check and --update.
-                  Skips the household refresh. Units: guards pacman packaging
-                  prefix overlay leaves settings sddm session logind portals
-                  user splash
+                  Skips the household refresh and Omarchy's own update.
+                  Units: guards pacman packaging prefix overlay leaves
+                  settings sddm session logind portals user splash
+  -y              Passed to `omarchy update`: do not ask anything.
+  --no-omarchy-update
+                  Monarchy only. Household refresh, snapshot, classify,
+                  apply -- without running Omarchy's own update in the
+                  middle. For iterating on monarchy without a full -Syu.
 
   omarchy-update (Omarchy menu) wraps monarchy-update. That path has no
   terminal, so chezmoi apply is skipped rather than hanging on a prompt.
@@ -100,10 +117,35 @@ monarchy_cli() {
             packages_strip_omarchy_owned
             packages_install_omarchy_aur
             ;;
-        update)
+        update-pre)
+            # Guards and the snapshot first, so a host this overlay must never
+            # touch is refused before Omarchy's own update gets near it, and
+            # so there is something to roll back to if it goes wrong.
+            monarchy_ensure_log
+            monarchy_load_lock
+            monarchy_load_inventories
+            monarchy_guards_check
+            monarchy_snapshot_first
+            # Before the upgrade, not after. omarchy 4.0.5 depends on
+            # omarchy-settings=4.0.5; our replacement still provides 4.0.4,
+            # so a --noconfirm -Syu would resolve that by pulling upstream's
+            # omarchy-settings, which conflicts with ours, which --noconfirm
+            # answers by replacing it -- and upstream's post_install is the
+            # `rm -f /etc/os-release` this repo exists to keep off the box.
+            # Building ours to the new version first is what makes the
+            # upgrade resolve without reaching for upstream's.
+            export MONARCHY_EXPECT_FULL_UPGRADE=1
+            monarchy_build_packages
+            unset MONARCHY_EXPECT_FULL_UPGRADE
+            ;;
+        update-post)
+            # monarchy_update re-runs the guards and finds the snapshot
+            # already taken; what it adds is the classification of whatever
+            # the upgrade landed, and the overlay rebuilt over it.
             monarchy_update
             packages_strip_omarchy_owned
             packages_install_omarchy_aur
+            monarchy_after_omarchy_update
             ;;
         splash) monarchy_splash_only ;;
         *)
@@ -121,12 +163,35 @@ case "$MODE" in
 esac
 
 printf '%sWelcome back, commander.%s\n' "$MONARCHY_UI_BOLD" "$MONARCHY_UI_OFF"
+
+# Guards and the ZFS snapshot run before anything is touched, the household
+# refresh included: a host this overlay must never touch is refused while
+# nothing has changed yet, and everything after has a rollback point.
+if [ "$MODE" = update ]; then
+    monarchy_cli update-pre
+fi
+
 if [ -z "${MONARCHY_ONLY:-}" ]; then
     household_refresh
 fi
 
 case "$MODE" in
-    update) monarchy_cli update ;;
+    update)
+        # Household first, then Omarchy's own update, then monarchy over the
+        # top. Dotfiles are front-loaded on purpose: a template that reads a
+        # package version should see the one the box is about to run, and a
+        # post-update hook Omarchy fires should find chezmoi already applied.
+        if [ -z "${MONARCHY_ONLY:-}" ] && [ "${MONARCHY_NO_OMARCHY_UPDATE:-0}" != 1 ]; then
+            # -y is upstream's promise not to ask anything. The Omarchy menu
+            # wrap-execs this with no terminal, and omarchy-update-confirm
+            # would sit there waiting on an answer nobody can give.
+            if ! monarchy_can_prompt; then
+                OMARCHY_UPDATE_ARGS=(-y)
+            fi
+            monarchy_real_omarchy_update "${OMARCHY_UPDATE_ARGS[@]}"
+        fi
+        monarchy_cli update-post
+        ;;
     apply|full) monarchy_cli apply ;;
     *)
         echo "unknown monarchy mode: $MODE" >&2

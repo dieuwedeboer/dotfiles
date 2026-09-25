@@ -130,10 +130,10 @@ fi
 # fork this way; the first thing to notice was a failed apply on the box.
 tree=$(require_omarchy_tree)
 stale=""
-for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}"; do
+for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}" "${MONARCHY_BIN_SKIP[@]}"; do
     [ -e "$tree/bin/$name" ] || stale="$stale $name"
 done
 [ -z "$stale" ] \
-    || fail "bin.deny or bin.wrap names binaries the omarchy package does not ship:$stale"
+    || fail "bin.deny, bin.wrap or bin.skip names binaries the omarchy package does not ship:$stale"
 
 echo "pkgbuild tests passed"

@@ -420,3 +420,52 @@ monarchy_update() {
     monarchy_classify_check
     monarchy_apply
 }
+
+# ---- the real Omarchy update, bracketed ---------------------------------
+#
+# The overlay used to replace `omarchy-update` outright, and with it went
+# every other thing that command does: the free-space check, the cache prune,
+# the keyring refresh, the AUR and mise passes, the orphan sweep, the log
+# analysis, and omarchy-update-status, which is the only thing that tells the
+# bar's system-update widget there is anything to tell. Monarchy wants three
+# specific things out of that flow, not the whole of it gone. See ADR 0003.
+#
+# Three names are stubbed out of the run rather than replaced, because they
+# are right for a stock box and wrong here. monarchy/bin.skip says which and
+# why; the two that matter are omarchy-migrate, which upstream runs directly
+# after the upgrade that ships a migration and therefore before monarchy has
+# classified it, and omarchy-update-restart, which would bring the shell back
+# holding stock QML before the overlay has been rebuilt over it.
+monarchy_real_omarchy_update() {
+    local real="$MONARCHY_SRC/bin/omarchy-update"
+    [ -x "$real" ] || monarchy_die "missing $real; is the omarchy package installed?"
+    monarchy_section "Omarchy"
+    # By absolute path out of the package tree, never through the overlay:
+    # the overlay's omarchy-update is the wrapper that got us here. Its
+    # children still resolve through the overlay, which is the point -- that
+    # is how bin.skip and the ZFS omarchy-snapshot take effect.
+    export OMARCHY_PATH
+    export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
+    "$real" "$@"
+}
+
+# What upstream runs that monarchy had to hold back until classification was
+# done, run now that it is. monarchy_apply has marked every denied migration
+# complete, so omarchy-migrate offers only the ones nobody has objected to.
+monarchy_after_omarchy_update() {
+    local bin="$MONARCHY_PATH/bin"
+    monarchy_section "Omarchy, after classification"
+    export OMARCHY_PATH
+    export PATH="$bin:${PATH:-/usr/bin}"
+    if [ -x "$MONARCHY_SRC/bin/omarchy-migrate" ]; then
+        monarchy_step "migrations"
+        "$MONARCHY_SRC/bin/omarchy-migrate" || monarchy_warn "omarchy-migrate did not complete"
+    fi
+    # The bar's update widget. Harmless when there is nothing to report, and
+    # the whole reason the widget went quiet was that this never ran.
+    if [ -x "$MONARCHY_SRC/bin/omarchy-update-status" ]; then
+        monarchy_step "update status"
+        "$MONARCHY_SRC/bin/omarchy-update-status" >/dev/null 2>&1 \
+            || monarchy_trace "could not refresh the shell update status"
+    fi
+}

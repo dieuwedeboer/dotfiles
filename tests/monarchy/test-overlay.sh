@@ -33,7 +33,8 @@ PLAIN=(omarchy omarchy-install-app omarchy-pkg-add omarchy-apply-lock
     omarchy-plymouth-set-by-theme omarchy-system-sleep-monitor
     omarchy-system-sleep-lock omarchy-plugin-validate omarchy-shell)
 mkdir -p "$tmp/src/bin"
-for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}" "${PLAIN[@]}"; do
+for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}" \
+    "${MONARCHY_BIN_SKIP[@]}" "${PLAIN[@]}"; do
     printf '#!/bin/sh\necho %s\n' "$name" >"$tmp/src/bin/$name"
     chmod +x "$tmp/src/bin/$name"
 done
@@ -81,6 +82,24 @@ for name in "${MONARCHY_BIN_WRAP[@]}"; do
 done
 [ -x "$dest/yay" ] || fail "yay wrapper missing"
 
+# --- skipped names: a real stub that does nothing and succeeds -----------
+
+# The distinction that matters is the exit status. omarchy-update runs under
+# `set -e`, so a name it calls in its ordinary flow that refuses with 2 takes
+# the whole system update down with it -- which is the difference between a
+# box that updated and one that did not.
+for name in "${MONARCHY_BIN_SKIP[@]}"; do
+    [ "$(kind "$dest/$name")" = "regular file" ] \
+        || fail "skip $name is $(kind "$dest/$name"), expected a regular file"
+    cmp -s "$dest/$name" "$LIB/stubs/skip.sh" \
+        || fail "skip $name is not the skip stub"
+    set +e
+    "$dest/$name" >/dev/null 2>&1
+    st=$?
+    set -e
+    [ "$st" -eq 0 ] || fail "skip $name exits $st, expected 0"
+done
+
 # --- everything else: mirrored, and resolving ---------------------------
 
 # A dangling entry is worse than no entry: it shadows /usr/bin as well as
@@ -118,8 +137,8 @@ fi
 rm -f "$tmp/src/bin/omarchy-something-new"
 monarchy_check_bin_hazards || fail "hazard scan failed on a clean tree"
 
-# A wrap or deny for a name upstream dropped is dead weight that hides a
-# rename, and a rename is how an unclassified hazard gets in.
+# A wrap, deny or skip for a name upstream dropped is dead weight that hides
+# a rename, and a rename is how an unclassified hazard gets in.
 rm -f "$tmp/src/bin/omarchy-refresh-pacman"
 if ( monarchy_check_overrides_exist ) >/dev/null 2>&1; then
     fail "override check passed a denied name that is no longer in the package"

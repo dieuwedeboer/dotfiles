@@ -261,7 +261,7 @@ monarchy_ensure_settings_pkg() {
 
     required=$(monarchy_settings_required_version)
     if [ -n "$required" ] && [ "$required" != "$ver" ]; then
-        monarchy_die "omarchy needs omarchy-settings=$required but [omarchy] has $ver; run cachy-update first"
+        monarchy_die "omarchy needs omarchy-settings=$required but [omarchy] has $ver; the repo is mid-publish, try again shortly"
     fi
 
     want="${ver}-1"
@@ -304,7 +304,16 @@ monarchy_ensure_settings_pkg() {
     monarchy_install_built_pkg "$built" "${assume[@]}"
 
     if [ ${#assume[@]} -gt 0 ]; then
-        monarchy_die "omarchy-settings-monarchy now tracks omarchy-settings=$ver; installed omarchy still pins $pinned. Run cachy-update (or sudo pacman -Syu) to bring omarchy up to it, then re-run monarchy-update"
+        # This is a handoff, not a failure: the settings package now tracks
+        # the new version and what it is waiting for is the full upgrade. When
+        # that upgrade is the next thing this run does, saying so and carrying
+        # on is the whole point. Dying here instead would abort the update
+        # immediately before the step it is asking for.
+        if [ "${MONARCHY_EXPECT_FULL_UPGRADE:-0}" = 1 ]; then
+            monarchy_changed "omarchy-settings-monarchy now tracks omarchy-settings=$ver; the upgrade below brings omarchy up to it"
+            return 0
+        fi
+        monarchy_die "omarchy-settings-monarchy now tracks omarchy-settings=$ver; installed omarchy still pins $pinned. Run 'omarchy update' (or sudo pacman -Syu) to bring omarchy up to it, then re-run monarchy-update"
     fi
 }
 
@@ -352,7 +361,11 @@ monarchy_ensure_omarchy_pkg() {
     local pending
     pending=$(pacman -Qu 2>/dev/null | grep -c . || true)
     if [ "${pending:-0}" -gt 0 ]; then
-        monarchy_die "omarchy is not installed and pacman has $pending pending upgrades. monarchy-boot-stub and omarchy-settings-monarchy are in place and /usr/share/omarchy is clear, so a full upgrade now resolves: run cachy-update (or sudo pacman -Syu), then re-run monarchy-update"
+        if [ "${MONARCHY_EXPECT_FULL_UPGRADE:-0}" = 1 ]; then
+            monarchy_trace "omarchy is not installed; the upgrade below pulls it in through flea"
+            return 0
+        fi
+        monarchy_die "omarchy is not installed and pacman has $pending pending upgrades. monarchy-boot-stub and omarchy-settings-monarchy are in place and /usr/share/omarchy is clear, so a full upgrade now resolves: run 'omarchy update' (or sudo pacman -Syu), then re-run monarchy-update"
     fi
 
     monarchy_log "pacman -S omarchy"

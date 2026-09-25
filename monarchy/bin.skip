@@ -1,0 +1,32 @@
+# Names the real `omarchy-update` calls in its ordinary flow that must not run
+# on this box, and must not refuse loudly either: a deny stub exits 2 and
+# `omarchy-update` runs under `set -e`, so refusing takes the whole update
+# with it. A skip stub does nothing and exits 0.
+#
+# This is a third answer, distinct from both the others. bin.deny is "nothing
+# should ever call this, and if something does, say so". bin.wrap is "this has
+# to behave differently here". bin.skip is "upstream is right to call this,
+# and here it has nothing to do".
+#
+# Every row needs the reason it cannot simply run, because a row whose reason
+# has lapsed is one that should go back to being real.
+
+# Exits 0 only when OMARCHY_PATH is /usr/share/omarchy. Ours is the working
+# prefix, which is not a git checkout, so it reaches "Error: OMARCHY_PATH is
+# not a git checkout" and exits 1.
+omarchy-update-dev
+
+# Runs before monarchy has rebuilt its overlay over the tree the upgrade just
+# replaced, so the shell would come back holding stock QML -- no switch-user
+# on the lock screen, an unpatched power panel -- and be restarted again
+# moments later. monarchy_restart_shell does this once, at the end of apply,
+# against a tree that has finished settling.
+omarchy-update-restart
+
+# Migrations are classified before they are allowed to run: migrations.deny
+# halts an apply until a new hazardous one has been looked at, and the marker
+# that keeps a denied one out of --pending is written during apply. Upstream
+# runs this immediately after the upgrade that ships it, which is before
+# monarchy has had either chance. Monarchy runs the real one itself, after
+# classification.
+omarchy-migrate

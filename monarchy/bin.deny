@@ -14,6 +14,5 @@ omarchy-setup-direct-boot
 omarchy-sudo-passwordless
 omarchy-system-factory-reset
 omarchy-system-factory-reset-finish
-omarchy-update-dev
 omarchy-update-pacman-guard
 omarchy-upgrade-to-quattro
