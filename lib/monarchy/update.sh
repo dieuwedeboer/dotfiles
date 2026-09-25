@@ -1,6 +1,9 @@
 # shellcheck shell=bash
 # Sourced into one shell by lib/monarchy.sh; common.sh state is in scope.
-# shellcheck disable=SC2154,SC2153
+# The overlay-first PATH below is deliberately subshell-local: it belongs to
+# the Omarchy command being run and to nothing install.sh does afterwards.
+# That is what SC2030/SC2031 are pointing at, and it is the intent.
+# shellcheck disable=SC2154,SC2153,SC2030,SC2031
 
 monarchy_check_migrations() {
     local dir="$MONARCHY_SRC/migrations"
@@ -444,28 +447,51 @@ monarchy_real_omarchy_update() {
     # the overlay's omarchy-update is the wrapper that got us here. Its
     # children still resolve through the overlay, which is the point -- that
     # is how bin.skip and the ZFS omarchy-snapshot take effect.
-    export OMARCHY_PATH
-    export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
-    "$real" "$@"
+    #
+    # In a subshell, so the overlay-first PATH belongs to this command and
+    # not to everything install.sh does afterwards.
+    ( export OMARCHY_PATH
+      export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
+      "$real" "$@" )
 }
 
 # What upstream runs that monarchy had to hold back until classification was
 # done, run now that it is. monarchy_apply has marked every denied migration
 # complete, so omarchy-migrate offers only the ones nobody has objected to.
 monarchy_after_omarchy_update() {
-    local bin="$MONARCHY_PATH/bin"
     monarchy_section "Omarchy, after classification"
-    export OMARCHY_PATH
-    export PATH="$bin:${PATH:-/usr/bin}"
+    # Same subshell rule as above: these resolve their siblings through the
+    # overlay, and nothing after them should.
     if [ -x "$MONARCHY_SRC/bin/omarchy-migrate" ]; then
         monarchy_step "migrations"
-        "$MONARCHY_SRC/bin/omarchy-migrate" || monarchy_warn "omarchy-migrate did not complete"
+        ( export OMARCHY_PATH
+          export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
+          "$MONARCHY_SRC/bin/omarchy-migrate" ) \
+            || monarchy_warn "omarchy-migrate did not complete"
     fi
     # The bar's update widget. Harmless when there is nothing to report, and
     # the whole reason the widget went quiet was that this never ran.
     if [ -x "$MONARCHY_SRC/bin/omarchy-update-status" ]; then
         monarchy_step "update status"
-        "$MONARCHY_SRC/bin/omarchy-update-status" >/dev/null 2>&1 \
+        ( export OMARCHY_PATH
+          export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
+          "$MONARCHY_SRC/bin/omarchy-update-status" >/dev/null 2>&1 ) \
             || monarchy_trace "could not refresh the shell update status"
+    fi
+    # And last, upstream's own closing step. bin.skip holds it out of the
+    # update itself because it prompts to reboot, and a reboot taken there --
+    # after the upgrade, before monarchy has rebuilt the overlay over it --
+    # comes back to a session whose Exec= and greeter have not been put back.
+    # Here it is safe, and it is doing four things monarchy has no equivalent
+    # for: the kernel-updated reboot prompt, the reboot-required prompt, the
+    # Hyprland-updated prompt, and the restart-*-required marker sweep. It
+    # also owns the shell restart at this point; monarchy_restart_shell stood
+    # down for it.
+    if [ -x "$MONARCHY_SRC/bin/omarchy-update-restart" ]; then
+        monarchy_step "reboot and service restarts"
+        ( export OMARCHY_PATH
+          export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
+          "$MONARCHY_SRC/bin/omarchy-update-restart" ) \
+            || monarchy_trace "omarchy-update-restart did not complete"
     fi
 }

@@ -86,6 +86,34 @@ monarchy_log() { monarchy_log_line 0 "$*"; }
 # log has them regardless.
 monarchy_trace() { monarchy_log_line 1 "$*"; }
 
+# Take ownership of the log once, at the top of an apply, rather than
+# elevating on every monarchy_log call. Self-healing: it re-runs whenever the
+# file is not writable by whoever is running, so a change of administrator
+# fixes itself on the next apply.
+#
+# touch before chown, never `install /dev/null`, which would truncate the
+# history this exists to keep. Failure to elevate is not fatal: monarchy_log
+# falls back to journald, and refusing to apply because a log file could not
+# be chowned would be the wrong trade.
+#
+# This only fixes the file for the administrator. A deny stub run by another
+# account still cannot write it, and does not need to: deny.sh calls
+# `logger -t monarchy` first and unconditionally, so a block is recorded for
+# every account no matter who runs it.
+monarchy_ensure_log() {
+    [ -d "$(dirname "$MONARCHY_LOG")" ] || return 0
+    [ ! -w "$MONARCHY_LOG" ] || return 0
+    # if/else rather than a && b || c: any one of the three failing has to
+    # reach the warning, and the chain form reads as if-then-else when it is
+    # not one.
+    if ! { monarchy_sudo touch "$MONARCHY_LOG" \
+        && monarchy_sudo chown "$(id -u):$(id -g)" "$MONARCHY_LOG" \
+        && monarchy_sudo chmod 0644 "$MONARCHY_LOG"; }; then
+        monarchy_log "warning: cannot write $MONARCHY_LOG; logging to journald only"
+    fi
+    return 0
+}
+
 monarchy_die() {
     monarchy_log "error: $*"
     echo "monarchy: $*" >&2

@@ -126,6 +126,22 @@ monarchy_cli() {
             monarchy_load_inventories
             monarchy_guards_check
             monarchy_snapshot_first
+            # Only when the upgrade it prepares for is actually going to run.
+            # --only and --no-omarchy-update skip that upgrade, and building
+            # against a release bump without it leaves omarchy installed with
+            # an unsatisfied omarchy-settings pin -- and silently, because
+            # MONARCHY_EXPECT_FULL_UPGRADE turns the guard that would have
+            # said so into a note.
+            [ "$MONARCHY_RUN_OMARCHY_UPDATE" = 1 ] || return 0
+            # Refresh the sync DB first. Everything below reads `pacman -Si`,
+            # and the first -Sy in this flow is inside omarchy-update-keyring,
+            # which runs after. Against a stale DB the version check sees the
+            # release it already tracks, builds nothing, and the upgrade then
+            # resolves omarchy's new omarchy-settings pin by reaching for
+            # upstream's package -- the exact case this step exists to stop.
+            # cachy-update used to keep the DB fresh; ADR 0003 took that away.
+            monarchy_sudo pacman -Sy >/dev/null \
+                || monarchy_die "pacman -Sy failed; cannot prepare the local packages"
             # Before the upgrade, not after. omarchy 4.0.5 depends on
             # omarchy-settings=4.0.5; our replacement still provides 4.0.4,
             # so a --noconfirm -Syu would resolve that by pulling upstream's
@@ -164,9 +180,19 @@ esac
 
 printf '%sWelcome back, commander.%s\n' "$MONARCHY_UI_BOLD" "$MONARCHY_UI_OFF"
 
+# Whether Omarchy's own update runs this time. The pre phase prepares for it,
+# so both have to agree; they used to be two separate conditions and the pre
+# phase was the one that leaked.
+MONARCHY_RUN_OMARCHY_UPDATE=0
+if [ "$MODE" = update ] && [ -z "${MONARCHY_ONLY:-}" ] \
+    && [ "${MONARCHY_NO_OMARCHY_UPDATE:-0}" != 1 ]; then
+    MONARCHY_RUN_OMARCHY_UPDATE=1
+fi
+
 # Guards and the ZFS snapshot run before anything is touched, the household
 # refresh included: a host this overlay must never touch is refused while
-# nothing has changed yet, and everything after has a rollback point.
+# nothing has changed yet, and everything after has a rollback point. The
+# guards only read, so nothing has been written when they refuse.
 if [ "$MODE" = update ]; then
     monarchy_cli update-pre
 fi
@@ -181,14 +207,29 @@ case "$MODE" in
         # top. Dotfiles are front-loaded on purpose: a template that reads a
         # package version should see the one the box is about to run, and a
         # post-update hook Omarchy fires should find chezmoi already applied.
-        if [ -z "${MONARCHY_ONLY:-}" ] && [ "${MONARCHY_NO_OMARCHY_UPDATE:-0}" != 1 ]; then
+        if [ "$MONARCHY_RUN_OMARCHY_UPDATE" = 1 ]; then
             # -y is upstream's promise not to ask anything. The Omarchy menu
             # wrap-execs this with no terminal, and omarchy-update-confirm
             # would sit there waiting on an answer nobody can give.
             if ! monarchy_can_prompt; then
                 OMARCHY_UPDATE_ARGS=(-y)
             fi
-            monarchy_real_omarchy_update "${OMARCHY_UPDATE_ARGS[@]}"
+            # Its status is captured, not allowed to end the run. Six fallible
+            # steps sit between the upgrade and the end of that command -- the
+            # AUR pass, mise, the orphan sweep -- and any of them failing used
+            # to skip everything below. That leaves the worst state this flow
+            # can produce: a new package tree with monarchy's overlay, the
+            # session NoDisplay and the greeter still belonging to the old
+            # one. The re-apply is what closes that window, so it runs whether
+            # or not Omarchy's update finished happily.
+            omarchy_rc=0
+            monarchy_real_omarchy_update "${OMARCHY_UPDATE_ARGS[@]}" || omarchy_rc=$?
+            if [ "$omarchy_rc" -ne 0 ]; then
+                monarchy_warn "omarchy-update exited $omarchy_rc; applying monarchy over the tree it left"
+            fi
+            # Upstream's closing step runs after the re-apply instead. See
+            # monarchy_after_omarchy_update.
+            export MONARCHY_DEFER_SHELL_RESTART=1
         fi
         monarchy_cli update-post
         ;;

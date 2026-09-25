@@ -136,7 +136,8 @@ monarchy_prune_stale_overlay_links() {
         [ -L "$f" ] || continue
         name=$(basename "$f")
         if monarchy_in_list "$name" "${MONARCHY_BIN_DENY[@]}" \
-            || monarchy_in_list "$name" "${MONARCHY_BIN_WRAP[@]}"; then
+            || monarchy_in_list "$name" "${MONARCHY_BIN_WRAP[@]}" \
+            || monarchy_in_list "$name" "${MONARCHY_BIN_SKIP[@]}"; then
             continue
         fi
         monarchy_sudo rm -f "$f"
@@ -338,10 +339,21 @@ MONARCHY_SHELL_DIRTY=0
 # from outside.
 monarchy_shell_fingerprint() {
     local dir="$MONARCHY_PATH/shell"
-    [ -d "$dir" ] || { printf 'absent\n'; return 0; }
-    find "$dir" -type f -print0 2>/dev/null \
+    [ -e "$dir" ] || { printf 'absent\n'; return 0; }
+    # -L, because almost none of this tree is a real file. The working prefix
+    # links `shell` at the package, and monarchy_explode_symlink_dir replaces
+    # only `plugins` with a real directory -- so a plain `-type f` walked past
+    # Shell.qml, Bar/, and everything else that is still a child symlink, and
+    # a `shell` that was itself a symlink fingerprinted as empty. An upstream
+    # release that changed any of it looked identical and the shell was never
+    # restarted.
+    #
+    # Paths are made relative to $dir so the value does not carry the prefix
+    # and a temp-prefix run can be compared with a real one.
+    ( cd "$dir" 2>/dev/null || exit 0
+      find -L . -type f -print0 2>/dev/null \
         | LC_ALL=C sort -z \
-        | xargs -0 sha256sum 2>/dev/null \
+        | xargs -0 -r sha256sum 2>/dev/null ) \
         | sha256sum | cut -d' ' -f1
 }
 
@@ -364,6 +376,14 @@ monarchy_overlay_shell() {
 
 monarchy_restart_shell() {
     [ "${MONARCHY_SHELL_DIRTY:-0}" = 1 ] || return 0
+    # In the bracketed update the real omarchy-update-restart runs after this,
+    # from monarchy_after_omarchy_update, and it restarts the shell itself
+    # along with everything else it is responsible for. Restarting here as
+    # well would be the second blink this whole change exists to remove.
+    if [ "${MONARCHY_DEFER_SHELL_RESTART:-0}" = 1 ]; then
+        monarchy_trace "shell restart deferred to omarchy-update-restart"
+        return 0
+    fi
     MONARCHY_SHELL_DIRTY=0
 
     command -v omarchy-restart-shell >/dev/null 2>&1 || return 0

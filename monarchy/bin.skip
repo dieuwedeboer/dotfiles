@@ -16,11 +16,20 @@
 # not a git checkout" and exits 1.
 omarchy-update-dev
 
-# Runs before monarchy has rebuilt its overlay over the tree the upgrade just
-# replaced, so the shell would come back holding stock QML -- no switch-user
-# on the lock screen, an unpatched power panel -- and be restarted again
-# moments later. monarchy_restart_shell does this once, at the end of apply,
-# against a tree that has finished settling.
+# Held back rather than dropped: monarchy_after_omarchy_update runs the real
+# one once the overlay has been rebuilt. It does four things besides restart
+# the shell -- prompts to reboot when the running kernel is no longer the
+# installed one, prompts on reboot-required, prompts when Hyprland's binary
+# reads (deleted), and sweeps the restart-*-required markers -- and monarchy
+# has no equivalent for any of them. Now that `omarchy update` owns -Syu,
+# kernel upgrades happen here, so the reboot prompt matters more than it did.
+#
+# It cannot run where upstream puts it. A reboot taken there is taken after
+# the upgrade and before monarchy has rebuilt the overlay, so the box comes
+# back with the session Exec= and the greeter still belonging to the old
+# tree. And the shell restart would land on stock QML and be repeated moments
+# later. Afterwards both are right, and it owns the shell restart at that
+# point: monarchy_restart_shell stands down via MONARCHY_DEFER_SHELL_RESTART.
 omarchy-update-restart
 
 # Migrations are classified before they are allowed to run: migrations.deny

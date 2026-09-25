@@ -24,7 +24,10 @@ be the thing that asserts and brackets, not the thing that replaces.
 
 1. **Guards.** A host this overlay must never touch is refused while nothing
    has changed. `--only` cannot skip them.
-2. **ZFS pre-update snapshot.** Everything after it has a rollback point.
+2. **ZFS pre-update snapshot.** Everything that writes has a rollback point.
+   The guards above it only read — they refuse by dying, having changed
+   nothing — so the order between those two is a matter of failing fast, not
+   of recoverability.
 3. **Household refresh, chezmoi front-loaded.** A template that reads a
    package version should see the one the box is about to run, and a
    post-update hook Omarchy fires should find chezmoi already applied.
@@ -51,7 +54,14 @@ overwrites `nsswitch.conf`. That is a box nobody logs in to, arrived at by
 answering yes to a question nobody was asked.
 
 Building ours to the new version *first* is what makes the upgrade resolve
-without reaching for upstream's. `monarchy_ensure_settings_pkg` already did
+without reaching for upstream's — and it has to read a **refreshed** sync DB
+to do it. Every version check in that step is a plain `pacman -Si`, and the
+first `-Sy` in the flow is inside `omarchy-update-keyring`, which runs after.
+Against a stale DB the check sees the release it already tracks, builds
+nothing, and the upgrade then hits exactly the conflict this step exists to
+prevent. `cachy-update` used to keep the DB fresh as a side effect of owning
+`-Syu`; this decision took that away, so `update-pre` runs `pacman -Sy` of its
+own first. `monarchy_ensure_settings_pkg` already did
 exactly this and then stopped, telling the operator to run a full upgrade and
 come back. In this flow that upgrade is the next step, so
 `MONARCHY_EXPECT_FULL_UPGRADE=1` turns that stop into a note and carries on.
@@ -73,10 +83,15 @@ Three rows, each with its reason in the file. Two matter:
   migration, which is before monarchy has classified it against
   `migrations.deny` or written the marker that keeps a denied one out of
   `--pending`. Monarchy runs the real one itself, after classification.
-- **`omarchy-update-restart`** would bring the shell back holding stock QML —
-  no switch-user on the lock screen, an unpatched power panel — before the
-  overlay has been rebuilt over it, and it would be restarted again moments
-  later. `monarchy_restart_shell` does this once, at the end of apply.
+- **`omarchy-update-restart`** is held back, not dropped: it runs from
+  `monarchy_after_omarchy_update` once the overlay is rebuilt. Where upstream
+  puts it, its reboot prompt offers to reboot into a tree monarchy has not
+  re-applied to — the session `Exec=` and the greeter would still be the old
+  one — and its shell restart would land on stock QML and be repeated. It
+  carries the kernel-updated, reboot-required and Hyprland-updated prompts
+  and the `restart-*-required` sweep, none of which monarchy has an
+  equivalent for, and which matter more now that this decision makes kernel
+  upgrades part of the flow.
 
 ## Consequences
 
@@ -92,6 +107,20 @@ terminal and `omarchy-update-confirm` would wait on an answer nobody can give.
 
 **`--no-omarchy-update` exists** for iterating on monarchy without a full
 `-Syu` in the middle.
+
+**A failure in Omarchy's update does not skip the re-apply.** Six fallible
+steps sit between the upgrade and the end of that command — the AUR pass,
+mise, the orphan sweep. Letting any of them end the run leaves the worst
+state this flow can produce: a new package tree with monarchy's overlay, the
+session `NoDisplay` and the greeter still belonging to the old one. The
+status is captured and reported; the re-apply runs either way.
+
+**`update-pre` prepares only when the upgrade will actually follow.**
+`--only` and `--no-omarchy-update` still take the guards and the snapshot,
+but not the package build: building against a release bump with no upgrade
+behind it leaves `omarchy` with an unsatisfied `omarchy-settings` pin, and
+`MONARCHY_EXPECT_FULL_UPGRADE` would have turned the guard that says so into
+a note.
 
 **The blast radius is larger than it was.** A run now performs a full system
 upgrade where before it installed filtered leaves. The snapshot at step 2 is
