@@ -244,6 +244,7 @@ monarchy_splash_only() {
     monarchy_rebuild_overlay
     monarchy_overlay_session_lock
     monarchy_overlay_power_panel
+    monarchy_overlay_agent_marks
     export OMARCHY_PATH
     monarchy_pkg_installed plymouth || monarchy_die "plymouth is not installed"
     monarchy_splash

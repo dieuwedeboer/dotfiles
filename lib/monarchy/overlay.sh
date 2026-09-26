@@ -365,6 +365,46 @@ monarchy_overlay_power_panel() {
     monarchy_log "overlaid $dir"
 }
 
+# ---- agent marks ----------------------------------------------------------
+#
+# The AI panel draws a tab's mark from its own assets/<id>.svg (and an
+# <id>-light.svg twin for light surfaces) and from nowhere else, so a plugin
+# that adds an agent -- Grok, from monarchy/plugins -- cannot bring its mark.
+# monarchy/agent-marks holds the ones omarchy does not ship.
+
+monarchy_agent_marks_dir() {
+    printf '%s\n' "$MONARCHY_MISC/agent-marks"
+}
+
+# Once omarchy ships a mark of its own, ours is a row that does nothing but
+# hide theirs. Fail, as monarchy_check_launcher_unhides does for a stale row.
+monarchy_check_agent_marks() {
+    local src mark
+    src="$MONARCHY_SRC/shell/plugins/agents/assets"
+    [ -d "$src" ] || monarchy_die "omarchy package agents assets missing"
+    for mark in "$(monarchy_agent_marks_dir)"/*.svg; do
+        [ -e "$mark" ] || continue
+        [ ! -e "$src/$(basename "$mark")" ] \
+            || monarchy_die "omarchy now ships agents/assets/$(basename "$mark"); drop monarchy/agent-marks/$(basename "$mark")"
+    done
+    return 0
+}
+
+# Runs after monarchy_overlay_session_lock, for the same reason as the power
+# panel: shell/plugins is a fresh copy each apply.
+monarchy_overlay_agent_marks() {
+    local dir mark
+    dir="$MONARCHY_PATH/shell/plugins/agents/assets"
+    [ -d "$dir" ] && [ ! -L "$dir" ] \
+        || monarchy_die "$dir is not a real directory; lock overlay must run first"
+    for mark in "$(monarchy_agent_marks_dir)"/*.svg; do
+        [ -e "$mark" ] || continue
+        monarchy_write_to "$dir" cp -f "$mark" "$dir/"
+    done
+    MONARCHY_SHELL_DIRTY=1
+    monarchy_log "overlaid $dir"
+}
+
 # ---- launcher.hides -----------------------------------------------------
 #
 # AppLibrary.qml reads exactly one path, $OMARCHY_PATH/default/omarchy/

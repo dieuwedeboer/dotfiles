@@ -93,6 +93,12 @@ charge reports that at any charge level, so the panel called a filling pack
 held at a limit the machine does not have. A machine with `charge_control_*`
 decides exactly as upstream does.
 
+Agent marks are added, not patched. The AI panel draws a tab's mark from its
+own `assets/<id>.svg` and nowhere else, so the Grok tab a plugin adds would
+show a bare letter. `monarchy/agent-marks/` is copied into that directory, and
+the check fails once omarchy ships a mark of the same name, so ours never
+hides theirs.
+
 ## New upstream binaries
 
 There is nothing to regenerate. `monarchy_check_bin_hazards` greps the package
