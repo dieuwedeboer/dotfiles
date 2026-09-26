@@ -11,7 +11,17 @@
 #
 # Deleting a row here stops nothing that is already installed. To be rid of a
 # plugin: drop the row, then `omarchy plugin remove <id>`.
-https://github.com/dougfour/omarchy-grok-usage.git --enable
+#
+# Grok usage is a stopgap fork: upstream dougfour/omarchy-grok-usage lost its
+# Grok tab when omarchy stopped passing __sourceDir, and the fixes sit in its
+# open PRs #2 and #3. The fork is upstream plus those two merges, nothing else.
+# The username in its URL is an agreed exception to AGENTS.md "No names".
+# Return to https://github.com/dougfour/omarchy-grok-usage.git once both land.
+# Either way, an existing checkout keeps its origin -- apply sees the id already
+# there and leaves it -- so switch one by hand:
+#   git -C ~/.config/omarchy/plugins/io.github.dougfour.grok-usage remote set-url origin <url>
+#   omarchy plugin update io.github.dougfour.grok-usage --yes && omarchy restart shell
+https://github.com/dieuwedeboer/omarchy-grok-usage.git --enable
 https://github.com/crmne/omastats.git --enable
 https://github.com/IM0001GT/omarchy-screens.git --enable
 https://github.com/lgse/sandman.git --enable
