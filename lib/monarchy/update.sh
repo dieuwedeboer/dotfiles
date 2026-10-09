@@ -76,7 +76,7 @@ monarchy_check_applications_drop() {
 #
 # The order changed when the clone went away. It now has to be:
 #   pacman     [omarchy] has to exist before anything can be downloaded
-#   packaging  builds the two local packages, then installs `omarchy`
+#   packaging  builds the two local packages, installs `omarchy`, then hyprbars
 #   prefix     links the working prefix out of the tree `omarchy` just landed
 #   overlay    stubs and wraps, which need that prefix
 #   leaves     reads install/omarchy-base.packages, which only exists after
@@ -125,7 +125,7 @@ monarchy_pacman_apply() {
     monarchy_add_omarchy_repo
 }
 
-# ---- packaging: the two local packages, then the real omarchy ------------
+# ---- packaging: the two local packages, the real omarchy, hyprbars ------
 
 monarchy_packaging_check() {
     monarchy_check_pkgbuilds

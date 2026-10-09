@@ -47,7 +47,7 @@ See `docs/agents/domain.md`.
 
 Monarchy tracks the official `omarchy` package from the `[omarchy]` repository,
 channel stable — not a fork, not a clone, not a git commit. `monarchy/omarchy.lock`
-records which package and channel. There is no pin to bump. `monarchy-update` rebuilds the two local packages in
+records which package and channel. There is no pin to bump. `monarchy-update` rebuilds the local packages in
 `pkgbuilds/`, installs the current `omarchy` from `[omarchy]` stable, and halts
 if a new binary or migration touches Limine, snapper or `pacman.conf` without
 being classified into `monarchy/bin.deny`, `monarchy/bin.wrap` or
