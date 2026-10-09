@@ -242,9 +242,16 @@ monarchy_user_emacs() {
     fi
     # Keep emacs-wayland as explicit so dropping omarchy-emacs does not
     # leave it as an unused dependency. `pacman -Qe` is that question asked
-    # directly, so the install only runs when the answer is no.
+    # directly. -S --needed skips an installed package, reason and all, so an
+    # installed dependency is marked with -D instead.
     if ! pacman -Qe emacs-wayland >/dev/null 2>&1; then
-        if monarchy_sudo pacman -S --needed --noconfirm --asexplicit emacs-wayland; then
+        if pacman -Q emacs-wayland >/dev/null 2>&1; then
+            if monarchy_sudo pacman -D --asexplicit emacs-wayland; then
+                monarchy_changed "marked emacs-wayland explicit"
+            else
+                monarchy_warn "could not mark emacs-wayland explicit"
+            fi
+        elif monarchy_sudo pacman -S --needed --noconfirm --asexplicit emacs-wayland; then
             monarchy_changed "installed emacs-wayland"
         else
             monarchy_warn "could not install emacs-wayland"
