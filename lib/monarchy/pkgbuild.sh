@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Build and install the two local packages that let the official `omarchy`
-# package run on this host.
+# or `omarchy-dev` package run on this host. omarchy.lock says which.
 #
 #   monarchy-boot-stub          provides limine*/snapper so omarchy's hard deps
 #                               resolve without the ESP-hijacking hook
@@ -16,11 +16,12 @@
 MONARCHY_PKGBUILDS="${MONARCHY_PKGBUILDS:-$MONARCHY_DOTFILES/pkgbuilds}"
 MONARCHY_BUILD_DIR="${MONARCHY_BUILD_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/monarchy/build}"
 
-# The version `omarchy` pins its settings package to. omarchy depends on
-# omarchy-settings=<exact>, so our replacement has to provide that same
-# version or the dep does not resolve.
+# The version the locked package pins its settings package to. omarchy
+# depends on omarchy-settings=<exact>, so our replacement has to provide that
+# same version or the dep does not resolve. omarchy-dev depends on
+# omarchy-settings-dev with no version, so for it this is empty.
 monarchy_settings_required_version() {
-    pacman -Si omarchy 2>/dev/null | monarchy_parse_settings_pin
+    pacman -Si "$MONARCHY_LOCK_PACKAGE" 2>/dev/null | monarchy_parse_settings_pin
 }
 
 # The same pin, read from the omarchy that is installed now. On a release
@@ -29,11 +30,11 @@ monarchy_installed_settings_pin() {
     pacman -Qi omarchy 2>/dev/null | monarchy_parse_settings_pin
 }
 
-# stdin: `pacman -Si` / `-Qi` output for omarchy.
+# stdin: `pacman -Si` / `-Qi` output for omarchy or omarchy-dev.
 monarchy_parse_settings_pin() {
     awk -F': ' '$1 ~ /^Depends On/ { print $2 }' \
         | tr ' ' '\n' \
-        | sed -n 's/^omarchy-settings=\(.*\)$/\1/p' \
+        | sed -n 's/^omarchy-settings\(-dev\)\{0,1\}=\(.*\)$/\2/p' \
         | head -1
 }
 
@@ -163,7 +164,7 @@ monarchy_plan_overwrites() {
         owner=$(pacman -Qoq "$p" 2>/dev/null || true)
         if [ -n "$owner" ]; then
             case "$owner" in
-                monarchy-boot-stub|omarchy-settings-monarchy|omarchy) continue ;;
+                monarchy-boot-stub|omarchy-settings-monarchy|omarchy|omarchy-dev) continue ;;
             esac
             clashes+=("$p (owned by $owner)")
             continue
@@ -224,19 +225,20 @@ monarchy_ensure_boot_stub() {
 
 # ---- omarchy-settings-monarchy ------------------------------------------
 
-# Fetch the official package straight from [omarchy] and verify it against
-# pacman's keyring. `pacman -Sw omarchy-settings` cannot be used: our
+# Fetch the official settings package for the locked Omarchy package straight
+# from [omarchy] and verify it against pacman's keyring. `pacman -Sw
+# omarchy-settings` cannot be used: our
 # replacement conflicts with that name, so resolution refuses before it
 # downloads anything.
 monarchy_fetch_official_settings() {
     local full=$1 dest=$2
     local arch file url
-    arch=$(pacman -Si omarchy-settings 2>/dev/null \
+    arch=$(pacman -Si "$MONARCHY_SETTINGS_UPSTREAM" 2>/dev/null \
         | awk -F': ' '$1 ~ /^Architecture/ { print $2; exit }' | tr -d ' ')
-    [ -n "$arch" ] || monarchy_die "could not read omarchy-settings Architecture from [omarchy]"
+    [ -n "$arch" ] || monarchy_die "could not read $MONARCHY_SETTINGS_UPSTREAM Architecture from [omarchy]"
     # Path segment is the repo arch; the filename carries the package's own
     # arch, which for omarchy-settings is "any".
-    file="omarchy-settings-${full}-${arch}.pkg.tar.zst"
+    file="${MONARCHY_SETTINGS_UPSTREAM}-${full}-${arch}.pkg.tar.zst"
     url="$MONARCHY_OMARCHY_SERVER/$(uname -m)/$file"
 
     monarchy_log "fetch $url"
@@ -255,21 +257,21 @@ monarchy_ensure_settings_pkg() {
     local full ver required want have skip built tmp
     # Full upstream version incl. pkgrel ("4.0.2-1"): that is what names the
     # file on the mirror.
-    full=$(monarchy_repo_pkg_version omarchy-settings)
-    [ -n "$full" ] || monarchy_die "omarchy-settings not found in [omarchy]"
+    full=$(monarchy_repo_pkg_version "$MONARCHY_SETTINGS_UPSTREAM")
+    [ -n "$full" ] || monarchy_die "$MONARCHY_SETTINGS_UPSTREAM not found in [omarchy]"
     # pkgver cannot hold a pkgrel, and omarchy depends on omarchy-settings=4.0.2
     # with no pkgrel either, so the provides has to be the bare version.
     ver=${full%-*}
 
     required=$(monarchy_settings_required_version)
     if [ -n "$required" ] && [ "$required" != "$ver" ]; then
-        monarchy_die "omarchy needs omarchy-settings=$required but [omarchy] has $ver; the repo is mid-publish, try again shortly"
+        monarchy_die "$MONARCHY_LOCK_PACKAGE needs $MONARCHY_SETTINGS_UPSTREAM=$required but [omarchy] has $ver; the repo is mid-publish, try again shortly"
     fi
 
     want="${ver}-1"
     have=$(monarchy_installed_pkg_version omarchy-settings-monarchy)
     if [ "$have" = "$want" ]; then
-        monarchy_trace "omarchy-settings-monarchy $have already tracks omarchy-settings=$ver"
+        monarchy_trace "omarchy-settings-monarchy $have already tracks $MONARCHY_SETTINGS_UPSTREAM=$ver"
         return 0
     fi
 
@@ -284,6 +286,7 @@ monarchy_ensure_settings_pkg() {
     # PKGBUILD reads pkgver from here so the version tracks upstream with no
     # file to bump.
     export MONARCHY_SETTINGS_PKGVER="$ver"
+    export MONARCHY_SETTINGS_UPSTREAM
     built=$(monarchy_build_pkg omarchy-settings-monarchy \
         "$tmp/upstream.pkg.tar.zst" "$skip")
     unset MONARCHY_SETTINGS_PKGVER
@@ -305,17 +308,19 @@ monarchy_ensure_settings_pkg() {
     fi
     monarchy_install_built_pkg "$built" "${assume[@]}"
 
-    if [ ${#assume[@]} -gt 0 ]; then
+    # Switching between omarchy and omarchy-dev is the other way out of the
+    # old pin: monarchy_ensure_omarchy_pkg replaces the package that holds it.
+    if [ ${#assume[@]} -gt 0 ] && monarchy_pkg_exactly "$MONARCHY_LOCK_PACKAGE"; then
         # This is a handoff, not a failure: the settings package now tracks
         # the new version and what it is waiting for is the full upgrade. When
         # that upgrade is the next thing this run does, saying so and carrying
         # on is the whole point. Dying here instead would abort the update
         # immediately before the step it is asking for.
         if [ "${MONARCHY_EXPECT_FULL_UPGRADE:-0}" = 1 ]; then
-            monarchy_changed "omarchy-settings-monarchy now tracks omarchy-settings=$ver; the upgrade below brings omarchy up to it"
+            monarchy_changed "omarchy-settings-monarchy now tracks $MONARCHY_SETTINGS_UPSTREAM=$ver; the upgrade below brings $MONARCHY_LOCK_PACKAGE up to it"
             return 0
         fi
-        monarchy_die "omarchy-settings-monarchy now tracks omarchy-settings=$ver; installed omarchy still pins $pinned. Run 'omarchy update' (or sudo pacman -Syu) to bring omarchy up to it, then re-run monarchy-update"
+        monarchy_die "omarchy-settings-monarchy now tracks $MONARCHY_SETTINGS_UPSTREAM=$ver; installed $MONARCHY_LOCK_PACKAGE still pins $pinned. Run 'omarchy update' (or sudo pacman -Syu) to bring it up to that, then re-run monarchy-update"
     fi
 }
 
@@ -348,10 +353,11 @@ monarchy_clear_legacy_prefix_symlink() {
 }
 
 monarchy_ensure_omarchy_pkg() {
+    local want=$MONARCHY_LOCK_PACKAGE other
     # Idempotent; monarchy_build_packages already did this before the stub.
     monarchy_clear_legacy_prefix_symlink
-    if monarchy_pkg_exactly omarchy; then
-        monarchy_trace "omarchy $(monarchy_installed_pkg_version omarchy) already installed"
+    if monarchy_pkg_exactly "$want"; then
+        monarchy_trace "$want $(monarchy_installed_pkg_version "$want") already installed"
         return 0
     fi
 
@@ -370,9 +376,22 @@ monarchy_ensure_omarchy_pkg() {
         monarchy_die "omarchy is not installed and pacman has $pending pending upgrades. monarchy-boot-stub and omarchy-settings-monarchy are in place and /usr/share/omarchy is clear, so a full upgrade now resolves: run 'omarchy update' (or sudo pacman -Syu), then re-run monarchy-update"
     fi
 
-    monarchy_log "pacman -S omarchy"
-    monarchy_sudo pacman -S --needed --noconfirm omarchy \
-        || monarchy_die "pacman -S omarchy failed"
+    # omarchy and omarchy-dev conflict, and --noconfirm answers no to removing
+    # the other one. Each provides `omarchy`, so -Rdd leaves nothing broken
+    # for longer than this function.
+    case "$want" in
+        omarchy) other=omarchy-dev ;;
+        *) other=omarchy ;;
+    esac
+    if monarchy_pkg_exactly "$other"; then
+        monarchy_log "pacman -Rdd $other, to replace it with $want"
+        monarchy_sudo pacman -Rdd --noconfirm "$other" \
+            || monarchy_die "pacman -Rdd $other failed"
+    fi
+
+    monarchy_log "pacman -S $want"
+    monarchy_sudo pacman -S --needed --noconfirm "$want" \
+        || monarchy_die "pacman -S $want failed; the other Omarchy package is removed, so install one by hand before logging out"
 }
 
 # ---- unit verbs ---------------------------------------------------------
@@ -410,9 +429,9 @@ monarchy_check_pkgbuilds() {
         [ -f "$MONARCHY_PKGBUILDS/$name/PKGBUILD" ] \
             || monarchy_die "missing $MONARCHY_PKGBUILDS/$name/PKGBUILD"
     done
-    grep -q "provides=(\"omarchy-settings=\$pkgver\")" \
+    grep -q "provides=(\"omarchy-settings=\$pkgver\" \"omarchy-settings-dev=\$pkgver\")" \
         "$MONARCHY_PKGBUILDS/omarchy-settings-monarchy/PKGBUILD" \
-        || monarchy_die "omarchy-settings-monarchy must provide omarchy-settings=\$pkgver"
+        || monarchy_die "omarchy-settings-monarchy must provide omarchy-settings=\$pkgver and omarchy-settings-dev=\$pkgver"
     local dep
     for dep in limine limine-mkinitcpio-hook limine-snapper-sync snapper; do
         grep -q "'$dep'" "$MONARCHY_PKGBUILDS/monarchy-boot-stub/PKGBUILD" \

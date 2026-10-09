@@ -9,17 +9,10 @@ import argparse
 import sys
 from pathlib import Path
 
-KEYS_OLD = """        Keys.onPressed: function(event) {
-          root.wakeRequested()
-          if (event.key === Qt.Key_Escape || (event.modifiers & Qt.ControlModifier && event.key === Qt.Key_U)) {
-            root.passwordTextEdited("")
-            event.accepted = true
-          }
-        }"""
+KEYS_OLD = """          if (event.key === Qt.Key_Escape || (event.modifiers & Qt.ControlModifier && event.key === Qt.Key_U)) {
+"""
 
-KEYS_NEW = """        Keys.onPressed: function(event) {
-          root.wakeRequested()
-          var ctrl = event.modifiers & Qt.ControlModifier
+KEYS_NEW = """          var ctrl = event.modifiers & Qt.ControlModifier
           var meta = event.modifiers & Qt.MetaModifier
           if (root.inputEnabled && ctrl && meta && event.key === Qt.Key_U) {
             root.switchUserRequested()
@@ -27,29 +20,21 @@ KEYS_NEW = """        Keys.onPressed: function(event) {
             return
           }
           if (event.key === Qt.Key_Escape || (ctrl && !meta && event.key === Qt.Key_U)) {
-            root.passwordTextEdited("")
-            event.accepted = true
-          }
-        }"""
+"""
 
 SIGNAL_OLD = "  signal wakeRequested()\n"
 SIGNAL_NEW = "  signal wakeRequested()\n  signal switchUserRequested()\n"
 
-HINT_ANCHOR = """        objectName: "fingerprintIndicator"
-        anchors.right: parent.right
-        anchors.rightMargin: inputField.borderRight + 18
-        anchors.verticalCenter: parent.verticalCenter
-        visible: root.fingerprintConfigured
-        text: "󰈷"
-        color: Color.lock.placeholder
-        font.family: Style.font.family
-        font.pixelSize: Math.round(root.fieldFontSize * 1.1)
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-      }
-    }"""
+# Qt 6.12 ships a QtQuick `Color` that shadows the shell's, so the hint names
+# the shell's through a qualified import. Adding it to a file that already has
+# it, or that still uses bare Color, is harmless.
+COMMONS_IMPORT = "import qs.Commons as Commons\n"
+COMMONS_ANCHOR = "import qs.Commons\n"
 
-HINT_NEW = HINT_ANCHOR + """
+HINT_MARK = 'objectName: "fingerprintIndicator"'
+HINT_END = "\n      }\n    }"
+
+HINT_NEW = """
 
     Shortcut {
       enabled: root.inputEnabled
@@ -65,7 +50,7 @@ HINT_NEW = HINT_ANCHOR + """
       anchors.topMargin: Math.round(root.fieldHeight * 0.35)
       visible: root.inputEnabled
       text: "Super+Ctrl+U to switch user"
-      color: Color.lock.placeholder
+      color: Commons.Color.lock.placeholder
       font.family: Style.font.family
       font.pixelSize: Math.round(root.fieldFontSize * 0.55)
       horizontalAlignment: Text.AlignHCenter
@@ -171,10 +156,24 @@ def must_replace(content: str, old: str, new: str, label: str) -> str:
     return content.replace(old, new, 1)
 
 
+# The fingerprint Text's body changes between releases; only its objectName
+# and the close of it and the field around it are stable enough to anchor on.
+def insert_hint(content: str) -> str:
+    if content.count(HINT_MARK) != 1:
+        raise SystemExit(f"overlay-lock: fingerprintIndicator matched {content.count(HINT_MARK)} times")
+    end = content.find(HINT_END, content.index(HINT_MARK))
+    if end < 0:
+        raise SystemExit("overlay-lock: end of the fingerprintIndicator block missing from clone file")
+    end += len(HINT_END)
+    return content[:end] + HINT_NEW + content[end:]
+
+
 def patch_lock_view(content: str) -> str:
     content = must_replace(content, SIGNAL_OLD, SIGNAL_NEW, "signal wakeRequested")
     content = must_replace(content, KEYS_OLD, KEYS_NEW, "Keys.onPressed Ctrl+U")
-    content = must_replace(content, HINT_ANCHOR, HINT_NEW, "fingerprintIndicator")
+    content = insert_hint(content)
+    if COMMONS_IMPORT not in content:
+        content = must_replace(content, COMMONS_ANCHOR, COMMONS_ANCHOR + COMMONS_IMPORT, "import qs.Commons")
     return content
 
 

@@ -23,7 +23,6 @@ MONARCHY_ROOT_DATASET="${MONARCHY_ROOT_DATASET:-zpcachyos/ROOT/cos/root}"
 MONARCHY_ESP="${MONARCHY_ESP:-/boot/efi}"
 MONARCHY_ZBM_DIR="${MONARCHY_ZBM_DIR:-$MONARCHY_ESP/EFI/zbm}"
 MONARCHY_REFIND_DIR="${MONARCHY_REFIND_DIR:-$MONARCHY_ESP/EFI/refind}"
-MONARCHY_OMARCHY_SERVER="${MONARCHY_OMARCHY_SERVER:-https://pkgs.omarchy.org/stable}"
 MONARCHY_ZFS_KEYFILE="${MONARCHY_ZFS_KEYFILE:-/etc/zfs/zroot.key}"
 MONARCHY_MKINITCPIO_CONF="${MONARCHY_MKINITCPIO_CONF:-/etc/mkinitcpio.conf}"
 
@@ -175,6 +174,18 @@ monarchy_load_lock() {
     MONARCHY_LOCK_CHANNEL=$(awk -F= '$1=="channel"{print substr($0,index($0,"=")+1)}' "$lock")
     [ -n "$MONARCHY_LOCK_PACKAGE" ] || monarchy_die "omarchy.lock missing package"
     [ -n "$MONARCHY_LOCK_CHANNEL" ] || monarchy_die "omarchy.lock missing channel"
+    # Each Omarchy package has its own settings package, pinned to it.
+    # shellcheck disable=SC2034
+    case "$MONARCHY_LOCK_PACKAGE" in
+        omarchy) MONARCHY_SETTINGS_UPSTREAM=omarchy-settings ;;
+        omarchy-dev) MONARCHY_SETTINGS_UPSTREAM=omarchy-settings-dev ;;
+        *) monarchy_die "omarchy.lock package must be omarchy or omarchy-dev, not $MONARCHY_LOCK_PACKAGE" ;;
+    esac
+    case "$MONARCHY_LOCK_CHANNEL" in
+        stable|rc|edge) ;;
+        *) monarchy_die "omarchy.lock channel must be stable, rc or edge, not $MONARCHY_LOCK_CHANNEL" ;;
+    esac
+    MONARCHY_OMARCHY_SERVER="${MONARCHY_OMARCHY_SERVER:-https://pkgs.omarchy.org/$MONARCHY_LOCK_CHANNEL}"
 }
 
 monarchy_assert_root_pre_update_snapshot() {
@@ -282,8 +293,9 @@ monarchy_refuse_kernel_swap() {
     return 0
 }
 
-# `omarchy` is installed on purpose now. What must never be installed is a
-# settings package that carries upstream's post_install: it does
+# `omarchy` or `omarchy-dev` is installed on purpose now; neither has a
+# scriptlet. What must never be installed is a settings package that carries
+# upstream's post_install: it does
 # `rm -f /etc/os-release` and overwrites nsswitch.conf, faillock.conf,
 # plymouthd.conf and /etc/skel/.bashrc on every upgrade.
 # omarchy-settings-monarchy provides the name without the scriptlet, and
@@ -291,7 +303,7 @@ monarchy_refuse_kernel_swap() {
 monarchy_skip_os_release_clobber() {
     monarchy_assert_os_release
     local p
-    for p in omarchy-settings omarchy-settings-dev omarchy-dev; do
+    for p in omarchy-settings omarchy-settings-dev; do
         monarchy_pkg_exactly "$p" && monarchy_die "$p is installed; it clobbers /etc/os-release"
     done
     return 0

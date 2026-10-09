@@ -13,7 +13,7 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 | archzfs vs CachyOS ZFS (`linux-cachyos-zfs` and `zfs-dkms` both from Calamares) | CachyOS | Keep both CachyOS packages. No `[archzfs]` | `monarchy_refuse_archzfs` |
 | Limine vs rEFInd + ZFSBootMenu | King | Never install limine. Stub `omarchy-refresh-limine` | `monarchy_refuse_bootloader` |
 | Snapper vs sanoid + pacman ZFS hook | King | Never install snapper | `monarchy_refuse_snapper` |
-| Omarchy ALPM update guard | would be Omarchy | Never install `omarchy` / `omarchy-dev` | `monarchy_disable_omarchy_update_guard` |
+| Omarchy ALPM update guard | would be Omarchy | Mask `00-omarchy-update-guard.hook` | `monarchy_disable_omarchy_update_guard` |
 | `zroot/ROOT/default` vs `zpcachyos/ROOT/cos/root` | King | Never run `zfs.sh` / zfs-check | `monarchy_refuse_dataset_rename` |
 | `omarchy-settings*` overwrites `/etc/os-release` | CachyOS | Never install those packages | `monarchy_skip_os_release_clobber` |
 | Two DMs: CachyOS PLM vs Omarchy `sddm` | CachyOS | Install `sddm`, remove PLM | `monarchy_keep_sddm` |
@@ -37,6 +37,11 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 | Emacs | `emacs-wayland` + [omarchy-emacs-theme](https://github.com/berenddeboer/omarchy-emacs-theme) (Quattro `themed/` + `theme-set.d`). Live config is chezmoi `~/.config/emacs/`. `~/.emacs.d` is moved aside. Stock `emacs` and `omarchy-emacs` are uninstalled |
 | Nautilus vs Dolphin | Install nautilus. No user-global mimeapps |
 | `ufw-docker` | Deny. Never run `firewall.sh` |
+| `vi` | Deny. CachyOS's `ex-vi-compat` already provides `vi` and conflicts with a package of that name |
+| `superwhisper-bin` | Deny. Proprietary dictation app; Voxtype stays the dictation backend. Revisit if the household wants it |
+| `hype`, `monologue` | Deny. Optional Basecamp apps (slides, webcam recorder) that the household does not need; `omarchy-pkg-add` either one by hand |
+| Migrations `1787589206.sh`, `1788112314.sh` edit `pacman.conf` | Deny. Both are no-ops here: one drops a `SigLevel` override Monarchy never writes, the other only acts on an rc mirror |
+| Migration `1791403252.sh` moves `[omarchy]` above every other repo, then runs a full upgrade | Deny. `[omarchy]` stays after CachyOS (`monarchy_preserve_pacman_conf`); its packages would otherwise shadow CachyOS builds |
 | NVIDIA 580xx-dkms vs `chwd` | Never run Omarchy `nvidia.sh` |
 | `tuxedo-drivers-nocompatcheck-dkms` | Deny the package and the script |
 | `tlp-pd` vs `power-profiles-daemon` | Abort if TLP is installed. Omarchy calls `powerprofilesctl` |
@@ -44,7 +49,7 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 
 ## `packages.deny`
 
-See `monarchy/packages.deny`. Curated bricks only: two DMs (`plasma-login-manager`), metapackages (`omarchy` / `omarchy-settings*`), Limine, Snapper, stock `linux`/`linux-ptl*`, `tldr` (tealdeer), and `ufw-docker` (kingfisher keeps ufw disabled). `yay` is allowed. Overlay `yay` still execs `paru` when an Omarchy script calls it from session PATH.
+See `monarchy/packages.deny`. Curated bricks only: two DMs (`plasma-login-manager`), metapackages (`omarchy-dev` / `omarchy-settings*`, which the packaging unit installs or replaces itself), Limine, Snapper, stock `linux`/`linux-ptl*`, `tldr` (tealdeer), `ufw-docker` (kingfisher keeps ufw disabled), `vi`, `superwhisper-bin`, `hype` and `monologue`. `yay` is allowed. Overlay `yay` still execs `paru` when an Omarchy script calls it from session PATH.
 
 ## AUR packages that depend on `omarchy`
 
@@ -94,10 +99,11 @@ held at a limit the machine does not have. A machine with `charge_control_*`
 decides exactly as upstream does.
 
 Agent marks are added, not patched. The AI panel draws a tab's mark from its
-own `assets/<id>.svg` and nowhere else, so the Grok tab a plugin adds would
-show a bare letter. `monarchy/agent-marks/` is copied into that directory, and
-the check fails once omarchy ships a mark of the same name, so ours never
-hides theirs.
+own `assets/<id>.svg` and nowhere else, so a tab a plugin adds would show a
+bare letter. `monarchy/agent-marks/` is copied into that directory, and the
+check fails once omarchy ships a mark of the same name, so ours never hides
+theirs. The Grok marks that lived there went when omarchy-dev started
+shipping its own; the directory is empty until a plugin needs one again.
 
 ## New upstream binaries
 

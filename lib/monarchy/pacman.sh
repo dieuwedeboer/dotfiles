@@ -153,6 +153,12 @@ monarchy_install_omarchy_keyring() {
     fi
 }
 
+monarchy_assert_omarchy_channel() {
+    local conf=${MONARCHY_PACMAN_CONF:-/etc/pacman.conf}
+    grep -qxF "Server = $MONARCHY_OMARCHY_SERVER/\$arch" "$conf" \
+        || monarchy_die "[omarchy] in $conf is not $MONARCHY_OMARCHY_SERVER, the channel omarchy.lock names. Run ./install.sh --only=pacman, then cachy-update, then this again"
+}
+
 monarchy_add_omarchy_repo() {
     local conf=${MONARCHY_PACMAN_CONF:-/etc/pacman.conf}
     local bak=/etc/pacman.conf.monarchy.bak
@@ -177,7 +183,7 @@ monarchy_add_omarchy_repo() {
 $begin
 [omarchy]
 SigLevel = Required DatabaseOptional
-Server = https://pkgs.omarchy.org/stable/\$arch
+Server = $MONARCHY_OMARCHY_SERVER/\$arch
 $end
 EOF
     )

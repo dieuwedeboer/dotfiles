@@ -1,5 +1,14 @@
-# What Monarchy tracks. This used to pin a git commit on a third-party ZFS
-# fork; it now names the official package and channel, and pacman does the
-# pinning. Deployed to /etc/omarchy.lock at apply.
-package=omarchy
-channel=stable
+# What Monarchy tracks: the official Omarchy package and the [omarchy] channel
+# it comes from. pacman does the pinning. Deployed to /etc/omarchy.lock at
+# apply.
+#
+# package  omarchy (tagged releases) or omarchy-dev (built from upstream's
+#          development branch). Each brings its own settings package, which
+#          omarchy-settings-monarchy replaces.
+# channel  stable, rc or edge: the pkgs.omarchy.org path [omarchy] points at.
+#          omarchy-dev is only current on edge.
+#
+# Changing either: ./install.sh --only=pacman, then cachy-update, then
+# monarchy-update. See docs/adr/0003-track-omarchy-dev-on-edge.md.
+package=omarchy-dev
+channel=edge

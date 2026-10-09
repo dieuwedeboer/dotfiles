@@ -15,7 +15,7 @@ monarchy_check_migrations() {
         if monarchy_in_list "$base" "${MONARCHY_MIGRATE_DENY[@]}"; then
             continue
         fi
-        if grep -Eq 'limine-mkinitcpio|omarchy-refresh-pacman|use_omarchy_pacman_config' "$f"; then
+        if grep -Eq 'limine-mkinitcpio|omarchy-refresh-pacman|use_omarchy_pacman_config|/etc/pacman\.conf|omarchy-update-system-pkgs' "$f"; then
             echo "migration not in migrations.deny but touches limine/pacman: $base" >&2
             monarchy_die "classify $base into migrations.deny"
         fi
@@ -117,6 +117,7 @@ monarchy_guards_apply() { :; }
 
 monarchy_pacman_check() {
     monarchy_preserve_pacman_conf
+    monarchy_assert_omarchy_channel
     monarchy_refuse_archzfs
     monarchy_refuse_omarchy_zfs_repo
 }
@@ -418,6 +419,10 @@ monarchy_update() {
     monarchy_ensure_log
     monarchy_load_lock
     monarchy_load_inventories
+    # The packages below are built from whatever [omarchy] the sync DB has, so
+    # a channel change in omarchy.lock has to reach pacman.conf, and the DB be
+    # refreshed, before this runs.
+    monarchy_assert_omarchy_channel
     monarchy_snapshot_first
     # Build and install the packages before classifying, so a new upstream
     # version is classified against the tree that is about to be applied

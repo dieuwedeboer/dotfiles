@@ -18,11 +18,11 @@ Household boxes run CachyOS on native-encrypted ZFS with KDE Plasma, rEFInd chai
 
 CachyOS owns the OS: kernel, ZFS modules, repos, Plasma, `cachy-update`, sanoid, ZBM. Monarchy owns the Hyprland session, the clash bridge, and branding. Omarchy never owns `pacman.conf`, the bootloader, or `/etc/os-release`.
 
-The desktop comes from the official `omarchy` package, plus two packages built here: `monarchy-boot-stub` and `omarchy-settings-monarchy`. There is no fork and no clone. A third local package, `hyprbars-monarchy`, builds the hyprbars title-bar plugin against the installed Hyprland for the Classic Desktop shell plugin.
+The desktop comes from an official Omarchy package (`omarchy` or `omarchy-dev`, whichever `monarchy/omarchy.lock` names), plus two packages built here: `monarchy-boot-stub` and `omarchy-settings-monarchy`. There is no fork and no clone. A third local package, `hyprbars-monarchy`, builds the hyprbars title-bar plugin against the installed Hyprland for the Classic Desktop shell plugin.
 
 ### Where the desktop comes from
 
-The `[omarchy]` repository, channel **stable**. `monarchy/omarchy.lock` names `package=omarchy` and `channel=stable`, and pacman does the version pinning from there. Read that as: there is no git remote to follow, no commit pinned, and nothing to re-pin. `monarchy-update` installs whatever that channel currently carries and halts on a new binary or migration it cannot classify, which is the human step that used to be a pin bump.
+The `[omarchy]` repository, on the channel `monarchy/omarchy.lock` names. It is currently `package=omarchy-dev` and `channel=edge`, upstream's development build, taken for a Qt 6.12 fix that stable did not have yet (ADR 0003); `package=omarchy` and `channel=stable` is the tagged-release setting. Pacman does the version pinning from there. Read that as: there is no git remote to follow, no commit pinned, and nothing to re-pin. `monarchy-update` installs whatever that channel currently carries and halts on a new binary or migration it cannot classify, which is the human step that used to be a pin bump.
 
 Anything describing how to move this repo onto a newer upstream *commit* — a note, a skill, a stale paragraph — is describing the arrangement below, which ended. Check `monarchy/omarchy.lock` before believing it.
 
@@ -32,7 +32,7 @@ Until the move to the packages, it was a pinned git clone of `berenddeboer/omarc
 
 `berenddeboer/omarchy-zfs-pkgs` does not help either: its `omarchy-settings-dev.install` is upstream's byte-for-byte where it matters (`rm -f /etc/os-release` and the five unconditional `cp -f` into `/etc`), and its `omarchy-dev` hard-depends on all four of limine, limine-mkinitcpio-hook, limine-snapper-sync and snapper. That is correct for a box where Omarchy *is* the OS. It is the opposite of what this repo needs.
 
-Do not vendor-fork Omarchy. Do not re-add a clone. Do not re-add a pin. The overlay in this repo is what we maintain, on top of whatever `[omarchy]` stable ships.
+Do not vendor-fork Omarchy. Do not re-add a clone. Do not re-add a pin. The overlay in this repo is what we maintain, on top of whatever the locked `[omarchy]` channel ships.
 
 ## Architecture
 
@@ -71,8 +71,8 @@ flowchart TB
 Three layers:
 
 1. Official `[omarchy]` appended after CachyOS. Pacman first-match keeps `hyprland`, `quickshell`, `linux`, and `zfs-utils` on CachyOS. Names that exist only in Omarchy (`omarchy-nvim`, `omarchy-keyring`, `omacalc`, …) come from `[omarchy]`.
-2. The official `omarchy` package, plus a working prefix of symlinks into the tree it owns. Same idea as `omarchy-dev-link`, without installing `omarchy-dev`.
-3. Two local packages, not a denylist. `omarchy` is installed. `omarchy-settings` is replaced by `omarchy-settings-monarchy`; `limine*` and `snapper` are satisfied by `monarchy-boot-stub`. `omarchy-dev`, `omarchy-settings` and `omarchy-settings-dev` stay in `packages.deny`.
+2. The locked Omarchy package, plus a working prefix of symlinks into the tree it owns. Same idea as `omarchy-dev-link`, without a git checkout.
+3. Two local packages, not a denylist. `omarchy` or `omarchy-dev` is installed; the packaging unit replaces one with the other when the lock changes, since they conflict. `omarchy-settings` and `omarchy-settings-dev` are replaced by `omarchy-settings-monarchy`, built from whichever of the two goes with the locked package and providing both names; `limine*` and `snapper` are satisfied by `monarchy-boot-stub`. `omarchy-dev`, `omarchy-settings` and `omarchy-settings-dev` stay in `packages.deny`, which only filters the `omarchy-base.packages` leaves.
 
 Do not add `[omarchy-zfs]` or `[archzfs]`. Do not replace `/etc/pacman.d/mirrorlist` or any `cachyos-*-mirrorlist`.
 
@@ -80,13 +80,13 @@ Do not add `[omarchy-zfs]` or `[archzfs]`. Do not replace `/etc/pacman.d/mirrorl
 
 | Path | Role |
 | --- | --- |
-| `/usr/share/omarchy` | Owned by `omarchy` + `omarchy-settings-monarchy`. Never written to. A symlink here aborts the pacman transaction, so apply removes a leftover one before installing. |
+| `/usr/share/omarchy` | Owned by `omarchy` or `omarchy-dev`, + `omarchy-settings-monarchy`. Never written to. A symlink here aborts the pacman transaction, so apply removes a leftover one before installing. |
 | `/usr/local/share/omarchy` | `OMARCHY_PATH`. What the session reads. |
 | `/etc/omarchy.conf` | `OMARCHY_PATH=/usr/local/share/omarchy` |
 | `/etc/omarchy.lock` | Copy of `monarchy/omarchy.lock` written at apply. `omarchy-version-branch` reads it. |
 | `monarchy/omarchy.lock` | `package` and `channel`. Pacman does the version pinning now. |
 
-`monarchy_link_working_prefix` symlinks `default`, `shell`, `themes`, `migrations`, `config`, `install`, `applications`, `version`, `logo.txt`, `logo.svg`, `icon.txt`, and `icon.png` into the working prefix. `omarchy` ships six of those names and `omarchy-settings-monarchy` the other six, so the set is complete without a clone. `bin/` is not a symlink. Apply then explodes `shell/` and `default/` so lock QML, the power panel, the AI panel's agent marks, `omarchy-menu.jsonc` and `launcher.hides` can be patched copies — a pacman-owned path is not somewhere to write, because the next upgrade would silently revert them.
+`monarchy_link_working_prefix` symlinks `default`, `shell`, `themes`, `migrations`, `config`, `install`, `applications`, `version`, `logo.txt`, `logo.svg`, `icon.txt`, and `icon.png` into the working prefix. `omarchy` (or `omarchy-dev`) ships six of those names and `omarchy-settings-monarchy` the other six, so the set is complete without a clone. `bin/` is not a symlink. Apply then explodes `shell/` and `default/` so lock QML, the power panel, the AI panel's agent marks, `omarchy-menu.jsonc` and `launcher.hides` can be patched copies — a pacman-owned path is not somewhere to write, because the next upgrade would silently revert them.
 
 env-bootstrap and `envs.lua` both prepend `$OMARCHY_PATH/bin`. That directory is the overlay: a full mirror of the packaged `bin/`, with Monarchy's stubs and wraps over the names we override.
 
@@ -161,11 +161,11 @@ The repo is a marker block, replaced in place:
 # BEGIN monarchy-omarchy
 [omarchy]
 SigLevel = Required DatabaseOptional
-Server = https://pkgs.omarchy.org/stable/$arch
+Server = https://pkgs.omarchy.org/edge/$arch
 # END monarchy-omarchy
 ```
 
-CachyOS does not Include drop-ins, so this lives in `pacman.conf` itself. First edit takes `/etc/pacman.conf.monarchy.bak`. `monarchy_preserve_pacman_conf` aborts if `[cachyos]` / `[cachyos-v3]` do not precede `[omarchy]`, or if the CachyOS/Arch mirrorlist Includes are gone.
+The path is the lock's channel. `monarchy-update` refuses to build while it differs, so a lock change goes `./install.sh --only=pacman`, `cachy-update`, `monarchy-update`. CachyOS does not Include drop-ins, so this lives in `pacman.conf` itself. First edit takes `/etc/pacman.conf.monarchy.bak`. `monarchy_preserve_pacman_conf` aborts if `[cachyos]` / `[cachyos-v3]` do not precede `[omarchy]`, or if the CachyOS/Arch mirrorlist Includes are gone.
 
 `monarchy_install_packages` reads `install/omarchy-base.packages` from the package tree, subtracts `monarchy/packages.deny`, `pacman -S --needed --noconfirm`, writes `monarchy/packages.installed` and `/var/lib/monarchy/packages.installed`. Do not install from `omarchy-other.packages`. Hardware stays CachyOS `chwd` plus `hardware/`.
 
@@ -353,7 +353,7 @@ monarchy/
   applications.drop
   launcher.unhides
   plugins
-  agent-marks/           # AI panel marks omarchy does not ship (grok, from lobehub, MIT)
+  agent-marks/           # AI panel marks omarchy does not ship (none at present)
   bin.wrap
   bin.deny
   migrations.deny

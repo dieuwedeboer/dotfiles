@@ -25,7 +25,9 @@
 #   settings.skip         monarchy/settings.skip
 #   PKGBUILD              this file
 # and exports MONARCHY_SETTINGS_PKGVER. Not a standalone PKGBUILD by design:
-# the version has to track whatever `omarchy` currently depends on.
+# the version has to track whatever `omarchy` currently depends on. The
+# upstream is omarchy-settings or omarchy-settings-dev, whichever goes with
+# the package omarchy.lock names; this provides both names so either resolves.
 
 pkgname=omarchy-settings-monarchy
 pkgver=${MONARCHY_SETTINGS_PKGVER:?set by lib/monarchy/pkgbuild.sh}
@@ -37,9 +39,9 @@ license=('MIT')
 
 depends=('bash' 'curl' 'gum' 'hicolor-icon-theme' 'plymouth')
 
-provides=("omarchy-settings=$pkgver")
+provides=("omarchy-settings=$pkgver" "omarchy-settings-dev=$pkgver")
 conflicts=('omarchy-settings' 'omarchy-settings-dev')
-replaces=('omarchy-settings')
+replaces=('omarchy-settings' 'omarchy-settings-dev')
 
 source=('upstream.pkg.tar.zst' 'settings.skip')
 sha256sums=('SKIP' 'SKIP')
