@@ -41,6 +41,7 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 | `superwhisper-bin` | Deny. Proprietary dictation app; Voxtype stays the dictation backend. Revisit if the household wants it |
 | `hype`, `monologue` | Deny. Optional Basecamp apps (slides, webcam recorder) that the household does not need; `omarchy-pkg-add` either one by hand |
 | Migrations `1787589206.sh`, `1788112314.sh` edit `pacman.conf` | Deny. Both are no-ops here: one drops a `SigLevel` override Monarchy never writes, the other only acts on an rc mirror |
+| Migration `1791123731.sh` appends a transparency example to `~/.config/hypr/looknfeel.lua` | Deny. chezmoi owns that file (ADR 0001), so the append would only show up as drift |
 | Migration `1791403252.sh` moves `[omarchy]` above every other repo, then runs a full upgrade | Deny. `[omarchy]` stays after CachyOS (`monarchy_preserve_pacman_conf`); its packages would otherwise shadow CachyOS builds |
 | NVIDIA 580xx-dkms vs `chwd` | Never run Omarchy `nvidia.sh` |
 | `tuxedo-drivers-nocompatcheck-dkms` | Deny the package and the script |
