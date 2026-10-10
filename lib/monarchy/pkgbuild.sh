@@ -78,9 +78,11 @@ monarchy_build_pkg() {
     ( cd "$build" && makepkg --force --clean --nodeps --noconfirm >/dev/null ) \
         || monarchy_die "makepkg failed for $name (see $build)"
 
+    # Not a glob over $build: a source can itself be a package, as
+    # omarchy-settings-monarchy's upstream.pkg.tar.zst is.
     local built
-    built=$(find "$build" -maxdepth 1 -name '*.pkg.tar.*' ! -name '*.sig' -print -quit)
-    [ -n "$built" ] || monarchy_die "makepkg produced no package for $name"
+    built=$( cd "$build" && makepkg --packagelist 2>/dev/null | head -n1 )
+    [ -n "$built" ] && [ -f "$built" ] || monarchy_die "makepkg produced no package for $name"
     printf '%s\n' "$built"
 }
 
