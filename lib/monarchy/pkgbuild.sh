@@ -394,6 +394,13 @@ monarchy_ensure_omarchy_pkg() {
     monarchy_log "pacman -S $want"
     monarchy_sudo pacman -S --needed --noconfirm "$want" \
         || monarchy_die "pacman -S $want failed; the other Omarchy package is removed, so install one by hand before logging out"
+
+    # Between -Rdd and -S there is no /usr/share/omarchy/default/hypr. A
+    # running Hyprland that autoreloads in that window registers no binds and
+    # drops into emergency mode, and nothing reloads it once the tree is back.
+    if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] && command -v hyprctl >/dev/null 2>&1; then
+        hyprctl reload >/dev/null 2>&1 || monarchy_warn "hyprctl reload failed after replacing $other; run it by hand"
+    fi
 }
 
 # ---- unit verbs ---------------------------------------------------------
