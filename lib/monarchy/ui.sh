@@ -34,12 +34,14 @@ if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != dumb ]; then
     MONARCHY_UI_BOLD=$'\033[1m'
     MONARCHY_UI_DIM=$'\033[2m'
     MONARCHY_UI_YELLOW=$'\033[33m'
+    MONARCHY_UI_RED=$'\033[31m'
     MONARCHY_UI_GREEN=$'\033[32m'
     MONARCHY_UI_OFF=$'\033[0m'
 else
     MONARCHY_UI_BOLD=""
     MONARCHY_UI_DIM=""
     MONARCHY_UI_YELLOW=""
+    MONARCHY_UI_RED=""
     MONARCHY_UI_GREEN=""
     MONARCHY_UI_OFF=""
 fi
@@ -47,6 +49,7 @@ fi
 MONARCHY_UI_CHANGED=()
 MONARCHY_UI_LEFT=()
 MONARCHY_UI_WARNED=()
+MONARCHY_UI_FAILED=()
 MONARCHY_UI_STARTED=${MONARCHY_UI_STARTED:-$SECONDS}
 MONARCHY_UI_STEPS=0
 
@@ -143,7 +146,10 @@ monarchy_warn() {
 }
 
 monarchy_ui_note_warning() {
-    MONARCHY_UI_WARNED+=("${1#warning: }")
+    case "$1" in
+        error:*) MONARCHY_UI_FAILED+=("${1#error: }") ;;
+        *) MONARCHY_UI_WARNED+=("${1#warning: }") ;;
+    esac
 }
 
 monarchy_ui_list() {
@@ -167,16 +173,22 @@ monarchy_summary() {
     monarchy_section "Summary"
     if [ "${#MONARCHY_UI_CHANGED[@]}" -eq 0 ] \
         && [ "${#MONARCHY_UI_LEFT[@]}" -eq 0 ] \
-        && [ "${#MONARCHY_UI_WARNED[@]}" -eq 0 ]; then
+        && [ "${#MONARCHY_UI_WARNED[@]}" -eq 0 ] \
+        && [ "${#MONARCHY_UI_FAILED[@]}" -eq 0 ]; then
         printf '\n  Nothing changed.\n'
     fi
     monarchy_ui_list "$MONARCHY_UI_GREEN" Changed "${MONARCHY_UI_CHANGED[@]}"
     monarchy_ui_list "$MONARCHY_UI_BOLD" "Left alone" "${MONARCHY_UI_LEFT[@]}"
     monarchy_ui_list "$MONARCHY_UI_YELLOW" Warnings "${MONARCHY_UI_WARNED[@]}"
+    monarchy_ui_list "$MONARCHY_UI_RED" Stopped "${MONARCHY_UI_FAILED[@]}"
 
     if [ "${#MONARCHY_UI_LEFT[@]}" -gt 0 ]; then
         printf '\n  %sLeft alone is not a failure: monarchy seeds, it does not\n' "$MONARCHY_UI_DIM"
         printf '  switch anything back on that was switched off here.%s\n' "$MONARCHY_UI_OFF"
+    fi
+
+    if [ "${#MONARCHY_UI_FAILED[@]}" -gt 0 ]; then
+        printf '\n  %sStopped partway: later steps did not run.%s\n' "$MONARCHY_UI_RED" "$MONARCHY_UI_OFF"
     fi
 
     printf '\n  %s%d steps · %s%s\n' \
