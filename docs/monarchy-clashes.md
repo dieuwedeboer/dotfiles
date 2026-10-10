@@ -39,7 +39,7 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 | `ufw-docker` | Deny. Never run `firewall.sh` |
 | `vi` | Deny. CachyOS's `ex-vi-compat` already provides `vi` and conflicts with a package of that name |
 | `superwhisper-bin` | Deny. Proprietary dictation app; Voxtype stays the dictation backend. Revisit if the household wants it |
-| `hype`, `monologue` | Deny. Optional Basecamp apps (slides, webcam recorder) that the household does not need; `omarchy-pkg-add` either one by hand |
+| `hype`, `monologue` | Install. Basecamp slides and webcam recorder, wanted on this box |
 | Migrations `1787589206.sh`, `1788112314.sh` edit `pacman.conf` | Deny. Both are no-ops here: one drops a `SigLevel` override Monarchy never writes, the other only acts on an rc mirror |
 | Migration `1791123731.sh` appends a transparency example to `~/.config/hypr/looknfeel.lua` | Deny. chezmoi owns that file (ADR 0001), so the append would only show up as drift |
 | Migration `1791403252.sh` moves `[omarchy]` above every other repo, then runs a full upgrade | Deny. `[omarchy]` stays after CachyOS (`monarchy_preserve_pacman_conf`); its packages would otherwise shadow CachyOS builds |
@@ -50,7 +50,7 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 
 ## `packages.deny`
 
-See `monarchy/packages.deny`. Curated bricks only: two DMs (`plasma-login-manager`), metapackages (`omarchy-dev` / `omarchy-settings*`, which the packaging unit installs or replaces itself), Limine, Snapper, stock `linux`/`linux-ptl*`, `tldr` (tealdeer), `ufw-docker` (kingfisher keeps ufw disabled), `vi`, `superwhisper-bin`, `hype` and `monologue`. `yay` is allowed. Overlay `yay` still execs `paru` when an Omarchy script calls it from session PATH.
+See `monarchy/packages.deny`. Curated bricks only: two DMs (`plasma-login-manager`), metapackages (`omarchy-dev` / `omarchy-settings*`, which the packaging unit installs or replaces itself), Limine, Snapper, stock `linux`/`linux-ptl*`, `tldr` (tealdeer), `ufw-docker` (kingfisher keeps ufw disabled), `vi` and `superwhisper-bin`. `yay` is allowed. Overlay `yay` still execs `paru` when an Omarchy script calls it from session PATH.
 
 ## AUR packages that depend on `omarchy`
 
