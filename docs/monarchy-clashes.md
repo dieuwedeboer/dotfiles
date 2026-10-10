@@ -40,6 +40,8 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 | `vi` | Deny. CachyOS's `ex-vi-compat` already provides `vi` and conflicts with a package of that name |
 | `superwhisper-bin` | Deny. Proprietary dictation app; Voxtype stays the dictation backend. Revisit if the household wants it |
 | `hype`, `monologue` | Install. Basecamp slides and webcam recorder, wanted on this box |
+| `usbguard` | Install. The package alone enables nothing; the daemon only runs once someone opts in from Setup > Security. "USB at Boot" in that menu stays inert, because `omarchy-usb-authorization-boot` is denied |
+| `gliff` | Install. Remote desktop over SSH; inert until used |
 | Migrations `1787589206.sh`, `1788112314.sh` edit `pacman.conf` | Deny. Both are no-ops here: one drops a `SigLevel` override Monarchy never writes, the other only acts on an rc mirror |
 | Migration `1791123731.sh` appends a transparency example to `~/.config/hypr/looknfeel.lua` | Deny. chezmoi owns that file (ADR 0001), so the append would only show up as drift |
 | Migration `1791581004.sh` rebuilds the Limine boot image so `systemd.tty.term.console=dumb` reaches the kernel command line | Deny. This host boots rEFInd → ZFSBootMenu, and `settings.skip` already drops the `limine-entry-tool.d` file it reads |
