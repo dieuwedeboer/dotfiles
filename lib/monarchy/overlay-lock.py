@@ -89,6 +89,7 @@ FINISH_NEW = """  function finishUnlock() {
     resetAuthenticationState()
     idleBlankTimer.stop()
     sessionLock.locked = false
+    Qt.callLater(function() { root.unlockSettled++ })
     logEvent("unlocked")
     runWake()
   }
@@ -101,6 +102,17 @@ FINISH_NEW = """  function finishUnlock() {
 
   function armBlankTimer() {
 """
+
+# Since Quickshell 0.3.2 no lockStateChanged arrives when the shell unlocks, so
+# `locked` last re-evaluates on secureStateChanged, while sessionLock.locked
+# still reads true, and stays true. Every later lock request is then a no-op. A
+# counter the binding reads, bumped once the unlock has settled, forces it to
+# look again. Remove once upstream re-evaluates `locked` on unlock.
+LOCKED_OLD = "  readonly property bool locked: lockRequested || sessionLock.locked || sessionLock.secure\n"
+LOCKED_NEW = (
+    "  property int unlockSettled: 0\n"
+    "  readonly property bool locked: unlockSettled >= 0 && (lockRequested || sessionLock.locked || sessionLock.secure)\n"
+)
 
 BLANK_PROC = """  Process {
     id: blankProcess
@@ -178,6 +190,7 @@ def patch_lock_view(content: str) -> str:
 
 
 def patch_service(content: str) -> str:
+    content = must_replace(content, LOCKED_OLD, LOCKED_NEW, "locked binding")
     content = must_replace(content, FINISH_OLD, FINISH_NEW, "finishUnlock")
     content = must_replace(content, WAKE_OLD, WAKE_NEW, "onWakeRequested")
     content = must_replace(content, BLANK_PROC, SWITCH_PROC, "blankProcess")
