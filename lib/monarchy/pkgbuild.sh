@@ -10,8 +10,6 @@
 # Between them, `pacman -S omarchy` becomes a normal install. That is what
 # retires the git clone: /usr/share/omarchy is then a pacman-owned tree with
 # exactly the twelve names monarchy_link_working_prefix wants.
-#
-#   hyprbars-monarchy           hyprbars built against the installed hyprland
 
 MONARCHY_PKGBUILDS="${MONARCHY_PKGBUILDS:-$MONARCHY_DOTFILES/pkgbuilds}"
 MONARCHY_BUILD_DIR="${MONARCHY_BUILD_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/monarchy/build}"
@@ -405,36 +403,9 @@ monarchy_ensure_omarchy_pkg() {
 
 # ---- unit verbs ---------------------------------------------------------
 
-# ---- hyprbars-monarchy -------------------------------------------------
-
-monarchy_hyprbars_wanted_version() {
-    local hyprland
-    hyprland=$(monarchy_installed_pkg_version hyprland)
-    [ -n "$hyprland" ] || return 0
-    printf '%s-1\n' "${hyprland//-/_}"
-}
-
-monarchy_ensure_hyprbars() {
-    local want have
-    want=$(monarchy_hyprbars_wanted_version)
-    if [ -z "$want" ]; then
-        monarchy_log "hyprland not installed; skipping hyprbars-monarchy"
-        return 0
-    fi
-    have=$(monarchy_installed_pkg_version hyprbars-monarchy)
-    if [ "$have" = "$want" ]; then
-        monarchy_log "hyprbars-monarchy $have already installed"
-        return 0
-    fi
-    monarchy_assert_can_makepkg
-    local built
-    built=$(monarchy_build_pkg hyprbars-monarchy)
-    monarchy_install_built_pkg "$built"
-}
-
 monarchy_check_pkgbuilds() {
     local name
-    for name in monarchy-boot-stub omarchy-settings-monarchy hyprbars-monarchy; do
+    for name in monarchy-boot-stub omarchy-settings-monarchy; do
         [ -f "$MONARCHY_PKGBUILDS/$name/PKGBUILD" ] \
             || monarchy_die "missing $MONARCHY_PKGBUILDS/$name/PKGBUILD"
     done
@@ -458,5 +429,4 @@ monarchy_build_packages() {
     monarchy_ensure_settings_pkg
     monarchy_mask_omarchy_update_guard
     monarchy_ensure_omarchy_pkg
-    monarchy_ensure_hyprbars
 }

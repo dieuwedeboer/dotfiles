@@ -27,9 +27,6 @@
 #   git -C ~/.config/omarchy/plugins/io.github.dougfour.grok-usage remote set-url origin <url>
 #   omarchy plugin update io.github.dougfour.grok-usage --yes && omarchy restart shell
 https://github.com/dieuwedeboer/omarchy-grok-usage.git --enable
-# Classic Desktop is the king's own plugin. Its URL is the same agreed exception
-# to AGENTS.md "No names" as the Grok usage fork.
-https://github.com/dieuwedeboer/omarchy-classic-desktop.git --enable
 https://github.com/crmne/omastats.git --enable
 https://github.com/IM0001GT/omarchy-screens.git --enable
 https://github.com/lgse/sandman.git --enable

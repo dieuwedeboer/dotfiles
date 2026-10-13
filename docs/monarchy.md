@@ -18,7 +18,7 @@ Household boxes run CachyOS on native-encrypted ZFS with KDE Plasma, rEFInd chai
 
 CachyOS owns the OS: kernel, ZFS modules, repos, Plasma, `cachy-update`, sanoid, ZBM. Monarchy owns the Hyprland session, the clash bridge, and branding. Omarchy never owns `pacman.conf`, the bootloader, or `/etc/os-release`.
 
-The desktop comes from an official Omarchy package (`omarchy` or `omarchy-dev`, whichever `monarchy/omarchy.lock` names), plus two packages built here: `monarchy-boot-stub` and `omarchy-settings-monarchy`. There is no fork and no clone. A third local package, `hyprbars-monarchy`, builds the hyprbars title-bar plugin against the installed Hyprland for the Classic Desktop shell plugin.
+The desktop comes from an official Omarchy package (`omarchy` or `omarchy-dev`, whichever `monarchy/omarchy.lock` names), plus two packages built here: `monarchy-boot-stub` and `omarchy-settings-monarchy`. There is no fork and no clone.
 
 ### Where the desktop comes from
 
@@ -324,7 +324,7 @@ lib/monarchy/
   overlay-power.py       # power panel: "Holding" needs a charge limit to exist
   switch-user.sh         # /usr/local/bin/monarchy-switch-user
   packages.sh            # filtered install, writes packages.installed
-  pkgbuild.sh            # build+install the two local packages, omarchy, then hyprbars
+  pkgbuild.sh            # build+install the two local packages, then omarchy
   plugins.sh             # third-party omarchy plugin clone, enable on first sight
   prefix.sh              # working prefix out of /usr/share/omarchy
   sessions.sh            # omarchy.desktop, AccountsService, hide stock Hyprland
@@ -578,7 +578,7 @@ ZFS datasets do not change: `zpcachyos/ROOT/cos/{root,home,varcache,varlog}`. Po
 | Updater | Owns | Must not |
 | --- | --- | --- |
 | `cachy-update` / `pacman -Syu` | CachyOS kernel, ZFS modules, Plasma, already-installed leaf packages | Be aborted by omarchy-update-guard. Swap kernel. Drop `[cachyos*]`. Replace mirrorlist. |
-| `monarchy-update` | Rebuild the local packages, `pacman -S omarchy`, hazard scan, overlay rebuild, filtered leaf packages, user/session/splash | Call `omarchy-refresh-pacman`. Unfiltered `-Syyuu`. Apply past an unclassified hazard in `bin/` or `migrations/`. |
+| `monarchy-update` | Rebuild the two local packages, `pacman -S omarchy`, hazard scan, overlay rebuild, filtered leaf packages, user/session/splash | Call `omarchy-refresh-pacman`. Unfiltered `-Syyuu`. Apply past an unclassified hazard in `bin/` or `migrations/`. |
 
 Channel: `[omarchy]` **stable**, for the packages and the desktop alike — they can no longer differ. Hyprland and Quickshell stay on CachyOS first-match. Do not pull them from `[omarchy]` to "catch up."
 
