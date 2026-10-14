@@ -9,20 +9,9 @@ source "$SCRIPT_DIR/zbm/boot.sh"
 # This runs as a subprocess of install.sh, not sourced into it, so it borrows
 # the voice but not the ledger: a change made here is logged, and the parent's
 # summary does not see it. Naming the step is household.sh's job, and so is
-# anything a person has to be told about -- household_ksystemstats owns the
-# zpool sensor for exactly that reason.
+# anything a person has to be told about.
 # shellcheck source=monarchy/common.sh
 source "$SCRIPT_DIR/monarchy/common.sh"
-
-monarchy_log "ksystemstats_scripts plugin"
-if [ ! -f /usr/lib/qt6/plugins/ksystemstats/ksystemstats_plugin_scripts.so ]; then
-    tmpdir=$(mktemp -d)
-    git clone --depth 1 https://github.com/KerJoe/ksystemstats_scripts.git "$tmpdir"
-    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=/usr -B "$tmpdir/build" "$tmpdir"
-    cmake --build "$tmpdir/build"
-    sudo cmake --install "$tmpdir/build"
-    rm -rf "$tmpdir"
-fi
 
 monarchy_log "/etc drop-ins"
 sudo mkdir -p /etc/sanoid

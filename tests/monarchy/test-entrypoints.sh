@@ -38,7 +38,7 @@ for fn in \
     monarchy_install_if_changed monarchy_seeded monarchy_mark_seeded \
     monarchy_seed_ledger_bootstrap monarchy_shell_fingerprint \
     monarchy_overlay_shell monarchy_restart_shell \
-    household_refresh household_chezmoi household_ksystemstats \
+    household_refresh household_chezmoi \
     packages_install packages_strip_omarchy_owned packages_install_omarchy_aur; do
     declare -F "$fn" >/dev/null || missing="$missing $fn"
 done

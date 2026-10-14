@@ -211,7 +211,6 @@ quickshell restarted and the bar redrew, every single update.
 | --- | --- |
 | quickshell restart | `monarchy_shell_fingerprint` differs across the overlay pair |
 | `shell rescanPlugins` | a plugin directory appeared this run |
-| ksystemstats restart | `chezmoi apply` wrote something, and the zpool sensor exists |
 | `systemctl --user daemon-reload` | a unit is about to be seeded |
 | `update-desktop-database` | a webapp `.desktop` was actually dropped |
 | `pacman -S emacs-wayland` | `pacman -Qe` says it is not installed as explicit |
@@ -229,11 +228,9 @@ package manager**: the absent set is worked out first and handed to `pacman`,
 `paru` or `flatpak` in a single call, so a step that is usually a no-op stops
 costing forty dependency resolutions and forty screens of output. The summary
 bullet names the first six and counts the rest; the log line has them all.
-**One `chezmoi apply`**: `lib/zfs.sh` used to run a second one for the zpool
-sensor `household_chezmoi` had already written, which doubled the slowest step
-and gave a menu-driven update a second chance to hang on a prompt. It now
-checks for `~/.local/share/ksystemstats-scripts/ZFS` and restarts ksystemstats
-only when that apply actually wrote something.
+**One `chezmoi apply`**, in `household_chezmoi`. A second one doubles the
+slowest step and gives a menu-driven update a second chance to hang on a
+prompt.
 
 ```bash
 ./install.sh           # first run: household refresh, then Monarchy apply

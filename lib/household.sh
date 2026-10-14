@@ -64,31 +64,7 @@ household_chezmoi() {
     fi
     chezmoi apply
     if [ -n "$drift" ]; then
-        # Read by household_ksystemstats below. Only a real change is worth a
-        # Plasma service restart.
-        MONARCHY_CHEZMOI_APPLIED=1
         monarchy_changed "applied chezmoi-managed dotfiles"
-    fi
-}
-
-# The zpool sensor is chezmoi's, and lib/zfs.sh used to run a second
-# `chezmoi apply` of its own to get it. That check lives here rather than
-# there because zfs.sh runs as a subprocess: a warning it raises dies with the
-# process and never reaches the summary, and a missing sensor nobody is told
-# about is the whole failure mode.
-household_ksystemstats() {
-    monarchy_step "zpool sensor"
-    local sensor="$HOME/.local/share/ksystemstats-scripts/ZFS"
-    if [ ! -e "$sensor" ]; then
-        monarchy_warn "no $sensor; the zpool sensor is chezmoi's. Run: chezmoi apply"
-        return 0
-    fi
-    [ "${MONARCHY_CHEZMOI_APPLIED:-0}" = 1 ] || return 0
-    command -v systemctl >/dev/null 2>&1 || return 0
-    if systemctl restart --user plasma-ksystemstats.service 2>/dev/null; then
-        monarchy_changed "restarted ksystemstats to load the zpool sensor"
-    else
-        monarchy_log "plasma-ksystemstats.service is not running; nothing to reload"
     fi
 }
 
@@ -167,6 +143,4 @@ household_refresh() {
     # shellcheck source=games.sh
     source "$LIB_DIR/games.sh"
     games_apply
-
-    household_ksystemstats
 }

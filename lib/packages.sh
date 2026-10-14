@@ -27,7 +27,6 @@ PACMAN_PACKAGES=(
     uv
     kdenlive
     audacity
-    extra-cmake-modules
     aws-cli-v2
     glab
     gdu
