@@ -31,7 +31,11 @@ eza
 fakeroot
 fastfetch
 fcitx5
+fcitx5-chewing
+fcitx5-chinese-addons
 fcitx5-gtk
+fcitx5-hangul
+fcitx5-mozc
 fcitx5-qt
 fd
 ffmpeg
@@ -94,6 +98,7 @@ obs-studio
 obsidian
 omacalc
 omacut
+omarchy-hyprland-titlebars
 omawrite
 omarchy-nvim
 omasnap
@@ -113,6 +118,7 @@ qt6-declarative
 qt6-multimedia
 qt6-svg
 qt6-wayland
+signed
 ttfx
 qemu-user-static-binfmt
 qrencode

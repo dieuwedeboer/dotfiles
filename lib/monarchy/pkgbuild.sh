@@ -410,6 +410,35 @@ monarchy_mask_omarchy_update_guard() {
     monarchy_log "masked Omarchy ALPM update guard at $masked"
 }
 
+# Upstream pauses Hyprland's config autoreload before a settings upgrade and
+# reloads after it, from two hooks that name omarchy-settings and
+# omarchy-settings-dev. A Target is a package name, not a provides, so neither
+# fires for omarchy-settings-monarchy: the upgrade rewrites default/hypr under
+# a running session, an autoreload lands mid-write, and Hyprland drops to its
+# emergency config. Same-named copies in HookDir take precedence; each is
+# upstream's hook with our package added as a Target, rebuilt from the
+# packaged one so it follows upstream's Exec.
+MONARCHY_SETTINGS_HOOKS=(10-omarchy-hyprland-reload-pause.hook 90-omarchy-hyprland-reload-resume.hook)
+
+monarchy_retarget_settings_hooks() {
+    local name src dest tmp
+    monarchy_sudo mkdir -p /etc/pacman.d/hooks
+    for name in "${MONARCHY_SETTINGS_HOOKS[@]}"; do
+        src=/usr/share/libalpm/hooks/$name
+        dest=/etc/pacman.d/hooks/$name
+        [ -f "$src" ] || continue
+        tmp=$(mktemp)
+        awk '{ print } /^Target = omarchy-settings-dev$/ { print "Target = omarchy-settings-monarchy" }' "$src" >"$tmp"
+        grep -qx 'Target = omarchy-settings-monarchy' "$tmp" \
+            || monarchy_die "$src no longer targets omarchy-settings-dev; reclassify it"
+        if ! monarchy_sudo cmp -s "$tmp" "$dest"; then
+            monarchy_sudo install -m 644 "$tmp" "$dest"
+            monarchy_changed "retargeted $name at omarchy-settings-monarchy"
+        fi
+        rm -f "$tmp"
+    done
+}
+
 # The bridge that used to point /usr/share/omarchy at the working prefix.
 # pacman will not extract through a symlinked directory: with this in place
 # every file in the omarchy package reports "exists in filesystem", because
@@ -492,6 +521,7 @@ monarchy_build_packages() {
     # and on into the clone.
     monarchy_clear_legacy_prefix_symlink
     monarchy_ensure_boot_stub
+    monarchy_retarget_settings_hooks
     monarchy_ensure_settings_pkg
     monarchy_mask_omarchy_update_guard
     monarchy_ensure_omarchy_pkg
