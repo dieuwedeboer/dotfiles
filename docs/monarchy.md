@@ -185,6 +185,10 @@ Upstream's `post_install`/`post_upgrade` is destructive by design, and says so i
 
 `pkgver` tracks whatever `omarchy` currently depends on. `omarchy` declares `omarchy-settings=<exact>`, so `monarchy_ensure_settings_pkg` reads that, downloads the matching official package straight from `[omarchy]`, verifies the signature against pacman's keyring, and rebuilds. Nothing to bump by hand; a mismatch between the repo and the dep is a hard error telling you to update first.
 
+`depends` and any provides beyond the two settings names come from upstream's `.PKGINFO` at build time, not the PKGBUILD. A hardcoded list went stale when `omarchy-dev` started depending on `omarchy-security-functions`, a virtual name only upstream settings provides.
+
+When upstream moves a file from the Omarchy package into settings, the installed Omarchy package still owns it and pacman refuses settings on its own. `monarchy_plan_overwrites` records those paths, and `monarchy_ensure_settings_pkg` then downloads the new locked Omarchy package with `pacman -Sddw` and installs both in one `pacman -U`, which is the only way pacman hands a file between packages. That is a partial upgrade of one package ahead of `omarchy update`; ADR 0004 records why.
+
 `pacman -Sw omarchy-settings` cannot be used to fetch it, because our replacement conflicts with that name and resolution refuses before downloading. Hence the direct fetch — and hence the explicit `gpg --verify`, since `SigLevel` for `[omarchy]` is `Required` and bypassing pacman must not also bypass the signature.
 
 ## Apply

@@ -24,7 +24,8 @@
 #   upstream.pkg.tar.zst  the official package, downloaded and verified by pacman
 #   settings.skip         monarchy/settings.skip
 #   PKGBUILD              this file
-# and exports MONARCHY_SETTINGS_PKGVER. Not a standalone PKGBUILD by design:
+# and exports MONARCHY_SETTINGS_PKGVER, MONARCHY_SETTINGS_DEPENDS and
+# MONARCHY_SETTINGS_PROVIDES. Not a standalone PKGBUILD by design:
 # the version has to track whatever `omarchy` currently depends on. The
 # upstream is omarchy-settings or omarchy-settings-dev, whichever goes with
 # the package omarchy.lock names; this provides both names so either resolves.
@@ -37,9 +38,16 @@ arch=('any')
 url='https://github.com/dieuwedeboer/dotfiles'
 license=('MIT')
 
-depends=('bash' 'curl' 'gum' 'hicolor-icon-theme' 'plymouth')
+# Upstream's own depends and provides, read from its .PKGINFO. Hardcoding them
+# went stale when omarchy-dev started depending on omarchy-security-functions,
+# a name only omarchy-settings-dev provides: the upgrade then had no way to
+# satisfy it except by pulling upstream's package over ours.
+read -ra depends <<<"${MONARCHY_SETTINGS_DEPENDS:?set by lib/monarchy/pkgbuild.sh}"
 
+# Versioned, unlike upstream's: omarchy pins omarchy-settings=<exact>.
 provides=("omarchy-settings=$pkgver" "omarchy-settings-dev=$pkgver")
+read -ra _upstream_provides <<<"${MONARCHY_SETTINGS_PROVIDES?set by lib/monarchy/pkgbuild.sh}"
+provides+=("${_upstream_provides[@]}")
 conflicts=('omarchy-settings' 'omarchy-settings-dev')
 replaces=('omarchy-settings' 'omarchy-settings-dev')
 

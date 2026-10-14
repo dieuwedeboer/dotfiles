@@ -143,6 +143,7 @@ monarchy_plan_overwrites() {
     local f p owner root_canon parent_canon expected_parent
     local -a clashes=() escapes=()
     MONARCHY_OVERWRITE_ARGS=()
+    MONARCHY_HANDOVER_PATHS=()
     root_canon=$(realpath -m "${MONARCHY_ROOT:-/}" 2>/dev/null) || root_canon=/
     root_canon=${root_canon%/}
 
@@ -164,7 +165,13 @@ monarchy_plan_overwrites() {
         owner=$(pacman -Qoq "$p" 2>/dev/null || true)
         if [ -n "$owner" ]; then
             case "$owner" in
-                monarchy-boot-stub|omarchy-settings-monarchy|omarchy|omarchy-dev) continue ;;
+                monarchy-boot-stub|omarchy-settings-monarchy) continue ;;
+                # Upstream moved this file from the Omarchy package into the
+                # settings package. pacman hands it over only when both
+                # change in one transaction; see monarchy_ensure_settings_pkg.
+                omarchy|omarchy-dev)
+                    MONARCHY_HANDOVER_PATHS+=("$p")
+                    continue ;;
             esac
             clashes+=("$p (owned by $owner)")
             continue
@@ -224,6 +231,13 @@ monarchy_ensure_boot_stub() {
 }
 
 # ---- omarchy-settings-monarchy ------------------------------------------
+
+# stdin: an upstream package. Prints the values of one .PKGINFO key, one per
+# line.
+monarchy_pkginfo_values() {
+    bsdtar -xOf - .PKGINFO 2>/dev/null \
+        | awk -F' = ' -v k="$1" '$1==k { print $2 }'
+}
 
 # Fetch the official settings package for the locked Omarchy package straight
 # from [omarchy] and verify it against pacman's keyring. `pacman -Sw
@@ -287,9 +301,17 @@ monarchy_ensure_settings_pkg() {
     # file to bump.
     export MONARCHY_SETTINGS_PKGVER="$ver"
     export MONARCHY_SETTINGS_UPSTREAM
+    MONARCHY_SETTINGS_DEPENDS=$(monarchy_pkginfo_values depend <"$tmp/upstream.pkg.tar.zst" | tr '\n' ' ')
+    [ -n "$MONARCHY_SETTINGS_DEPENDS" ] \
+        || monarchy_die "could not read depends from $MONARCHY_SETTINGS_UPSTREAM's .PKGINFO"
+    # Upstream provides the two settings names unversioned; the PKGBUILD
+    # provides them versioned itself.
+    MONARCHY_SETTINGS_PROVIDES=$(monarchy_pkginfo_values provides <"$tmp/upstream.pkg.tar.zst" \
+        | grep -Ev '^omarchy-settings(-dev)?(=|$)' | tr '\n' ' ' || true)
+    export MONARCHY_SETTINGS_DEPENDS MONARCHY_SETTINGS_PROVIDES
     built=$(monarchy_build_pkg omarchy-settings-monarchy \
         "$tmp/upstream.pkg.tar.zst" "$skip")
-    unset MONARCHY_SETTINGS_PKGVER
+    unset MONARCHY_SETTINGS_PKGVER MONARCHY_SETTINGS_DEPENDS MONARCHY_SETTINGS_PROVIDES
     rm -rf "$tmp"
 
     # A release bump. The installed omarchy still pins the old settings
@@ -306,7 +328,27 @@ monarchy_ensure_settings_pkg() {
     if [ -n "$pinned" ] && [ "$pinned" != "$ver" ]; then
         assume=(--assume-installed "omarchy-settings=$pinned")
     fi
-    monarchy_install_built_pkg "$built" "${assume[@]}"
+
+    # A file upstream moved out of the Omarchy package and into settings is
+    # still owned by the installed Omarchy package, and pacman refuses ours on
+    # its own. It hands a file between packages only inside one transaction,
+    # so the new Omarchy package comes along in this one. --overwrite instead
+    # would leave the file listed under both, and the upgrade that drops it
+    # from Omarchy would then delete it. ADR 0004.
+    local -a handover=()
+    monarchy_plan_overwrites "$built"
+    if [ "${#MONARCHY_HANDOVER_PATHS[@]}" -gt 0 ] \
+        && monarchy_pkg_exactly "$MONARCHY_LOCK_PACKAGE"; then
+        printf '  %s\n' "${MONARCHY_HANDOVER_PATHS[@]}"
+        monarchy_log "the paths above move from $MONARCHY_LOCK_PACKAGE to settings; upgrading both together"
+        local locked
+        locked=$(monarchy_fetch_locked_pkg) || exit 1
+        handover=("$locked")
+        assume=()
+    fi
+    monarchy_install_built_pkg "$built" "${assume[@]}" "${handover[@]}"
+    [ "${#handover[@]}" -eq 0 ] \
+        || monarchy_changed "$MONARCHY_LOCK_PACKAGE upgraded with omarchy-settings-monarchy, to hand over moved files"
 
     # Switching between omarchy and omarchy-dev is the other way out of the
     # old pin: monarchy_ensure_omarchy_pkg replaces the package that holds it.
@@ -322,6 +364,23 @@ monarchy_ensure_settings_pkg() {
         fi
         monarchy_die "omarchy-settings-monarchy now tracks $MONARCHY_SETTINGS_UPSTREAM=$ver; installed $MONARCHY_LOCK_PACKAGE still pins $pinned. Run 'omarchy update' (or sudo pacman -Syu) to bring it up to that, then re-run monarchy-update"
     fi
+}
+
+# Download the sync DB's version of the locked Omarchy package, without its
+# dependencies, verified by pacman against the repo's SigLevel, and print its
+# path in the cache.
+monarchy_fetch_locked_pkg() {
+    local file dir
+    file=$(pacman -Sddp --print-format '%n %f' "$MONARCHY_LOCK_PACKAGE" 2>/dev/null \
+        | awk -v n="$MONARCHY_LOCK_PACKAGE" '$1==n { print $2 }')
+    [ -n "$file" ] || monarchy_die "$MONARCHY_LOCK_PACKAGE not found in [omarchy]"
+    monarchy_log "pacman -Sw $MONARCHY_LOCK_PACKAGE" >&2
+    monarchy_sudo pacman -Sddw --noconfirm "$MONARCHY_LOCK_PACKAGE" >&2 \
+        || monarchy_die "could not download $MONARCHY_LOCK_PACKAGE"
+    while IFS= read -r dir; do
+        [ -f "${dir%/}/$file" ] && { printf '%s\n' "${dir%/}/$file"; return 0; }
+    done < <(pacman-conf CacheDir)
+    monarchy_die "downloaded $file but it is in no pacman CacheDir"
 }
 
 # ---- the official omarchy package ---------------------------------------
