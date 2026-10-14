@@ -470,21 +470,25 @@ monarchy_update() {
 # holding stock QML before the overlay has been rebuilt over it.
 monarchy_real_omarchy_update() {
     local real="$MONARCHY_SRC/bin/omarchy-update"
+    local root=${MONARCHY_UPDATE_ROOT:-/usr/local/share/omarchy-update}
     [ -x "$real" ] || monarchy_die "missing $real; is the omarchy package installed?"
     monarchy_section "Omarchy"
-    # By absolute path out of the package tree, never through the overlay:
-    # the overlay's omarchy-update is the wrapper that got us here. Its
-    # children still resolve through the overlay, which is the point -- that
-    # is how bin.skip and the ZFS omarchy-snapshot take effect.
+    # Never through the overlay: its omarchy-update is the wrapper that got
+    # us here. Not from /usr/bin either: omarchy-update sets PATH to
+    # $OMARCHY_PATH/bin first and refuses to run from anywhere but there, so
+    # its children only reach bin.skip, the wraps and the ZFS
+    # omarchy-snapshot when OMARCHY_PATH is an overlay that holds a real copy
+    # of it. monarchy_build_update_root makes one. ADR 0003.
     #
-    # In a subshell, so the overlay-first PATH belongs to this command and
-    # not to everything install.sh does afterwards.
+    # In a subshell, so the PATH belongs to this command and not to
+    # everything install.sh does afterwards.
     #
     # MONARCHY_IN_OMARCHY_UPDATE holds back the omarchy-migrate it calls;
     # monarchy_after_omarchy_update runs it once classification is done.
-    ( export OMARCHY_PATH MONARCHY_IN_OMARCHY_UPDATE=1
-      export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
-      "$real" "$@" )
+    monarchy_build_update_root "$root"
+    ( export OMARCHY_PATH="$root" MONARCHY_IN_OMARCHY_UPDATE=1
+      export PATH="$root/bin:${PATH:-/usr/bin}"
+      "$root/bin/omarchy-update" "$@" )
 }
 
 # What upstream runs that monarchy had to hold back until classification was

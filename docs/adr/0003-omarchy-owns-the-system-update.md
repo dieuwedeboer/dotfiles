@@ -126,3 +126,23 @@ a note.
 upgrade where before it installed filtered leaves. The snapshot at step 2 is
 what that is traded against, and it is taken before the household refresh
 rather than after.
+
+## Amendment, 14 October 2026: the source-root check
+
+From r6975, `omarchy-update`, `omarchy-update-stay-awake` and
+`omarchy-channel-set` refuse to run unless the command really is
+`$OMARCHY_PATH/bin/<name>`, and `omarchy-update` sets `PATH` to
+`$OMARCHY_PATH/bin` first. The overlay's mirrored symlinks fail that check,
+and the overlay's `omarchy-update` is the wrap that leads here.
+
+The decision stands; how it is reached changes. The overlay copies, rather
+than links, every command that makes the check, found by grep at each
+rebuild. Step 5 runs `omarchy-update` from `/usr/local/share/omarchy-update`,
+rebuilt each run: links into the working prefix, plus a copy of the overlay
+`bin/` holding a real `omarchy-update`. With `OMARCHY_PATH` pointing there,
+the check passes and its children still resolve through `bin.skip` and the
+wraps. This works around upstream's hardening rather than with it. The files
+are root-owned, so it does not open what the check guards against: an
+environment variable pointing Omarchy at other code. If upstream tightens the
+check further, revisit running stock `omarchy-update` with
+`OMARCHY_PATH=/usr/share/omarchy`.

@@ -103,6 +103,13 @@ monarchy_rebuild_overlay() {
         monarchy_write_to "$parent" install -m 755 "$wrap_stub" "$dest/$name"
     done
     monarchy_write_to "$parent" install -m 755 "$yay" "$dest/yay"
+    # Upstream's source-root check refuses a command unless it really is
+    # $OMARCHY_PATH/bin/<name>, and a mirrored symlink resolves to /usr/bin.
+    # Those names are copied instead; the next rebuild refreshes them.
+    while read -r name; do
+        monarchy_overrides "$name" && continue
+        monarchy_write_to "$parent" install -m 755 "$(readlink -e "$src_bin/$name")" "$dest/$name"
+    done < <(monarchy_source_root_checked "$src_bin")
     for name in "${MONARCHY_BIN_ALIAS[@]}"; do
         alias_stub=$(monarchy_alias_stub_for "$name")
         [ -f "$alias_stub" ] || monarchy_die "missing $alias_stub"
@@ -132,6 +139,38 @@ monarchy_rebuild_overlay() {
         monarchy_install_update
         monarchy_install_migrate
     fi
+}
+
+# Names in a bin/ whose command calls omarchy_security_require_source_root.
+monarchy_source_root_checked() {
+    local f
+    for f in "$1"/*; do
+        # shellcheck disable=SC2016  # a literal $0 in upstream's source
+        grep -qF 'omarchy_security_require_source_root "$0"' "$(readlink -e "$f")" 2>/dev/null \
+            && basename "$f"
+    done
+    return 0
+}
+
+# The root omarchy-update runs from. It checks that it really is
+# $OMARCHY_PATH/bin/omarchy-update, and in the working prefix that name is
+# the wrap that brought us here. So: a prefix of its own, every entry a link
+# into the working prefix except bin/, which is the overlay with a real copy
+# of omarchy-update. Rebuilt per run, so the copy is the installed version.
+monarchy_build_update_root() {
+    local root=$1 entry
+    case "$root" in
+        ''|/) monarchy_die "refusing to rebuild an update root at '$root'" ;;
+    esac
+    monarchy_sudo rm -rf "$root"
+    monarchy_sudo mkdir -p "$root"
+    for entry in "$MONARCHY_PATH"/*; do
+        [ "$(basename "$entry")" = bin ] && continue
+        monarchy_sudo ln -s "$entry" "$root/$(basename "$entry")"
+    done
+    monarchy_sudo cp -a "$MONARCHY_PATH/bin" "$root/bin"
+    monarchy_sudo rm -f "$root/bin/omarchy-update"
+    monarchy_sudo install -m 755 "$(readlink -e "$MONARCHY_SRC/bin/omarchy-update")" "$root/bin/omarchy-update"
 }
 
 # Commands Omarchy calls that belong to tools this host replaces, mapped onto

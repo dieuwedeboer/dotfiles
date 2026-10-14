@@ -135,6 +135,8 @@ Wraps:
 
 `omarchy-refresh-pacman` stays in `bin.deny`. Its contract is "replace pacman.conf". Redirecting it to `--update` would hide that.
 
+Commands that call upstream's `omarchy_security_require_source_root` are copied into the overlay rather than linked, because the check refuses a command whose real path is not `$OMARCHY_PATH/bin/<name>`. `omarchy-update` itself runs from `/usr/local/share/omarchy-update` (ADR 0003, amendment).
+
 `monarchy_check_bin_hazards` greps the package `bin/` for the things that actually brick this host — `limine-entry-tool`, `limine-mkinitcpio`, `limine-install`, `limine-snapper`, `omarchy-refresh-pacman`, `use_omarchy_pacman_config`, a `pacman-*.conf`, `zroot/ROOT`, `/etc/pam.d/zfs-key`, or a `snapper` invocation — and fails on any hit that is neither denied nor wrapped. Same shape as `monarchy_check_migrations`.
 
 Matching on content rather than on a list of names is both smaller and stronger: an allow list cannot notice a hazard that arrives under a *renamed* binary, and this does. `monarchy_check_overrides_exist` is the other half — a wrap or deny for a name upstream dropped is dead weight that would hide exactly that rename.
