@@ -1,5 +1,9 @@
 # Track omarchy-dev on the edge channel until a stable release has the Qt 6.12 fix
 
+The repo-wide lock this describes is replaced by ADR 0009: the package and
+channel are now per box. The reason edge was taken still holds for the box
+that took it.
+
 Monarchy tracked `omarchy` on `[omarchy]` stable. On 9 October 2026 a full
 upgrade brought Qt 6.12 from CachyOS, and the shell lost most of its theme
 colours: menus, tooltips and the bar drew black. Qt 6.12 adds a QtQuick

@@ -126,7 +126,7 @@ monarchy_cli() {
             # touch is refused before Omarchy's own update gets near it, and
             # so there is something to roll back to if it goes wrong.
             monarchy_ensure_log
-            monarchy_load_lock
+            monarchy_load_channel
             monarchy_load_inventories
             monarchy_guards_check
             monarchy_snapshot_first

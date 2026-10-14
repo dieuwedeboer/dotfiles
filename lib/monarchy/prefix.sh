@@ -39,7 +39,7 @@ monarchy_assert_source_tree() {
 }
 
 monarchy_write_omarchy_conf() {
-    local tmp src parent
+    local tmp parent
     tmp=$(mktemp)
     printf 'OMARCHY_PATH=%s\n' "$MONARCHY_PATH" >"$tmp"
     parent=$(dirname "$MONARCHY_CONF")
@@ -47,11 +47,13 @@ monarchy_write_omarchy_conf() {
     monarchy_write_to "$parent" install -m 644 "$tmp" "$MONARCHY_CONF"
     rm -f "$tmp"
 
-    src="$MONARCHY_MISC/omarchy.lock"
-    [ -f "$src" ] || monarchy_die "missing $src"
-    parent=$(dirname "$MONARCHY_PIN")
-    monarchy_write_to "$parent" mkdir -p "$parent"
-    monarchy_write_to "$parent" install -m 644 "$src" "$MONARCHY_PIN"
+    # Apply used to copy monarchy/omarchy.lock here. Nothing reads it, and the
+    # channel is now read from the box itself (ADR 0009), so a copy left
+    # behind would only disagree with it.
+    if [ -e "$MONARCHY_PIN" ]; then
+        monarchy_write_to "$(dirname "$MONARCHY_PIN")" rm -f "$MONARCHY_PIN"
+        monarchy_changed "removed $MONARCHY_PIN; the channel is read from pacman.conf"
+    fi
 }
 
 monarchy_link_working_prefix() {

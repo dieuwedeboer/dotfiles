@@ -334,7 +334,7 @@ monarchy_unit_total() {
 monarchy_check() {
     local u n=0 total
     monarchy_assert_only_valid
-    monarchy_load_lock
+    monarchy_load_channel
     monarchy_load_inventories
     total=$(monarchy_unit_total)
     monarchy_section "Monarchy — check${MONARCHY_ONLY:+ (only $MONARCHY_ONLY)}"
@@ -373,7 +373,7 @@ monarchy_apply() {
     local u n=0 total started
     monarchy_ensure_log
     monarchy_assert_only_valid
-    monarchy_load_lock
+    monarchy_load_channel
     monarchy_load_inventories
     monarchy_snapshot_first
     monarchy_ensure_users_conf
@@ -439,11 +439,11 @@ monarchy_classify_check() {
 
 monarchy_update() {
     monarchy_ensure_log
-    monarchy_load_lock
+    monarchy_load_channel
     monarchy_load_inventories
     # The packages below are built from whatever [omarchy] the sync DB has, so
-    # a channel change in omarchy.lock has to reach pacman.conf, and the DB be
-    # refreshed, before this runs.
+    # a channel named in the environment has to reach pacman.conf, and the DB
+    # be refreshed, before this runs.
     monarchy_assert_omarchy_channel
     monarchy_snapshot_first
     # Build and install the packages before classifying, so a new upstream

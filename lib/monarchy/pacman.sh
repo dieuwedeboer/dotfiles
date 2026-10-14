@@ -156,7 +156,7 @@ monarchy_install_omarchy_keyring() {
 monarchy_assert_omarchy_channel() {
     local conf=${MONARCHY_PACMAN_CONF:-/etc/pacman.conf}
     grep -qxF "Server = $MONARCHY_OMARCHY_SERVER/\$arch" "$conf" \
-        || monarchy_die "[omarchy] in $conf is not $MONARCHY_OMARCHY_SERVER, the channel omarchy.lock names. Run ./install.sh --only=pacman, then cachy-update, then this again"
+        || monarchy_die "[omarchy] in $conf is not $MONARCHY_OMARCHY_SERVER, the channel asked for. Run MONARCHY_OMARCHY_CHANNEL=$MONARCHY_OMARCHY_CHANNEL ./install.sh --only=pacman, then this again"
 }
 
 monarchy_add_omarchy_repo() {

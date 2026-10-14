@@ -28,7 +28,7 @@
 # MONARCHY_SETTINGS_PROVIDES. Not a standalone PKGBUILD by design:
 # the version has to track whatever `omarchy` currently depends on. The
 # upstream is omarchy-settings or omarchy-settings-dev, whichever goes with
-# the package omarchy.lock names; this provides both names so either resolves.
+# the package installed (monarchy_load_channel); this provides both names so either resolves.
 
 pkgname=omarchy-settings-monarchy
 pkgver=${MONARCHY_SETTINGS_PKGVER:?set by lib/monarchy/pkgbuild.sh}

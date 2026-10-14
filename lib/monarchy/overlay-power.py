@@ -65,11 +65,25 @@ ICON_CALL_NEW = (
     "  var threshold = chargeThresholdActive(d, onBattery, states, hasChargeLimit)\n"
 )
 
-# modeLabel takes upstream's translator as its fourth argument, so
-# hasChargeLimit goes after it. Each anchor is one line: whole function
-# bodies broke on every upstream edit.
-MODE_SIG_OLD = "function modeLabel(device, onBattery, states, tr) {\n"
-MODE_SIG_NEW = "function modeLabel(device, onBattery, states, tr, hasChargeLimit) {\n"
+# modeLabel takes upstream's translator as its fourth argument on edge, and
+# no translator on stable releases before it (ADR 0009); hasChargeLimit goes
+# last either way. Model.js and Panel.qml come from one package, so the
+# signature found in Model.js picks the call patched in Panel.qml. Each
+# anchor is one line: whole function bodies broke on every upstream edit.
+MODE_VARIANTS = (
+    (
+        "function modeLabel(device, onBattery, states, tr) {\n",
+        "function modeLabel(device, onBattery, states, tr, hasChargeLimit) {\n",
+        "Model.modeLabel(device, root.discharging, upowerStates(), Commons.I18n.t)",
+        "Model.modeLabel(device, root.discharging, upowerStates(), Commons.I18n.t, root.hasChargeLimit)",
+    ),
+    (
+        "function modeLabel(device, onBattery, states) {\n",
+        "function modeLabel(device, onBattery, states, hasChargeLimit) {\n",
+        "Model.modeLabel(device, root.discharging, upowerStates())",
+        "Model.modeLabel(device, root.discharging, upowerStates(), root.hasChargeLimit)",
+    ),
+)
 
 MODE_CALL_OLD = "  if (chargeThresholdActive(d, onBattery, states)) return "
 MODE_CALL_NEW = "  if (chargeThresholdActive(d, onBattery, states, hasChargeLimit)) return "
@@ -91,9 +105,6 @@ PANEL_GATE_NEW = """  // Monarchy: whether this machine has a charge limit at al
 
 PANEL_ICON_OLD = "Model.batteryIcon(device, root.discharging, upowerStates())"
 PANEL_ICON_NEW = "Model.batteryIcon(device, root.discharging, upowerStates(), root.hasChargeLimit)"
-
-PANEL_MODE_OLD = "Model.modeLabel(device, root.discharging, upowerStates(), Commons.I18n.t)"
-PANEL_MODE_NEW = "Model.modeLabel(device, root.discharging, upowerStates(), Commons.I18n.t, root.hasChargeLimit)"
 
 PANEL_ACTIVE_OLD = """  readonly property bool chargeThresholdActive: {
     var device = UPower.displayDevice
@@ -153,19 +164,26 @@ def must_replace(content: str, old: str, new: str, label: str) -> str:
     return content.replace(old, new, 1)
 
 
-def patch_model(content: str) -> str:
+def mode_variant(model: str) -> tuple[str, str, str, str]:
+    for variant in MODE_VARIANTS:
+        if variant[0] in model:
+            return variant
+    raise SystemExit("overlay-power: modeLabel signature missing from packaged file")
+
+
+def patch_model(content: str, variant: tuple[str, str, str, str]) -> str:
     content = must_replace(content, THRESHOLD_OLD, THRESHOLD_NEW, "chargeThresholdActive")
     content = must_replace(content, ICON_OLD, ICON_NEW, "batteryIcon signature")
     content = must_replace(content, ICON_CALL_OLD, ICON_CALL_NEW, "batteryIcon threshold call")
-    content = must_replace(content, MODE_SIG_OLD, MODE_SIG_NEW, "modeLabel signature")
+    content = must_replace(content, variant[0], variant[1], "modeLabel signature")
     content = must_replace(content, MODE_CALL_OLD, MODE_CALL_NEW, "modeLabel threshold call")
     return content
 
 
-def patch_panel(content: str) -> str:
+def patch_panel(content: str, variant: tuple[str, str, str, str]) -> str:
     content = must_replace(content, PANEL_GATE_ANCHOR, PANEL_GATE_NEW, "batteryIcon function")
     content = must_replace(content, PANEL_ICON_OLD, PANEL_ICON_NEW, "batteryIcon call")
-    content = must_replace(content, PANEL_MODE_OLD, PANEL_MODE_NEW, "modeLabel call")
+    content = must_replace(content, variant[2], variant[3], "modeLabel call")
     content = must_replace(content, PANEL_ACTIVE_OLD, PANEL_ACTIVE_NEW, "chargeThresholdActive property")
     content = must_replace(content, PANEL_SEED_OLD, PANEL_SEED_NEW, "battery status seed")
     return content
@@ -176,8 +194,10 @@ def cmd_power(power_dir: Path, apply: bool) -> None:
     panel = power_dir / "Panel.qml"
     if not model.is_file() or not panel.is_file():
         raise SystemExit(f"overlay-power: missing Model.js or Panel.qml in {power_dir}")
-    model_out = patch_model(model.read_text())
-    panel_out = patch_panel(panel.read_text())
+    model_in = model.read_text()
+    variant = mode_variant(model_in)
+    model_out = patch_model(model_in, variant)
+    panel_out = patch_panel(panel.read_text(), variant)
     if apply:
         model.write_text(model_out)
         panel.write_text(panel_out)

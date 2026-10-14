@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Build and install the two local packages that let the official `omarchy`
-# or `omarchy-dev` package run on this host. omarchy.lock says which.
+# or `omarchy-dev` package run on this host. monarchy_load_channel says which.
 #
 #   monarchy-boot-stub          provides limine*/snapper so omarchy's hard deps
 #                               resolve without the ESP-hijacking hook
@@ -19,7 +19,7 @@ MONARCHY_BUILD_DIR="${MONARCHY_BUILD_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/monarc
 # same version or the dep does not resolve. omarchy-dev depends on
 # omarchy-settings-dev with no version, so for it this is empty.
 monarchy_settings_required_version() {
-    pacman -Si "$MONARCHY_LOCK_PACKAGE" 2>/dev/null | monarchy_parse_settings_pin
+    pacman -Si "$MONARCHY_OMARCHY_PACKAGE" 2>/dev/null | monarchy_parse_settings_pin
 }
 
 # The same pin, read from the omarchy that is installed now. On a release
@@ -281,7 +281,7 @@ monarchy_ensure_settings_pkg() {
 
     required=$(monarchy_settings_required_version)
     if [ -n "$required" ] && [ "$required" != "$ver" ]; then
-        monarchy_die "$MONARCHY_LOCK_PACKAGE needs $MONARCHY_SETTINGS_UPSTREAM=$required but [omarchy] has $ver; the repo is mid-publish, try again shortly"
+        monarchy_die "$MONARCHY_OMARCHY_PACKAGE needs $MONARCHY_SETTINGS_UPSTREAM=$required but [omarchy] has $ver; the repo is mid-publish, try again shortly"
     fi
 
     want="${ver}-1"
@@ -347,9 +347,9 @@ monarchy_ensure_settings_pkg() {
     local -a handover=()
     monarchy_plan_overwrites "$built"
     if [ "${#MONARCHY_HANDOVER_PATHS[@]}" -gt 0 ] \
-        && monarchy_pkg_exactly "$MONARCHY_LOCK_PACKAGE"; then
+        && monarchy_pkg_exactly "$MONARCHY_OMARCHY_PACKAGE"; then
         printf '  %s\n' "${MONARCHY_HANDOVER_PATHS[@]}"
-        monarchy_log "the paths above move from $MONARCHY_LOCK_PACKAGE to settings; upgrading both together"
+        monarchy_log "the paths above move from $MONARCHY_OMARCHY_PACKAGE to settings; upgrading both together"
         local locked
         locked=$(monarchy_fetch_locked_pkg) || exit 1
         handover=("$locked")
@@ -357,23 +357,23 @@ monarchy_ensure_settings_pkg() {
     fi
     MONARCHY_PKG_REINSTALL=$reinstall monarchy_install_built_pkg "$built" "${assume[@]}" "${handover[@]}"
     if [ "${#handover[@]}" -gt 0 ]; then
-        monarchy_reload_hyprland "after upgrading $MONARCHY_LOCK_PACKAGE"
-        monarchy_changed "$MONARCHY_LOCK_PACKAGE upgraded with omarchy-settings-monarchy, to hand over moved files"
+        monarchy_reload_hyprland "after upgrading $MONARCHY_OMARCHY_PACKAGE"
+        monarchy_changed "$MONARCHY_OMARCHY_PACKAGE upgraded with omarchy-settings-monarchy, to hand over moved files"
     fi
 
     # Switching between omarchy and omarchy-dev is the other way out of the
     # old pin: monarchy_ensure_omarchy_pkg replaces the package that holds it.
-    if [ ${#assume[@]} -gt 0 ] && monarchy_pkg_exactly "$MONARCHY_LOCK_PACKAGE"; then
+    if [ ${#assume[@]} -gt 0 ] && monarchy_pkg_exactly "$MONARCHY_OMARCHY_PACKAGE"; then
         # This is a handoff, not a failure: the settings package now tracks
         # the new version and what it is waiting for is the full upgrade. When
         # that upgrade is the next thing this run does, saying so and carrying
         # on is the whole point. Dying here instead would abort the update
         # immediately before the step it is asking for.
         if [ "${MONARCHY_EXPECT_FULL_UPGRADE:-0}" = 1 ]; then
-            monarchy_changed "omarchy-settings-monarchy now tracks $MONARCHY_SETTINGS_UPSTREAM=$ver; the upgrade below brings $MONARCHY_LOCK_PACKAGE up to it"
+            monarchy_changed "omarchy-settings-monarchy now tracks $MONARCHY_SETTINGS_UPSTREAM=$ver; the upgrade below brings $MONARCHY_OMARCHY_PACKAGE up to it"
             return 0
         fi
-        monarchy_die "omarchy-settings-monarchy now tracks $MONARCHY_SETTINGS_UPSTREAM=$ver; installed $MONARCHY_LOCK_PACKAGE still pins $pinned. Run 'omarchy update' (or sudo pacman -Syu) to bring it up to that, then re-run monarchy-update"
+        monarchy_die "omarchy-settings-monarchy now tracks $MONARCHY_SETTINGS_UPSTREAM=$ver; installed $MONARCHY_OMARCHY_PACKAGE still pins $pinned. Run 'omarchy update' (or sudo pacman -Syu) to bring it up to that, then re-run monarchy-update"
     fi
 }
 
@@ -391,12 +391,12 @@ monarchy_reload_hyprland() {
 # path in the cache.
 monarchy_fetch_locked_pkg() {
     local file dir
-    file=$(pacman -Sddp --print-format '%n %f' "$MONARCHY_LOCK_PACKAGE" 2>/dev/null \
-        | awk -v n="$MONARCHY_LOCK_PACKAGE" '$1==n { print $2 }')
-    [ -n "$file" ] || monarchy_die "$MONARCHY_LOCK_PACKAGE not found in [omarchy]"
-    monarchy_log "pacman -Sw $MONARCHY_LOCK_PACKAGE" >&2
-    monarchy_sudo pacman -Sddw --noconfirm "$MONARCHY_LOCK_PACKAGE" >&2 \
-        || monarchy_die "could not download $MONARCHY_LOCK_PACKAGE"
+    file=$(pacman -Sddp --print-format '%n %f' "$MONARCHY_OMARCHY_PACKAGE" 2>/dev/null \
+        | awk -v n="$MONARCHY_OMARCHY_PACKAGE" '$1==n { print $2 }')
+    [ -n "$file" ] || monarchy_die "$MONARCHY_OMARCHY_PACKAGE not found in [omarchy]"
+    monarchy_log "pacman -Sw $MONARCHY_OMARCHY_PACKAGE" >&2
+    monarchy_sudo pacman -Sddw --noconfirm "$MONARCHY_OMARCHY_PACKAGE" >&2 \
+        || monarchy_die "could not download $MONARCHY_OMARCHY_PACKAGE"
     while IFS= read -r dir; do
         [ -f "${dir%/}/$file" ] && { printf '%s\n' "${dir%/}/$file"; return 0; }
     done < <(pacman-conf CacheDir)
@@ -472,7 +472,7 @@ monarchy_clear_legacy_prefix_symlink() {
 }
 
 monarchy_ensure_omarchy_pkg() {
-    local want=$MONARCHY_LOCK_PACKAGE other
+    local want=$MONARCHY_OMARCHY_PACKAGE other
     # Idempotent; monarchy_build_packages already did this before the stub.
     monarchy_clear_legacy_prefix_symlink
     if monarchy_pkg_exactly "$want"; then

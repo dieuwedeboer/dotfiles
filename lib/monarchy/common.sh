@@ -166,26 +166,54 @@ monarchy_install_if_changed() {
     return 0
 }
 
-monarchy_load_lock() {
-    local lock="$MONARCHY_MISC/omarchy.lock"
-    [ -f "$lock" ] || monarchy_die "missing $lock"
-    # lock is key=value, not shell. Parse it.
-    MONARCHY_LOCK_PACKAGE=$(awk -F= '$1=="package"{print substr($0,index($0,"=")+1)}' "$lock")
-    MONARCHY_LOCK_CHANNEL=$(awk -F= '$1=="channel"{print substr($0,index($0,"=")+1)}' "$lock")
-    [ -n "$MONARCHY_LOCK_PACKAGE" ] || monarchy_die "omarchy.lock missing package"
-    [ -n "$MONARCHY_LOCK_CHANNEL" ] || monarchy_die "omarchy.lock missing channel"
+# Which Omarchy package and [omarchy] channel this box runs. A fact about the
+# box, not the repo (ADR 0009): read from what is installed and from
+# pacman.conf. A fresh box gets omarchy on stable. Setting either variable
+# in the environment is how a box is moved; see docs/monarchy-install.md.
+monarchy_load_channel() {
+    local conf=${MONARCHY_PACMAN_CONF:-/etc/pacman.conf}
+    if [ -z "${MONARCHY_OMARCHY_PACKAGE:-}" ]; then
+        if monarchy_pkg_exactly omarchy-dev; then
+            MONARCHY_OMARCHY_PACKAGE=omarchy-dev
+        else
+            MONARCHY_OMARCHY_PACKAGE=omarchy
+        fi
+    fi
+    if [ -z "${MONARCHY_OMARCHY_CHANNEL:-}" ]; then
+        MONARCHY_OMARCHY_CHANNEL=$(monarchy_pacman_conf_channel "$conf")
+        : "${MONARCHY_OMARCHY_CHANNEL:=stable}"
+    fi
     # Each Omarchy package has its own settings package, pinned to it.
     # shellcheck disable=SC2034
-    case "$MONARCHY_LOCK_PACKAGE" in
+    case "$MONARCHY_OMARCHY_PACKAGE" in
         omarchy) MONARCHY_SETTINGS_UPSTREAM=omarchy-settings ;;
         omarchy-dev) MONARCHY_SETTINGS_UPSTREAM=omarchy-settings-dev ;;
-        *) monarchy_die "omarchy.lock package must be omarchy or omarchy-dev, not $MONARCHY_LOCK_PACKAGE" ;;
+        *) monarchy_die "MONARCHY_OMARCHY_PACKAGE must be omarchy or omarchy-dev, not $MONARCHY_OMARCHY_PACKAGE" ;;
     esac
-    case "$MONARCHY_LOCK_CHANNEL" in
+    case "$MONARCHY_OMARCHY_CHANNEL" in
         stable|rc|edge) ;;
-        *) monarchy_die "omarchy.lock channel must be stable, rc or edge, not $MONARCHY_LOCK_CHANNEL" ;;
+        *) monarchy_die "MONARCHY_OMARCHY_CHANNEL must be stable, rc or edge, not $MONARCHY_OMARCHY_CHANNEL" ;;
     esac
-    MONARCHY_OMARCHY_SERVER="${MONARCHY_OMARCHY_SERVER:-https://pkgs.omarchy.org/$MONARCHY_LOCK_CHANNEL}"
+    # Every channel carries an omarchy-dev, but only edge keeps it current.
+    if [ "$MONARCHY_OMARCHY_PACKAGE" = omarchy-dev ] && [ "$MONARCHY_OMARCHY_CHANNEL" != edge ]; then
+        monarchy_warn "omarchy-dev on $MONARCHY_OMARCHY_CHANNEL is a stale build; omarchy-dev is only current on edge"
+    fi
+    MONARCHY_OMARCHY_SERVER="${MONARCHY_OMARCHY_SERVER:-https://pkgs.omarchy.org/$MONARCHY_OMARCHY_CHANNEL}"
+    monarchy_trace "tracking $MONARCHY_OMARCHY_PACKAGE on $MONARCHY_OMARCHY_CHANNEL"
+}
+
+# The channel the [omarchy] section's Server names, or nothing.
+monarchy_pacman_conf_channel() {
+    [ -r "$1" ] || return 0
+    awk '
+        /^\[/ { in_omarchy = ($0 == "[omarchy]"); next }
+        in_omarchy && /^Server[[:space:]]*=/ {
+            if (match($0, /pkgs\.omarchy\.org\/[a-z]+\//)) {
+                print substr($0, RSTART + 17, RLENGTH - 18)
+                exit
+            }
+        }
+    ' "$1"
 }
 
 monarchy_assert_root_pre_update_snapshot() {

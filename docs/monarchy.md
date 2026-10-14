@@ -18,13 +18,13 @@ Household boxes run CachyOS on native-encrypted ZFS with KDE Plasma, rEFInd chai
 
 CachyOS owns the OS: kernel, ZFS modules, repos, Plasma, `cachy-update`, sanoid, ZBM. Monarchy owns the Hyprland session, the clash bridge, and branding. Omarchy never owns `pacman.conf`, the bootloader, or `/etc/os-release`.
 
-The desktop comes from an official Omarchy package (`omarchy` or `omarchy-dev`, whichever `monarchy/omarchy.lock` names), plus two packages built here: `monarchy-boot-stub` and `omarchy-settings-monarchy`. There is no fork and no clone.
+The desktop comes from an official Omarchy package (`omarchy` or `omarchy-dev`, whichever the box has installed; ADR 0009), plus two packages built here: `monarchy-boot-stub` and `omarchy-settings-monarchy`. There is no fork and no clone.
 
 ### Where the desktop comes from
 
-The `[omarchy]` repository, on the channel `monarchy/omarchy.lock` names. It is currently `package=omarchy-dev` and `channel=edge`, upstream's development build, taken for a Qt 6.12 fix that stable did not have yet (ADR 0003); `package=omarchy` and `channel=stable` is the tagged-release setting. Pacman does the version pinning from there. Read that as: there is no git remote to follow, no commit pinned, and nothing to re-pin. `monarchy-update` installs whatever that channel currently carries and halts on a new binary or migration it cannot classify, which is the human step that used to be a pin bump.
+The `[omarchy]` repository, on whichever channel the box's `pacman.conf` names (ADR 0009). Boxes can differ: one on `omarchy-dev` from edge, taken for a Qt 6.12 fix that stable did not have yet (ADR 0003), another on `omarchy` from stable. A fresh box gets `omarchy` on stable. Pacman does the version pinning from there. Read that as: there is no git remote to follow, no commit pinned, and nothing to re-pin. `monarchy-update` installs whatever that channel currently carries and halts on a new binary or migration it cannot classify, which is the human step that used to be a pin bump.
 
-Anything describing how to move this repo onto a newer upstream *commit* — a note, a skill, a stale paragraph — is describing the arrangement below, which ended. Check `monarchy/omarchy.lock` before believing it.
+Anything describing how to move this repo onto a newer upstream *commit* — a note, a skill, a stale paragraph — is describing the arrangement below, which ended. Check `pacman -Q omarchy omarchy-dev` and the `[omarchy]` block in `pacman.conf` before believing it.
 
 ### What came before
 
@@ -83,8 +83,6 @@ Do not add `[omarchy-zfs]` or `[archzfs]`. Do not replace `/etc/pacman.d/mirrorl
 | `/usr/share/omarchy` | Owned by `omarchy` or `omarchy-dev`, + `omarchy-settings-monarchy`. Never written to. A symlink here aborts the pacman transaction, so apply removes a leftover one before installing. |
 | `/usr/local/share/omarchy` | `OMARCHY_PATH`. What the session reads. |
 | `/etc/omarchy.conf` | `OMARCHY_PATH=/usr/local/share/omarchy` |
-| `/etc/omarchy.lock` | Copy of `monarchy/omarchy.lock` written at apply. `omarchy-version-branch` reads it. |
-| `monarchy/omarchy.lock` | `package` and `channel`. Pacman does the version pinning now. |
 
 `monarchy_link_working_prefix` symlinks `default`, `shell`, `themes`, `migrations`, `config`, `install`, `applications`, `version`, `logo.txt`, `logo.svg`, `icon.txt`, and `icon.png` into the working prefix. `omarchy` (or `omarchy-dev`) ships six of those names and `omarchy-settings-monarchy` the other six, so the set is complete without a clone. `bin/` is not a symlink. Apply then explodes `shell/` and `default/` so lock QML, the power panel, the AI panel's agent marks, `omarchy-menu.jsonc` and `launcher.hides` can be patched copies — a pacman-owned path is not somewhere to write, because the next upgrade would silently revert them.
 
@@ -167,7 +165,7 @@ Server = https://pkgs.omarchy.org/edge/$arch
 # END monarchy-omarchy
 ```
 
-The path is the lock's channel. `monarchy-update` refuses to build while it differs, so a lock change goes `./install.sh --only=pacman`, `cachy-update`, `monarchy-update`. CachyOS does not Include drop-ins, so this lives in `pacman.conf` itself. First edit takes `/etc/pacman.conf.monarchy.bak`. `monarchy_preserve_pacman_conf` aborts if `[cachyos]` / `[cachyos-v3]` do not precede `[omarchy]`, or if the CachyOS/Arch mirrorlist Includes are gone.
+The path is the box's channel, and `monarchy_load_channel` reads it back from here. To move a box, name the target once: `MONARCHY_OMARCHY_PACKAGE=… MONARCHY_OMARCHY_CHANNEL=… ./install.sh --only=pacman`, then `MONARCHY_OMARCHY_PACKAGE=… monarchy-update` (ADR 0009). CachyOS does not Include drop-ins, so this lives in `pacman.conf` itself. First edit takes `/etc/pacman.conf.monarchy.bak`. `monarchy_preserve_pacman_conf` aborts if `[cachyos]` / `[cachyos-v3]` do not precede `[omarchy]`, or if the CachyOS/Arch mirrorlist Includes are gone.
 
 `monarchy_install_packages` reads `install/omarchy-base.packages` from the package tree, subtracts `monarchy/packages.deny`, `pacman -S --needed --noconfirm`, writes `monarchy/packages.installed` and `/var/lib/monarchy/packages.installed`. Do not install from `omarchy-other.packages`. Hardware stays CachyOS `chwd` plus `hardware/`.
 
@@ -351,7 +349,6 @@ tests/
   zbm/                   # boot cmdline merge
   hardware/              # DMI detection
 monarchy/
-  omarchy.lock
   packages.deny
   packages.installed
   applications.drop
@@ -564,7 +561,6 @@ ZFS datasets do not change: `zpcachyos/ROOT/cos/{root,home,varcache,varlog}`. Po
 | `/etc/pacman.conf` marker block | `[omarchy]`, `SigLevel = Required DatabaseOptional` |
 | `/etc/pacman.conf.monarchy.bak` | Backup before first edit |
 | `/etc/omarchy.conf` | `OMARCHY_PATH=/usr/local/share/omarchy` |
-| `/etc/omarchy.lock` | Apply pin. `omarchy-version-branch` reads it |
 | `/etc/pam.d/omarchy-lock-password` | Quickshell lock PAM. Super+Ctrl+L is a no-op without it |
 | `/usr/share/omarchy` | Package tree: `omarchy` + `omarchy-settings-monarchy` |
 | `/usr/local/share/omarchy` | working prefix: symlinks into `/usr/share/omarchy` + overlay `bin/` |

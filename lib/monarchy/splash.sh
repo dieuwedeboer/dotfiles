@@ -274,7 +274,7 @@ monarchy_splash() {
 }
 
 monarchy_splash_only() {
-    monarchy_load_lock
+    monarchy_load_channel
     monarchy_load_inventories
     monarchy_snapshot_first
     monarchy_assert_zfs_layout

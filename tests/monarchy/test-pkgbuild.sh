@@ -128,12 +128,19 @@ fi
 # entry hides a rename, and a renamed hazard is one the classification guard
 # never sees. omarchy-upgrade-to-quattro-zfs-check survived the move off the
 # fork this way; the first thing to notice was a failed apply on the box.
+# Only omarchy-dev can say a row is stale: on a tagged release a missing name
+# is usually one that has not shipped yet (ADR 0009). monarchy_check_overrides_exist
+# applies the same rule.
 tree=$(require_omarchy_tree)
 stale=""
 for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}" "${MONARCHY_BIN_SKIP[@]}"; do
     [ -e "$tree/bin/$name" ] || stale="$stale $name"
 done
-[ -z "$stale" ] \
-    || fail "bin.deny, bin.wrap or bin.skip names binaries the omarchy package does not ship:$stale"
+if pacman -Q omarchy-dev >/dev/null 2>&1; then
+    [ -z "$stale" ] \
+        || fail "bin.deny, bin.wrap or bin.skip names binaries omarchy-dev does not ship:$stale"
+elif [ -n "$stale" ]; then
+    echo "stale-row check skipped on a tagged release; not shipped here:$stale"
+fi
 
 echo "pkgbuild tests passed"

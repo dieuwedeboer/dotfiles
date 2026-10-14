@@ -275,15 +275,22 @@ monarchy_check_bin_hazards() {
 
 # Every name we claim to override must still exist upstream. A wrap or a deny
 # stub for a binary that was removed is dead weight that hides a rename.
+# A row naming a binary the package does not ship is stale on omarchy-dev,
+# which is upstream's leading edge: the name was dropped or renamed, and a
+# renamed hazard is one the classification guard never sees. On a tagged
+# release the same row is usually a binary that has not shipped yet; the
+# lists serve every channel (ADR 0009), so there it is only noted.
 monarchy_check_overrides_exist() {
-    local name missing=0
+    local name missing=""
     for name in "${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}" "${MONARCHY_BIN_SKIP[@]}"; do
-        [ -e "$MONARCHY_SRC/bin/$name" ] && continue
-        echo "overridden name no longer in the omarchy package: $name" >&2
-        missing=1
+        [ -e "$MONARCHY_SRC/bin/$name" ] || missing="$missing $name"
     done
-    [ "$missing" = 0 ] || monarchy_die "drop or reclassify the names above"
-    return 0
+    [ -n "$missing" ] || return 0
+    if [ "${MONARCHY_OMARCHY_PACKAGE:-omarchy}" = omarchy-dev ]; then
+        echo "overridden names no longer in omarchy-dev:$missing" >&2
+        monarchy_die "drop or reclassify the names above"
+    fi
+    monarchy_log "not in this release, kept for newer ones:$missing"
 }
 
 monarchy_overlay_lock_py() {

@@ -62,16 +62,9 @@ WAKE_NEW = (
     "        onSwitchUserRequested: root.runSwitchUser()\n"
 )
 
-FINISH_OLD = """  function finishUnlock() {
-    if (!root.currentlyLocked()) return
-
-    lockRequested = false
-    pendingSessionLock = false
-    sessionLockStabilizeTimer.stop()
-    pendingSessionLockTimer.stop()
-    resetAuthenticationState()
-    idleBlankTimer.stop()
-    sessionLock.locked = false
+# Anchored on the tail of finishUnlock, which stable and edge share; its
+# opening guard differs between them (root.locked vs currentlyLocked()).
+FINISH_OLD = """    sessionLock.locked = false
     logEvent("unlocked")
     runWake()
   }
@@ -79,16 +72,7 @@ FINISH_OLD = """  function finishUnlock() {
   function armBlankTimer() {
 """
 
-FINISH_NEW = """  function finishUnlock() {
-    if (!root.currentlyLocked()) return
-
-    lockRequested = false
-    pendingSessionLock = false
-    sessionLockStabilizeTimer.stop()
-    pendingSessionLockTimer.stop()
-    resetAuthenticationState()
-    idleBlankTimer.stop()
-    sessionLock.locked = false
+FINISH_NEW = """    sessionLock.locked = false
     Qt.callLater(function() { root.unlockSettled++ })
     logEvent("unlocked")
     runWake()

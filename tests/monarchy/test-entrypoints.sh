@@ -31,7 +31,7 @@ for fn in \
     monarchy_ensure_log monarchy_log monarchy_trace monarchy_warn monarchy_die \
     monarchy_changed monarchy_changed_many monarchy_left_alone monarchy_summary \
     monarchy_section monarchy_step monarchy_step_took \
-    monarchy_load_lock monarchy_load_inventories monarchy_snapshot_first \
+    monarchy_load_channel monarchy_load_inventories monarchy_snapshot_first \
     monarchy_guards_check monarchy_check monarchy_apply monarchy_update \
     monarchy_real_omarchy_update monarchy_after_omarchy_update \
     monarchy_build_packages monarchy_splash_only \

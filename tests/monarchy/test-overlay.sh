@@ -138,11 +138,14 @@ fi
 rm -f "$tmp/src/bin/omarchy-something-new"
 monarchy_check_bin_hazards || fail "hazard scan failed on a clean tree"
 
-# A wrap, deny or skip for a name upstream dropped is dead weight that hides
-# a rename, and a rename is how an unclassified hazard gets in.
+# A wrap, deny or skip for a name omarchy-dev dropped is dead weight that
+# hides a rename, and a rename is how an unclassified hazard gets in. On a
+# tagged release the name may simply not have shipped yet (ADR 0009).
 rm -f "$tmp/src/bin/omarchy-refresh-pacman"
-if ( monarchy_check_overrides_exist ) >/dev/null 2>&1; then
-    fail "override check passed a denied name that is no longer in the package"
+if ( MONARCHY_OMARCHY_PACKAGE=omarchy-dev monarchy_check_overrides_exist ) >/dev/null 2>&1; then
+    fail "override check passed a denied name that is no longer in omarchy-dev"
 fi
+( MONARCHY_OMARCHY_PACKAGE=omarchy monarchy_check_overrides_exist ) >/dev/null 2>&1 \
+    || fail "override check stopped a tagged release over a name it has not shipped yet"
 
 echo "overlay tests passed"
