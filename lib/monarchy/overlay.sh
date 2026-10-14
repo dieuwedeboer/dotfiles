@@ -5,6 +5,9 @@
 monarchy_wrap_stub_for() {
     local name=$1
     case "$name" in
+        omarchy-agent-usage-update)
+            printf '%s\n' "$monarchy_lib_dir/stubs/wrap-agent-usage-update.sh"
+            ;;
         omarchy-update)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-update.sh"
             ;;
