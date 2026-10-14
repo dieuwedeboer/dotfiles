@@ -131,24 +131,18 @@ SWITCH_PROC = """  Process {
   }
 """
 
-LOCK_IPC = """    function lock(): string {
-      if (!root.passwordPamConfigured) return "missing-pam"
-      if (!root.currentlyLocked() && !root.beginLock()) return "failed"
-      return "ok"
-    }
+# switchUser() goes in just before isLocked(), the IPC function after lock().
+# Anchoring on lock()'s body broke each time upstream changed it.
+LOCK_IPC = """    function isLocked(): string {
 """
 
-SWITCH_IPC = """    function lock(): string {
-      if (!root.passwordPamConfigured) return "missing-pam"
-      if (!root.currentlyLocked() && !root.beginLock()) return "failed"
-      return "ok"
-    }
-
-    function switchUser(): string {
+SWITCH_IPC = """    function switchUser(): string {
       if (!root.lockRequested) return "not-locked"
       root.runSwitchUser()
       return "ok"
     }
+
+    function isLocked(): string {
 """
 
 MENU_LOCK = (
@@ -194,7 +188,7 @@ def patch_service(content: str) -> str:
     content = must_replace(content, FINISH_OLD, FINISH_NEW, "finishUnlock")
     content = must_replace(content, WAKE_OLD, WAKE_NEW, "onWakeRequested")
     content = must_replace(content, BLANK_PROC, SWITCH_PROC, "blankProcess")
-    content = must_replace(content, LOCK_IPC, SWITCH_IPC, "IpcHandler lock()")
+    content = must_replace(content, LOCK_IPC, SWITCH_IPC, "IpcHandler isLocked()")
     return content
 
 
