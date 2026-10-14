@@ -12,7 +12,6 @@ bolt
 brightnessctl
 btop
 chromium
-clang
 cliamp
 cups
 cups-filters
@@ -67,7 +66,6 @@ inotify-tools
 inxi
 networkmanager
 jq
-kdenlive
 kernel-modules-hook
 lazygit
 less
@@ -75,7 +73,6 @@ libsecret
 libvips
 libyaml
 libreoffice-fresh
-llvm
 localsend
 lua51
 luarocks
@@ -94,13 +91,12 @@ noto-fonts-cjk
 noto-fonts-emoji
 nss-mdns
 nvim
-obs-studio
 obsidian
 omacalc
 omacut
-omarchy-hyprland-titlebars
 omawrite
 omarchy-nvim
+omarchy-hyprland-titlebars
 omasnap
 owe
 owe-lockfeed
@@ -118,7 +114,6 @@ qt6-declarative
 qt6-multimedia
 qt6-svg
 qt6-wayland
-signed
 ttfx
 qemu-user-static-binfmt
 qrencode
@@ -127,6 +122,7 @@ quickshell
 ripgrep
 ruby
 sddm
+signed
 slurp
 socat
 starship
@@ -154,7 +150,6 @@ woff2-font-awesome
 xdg-desktop-portal-gtk
 xdg-desktop-portal-hyprland
 xdg-terminal-exec
-xournalpp
 yaru-icon-theme
 yay
 yt-dlp
