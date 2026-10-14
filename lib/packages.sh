@@ -30,6 +30,7 @@ PACMAN_PACKAGES=(
     extra-cmake-modules
     aws-cli-v2
     glab
+    gdu
     # tests/run.sh lints lib/, tests/, hardware/ and install.sh with this, and
     # skips that arm when it is absent -- which reads as a pass.
     shellcheck
