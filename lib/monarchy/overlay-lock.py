@@ -63,7 +63,7 @@ WAKE_NEW = (
 )
 
 FINISH_OLD = """  function finishUnlock() {
-    if (!root.locked && !lockRequested) return
+    if (!root.currentlyLocked()) return
 
     lockRequested = false
     pendingSessionLock = false
@@ -80,7 +80,7 @@ FINISH_OLD = """  function finishUnlock() {
 """
 
 FINISH_NEW = """  function finishUnlock() {
-    if (!root.locked && !lockRequested) return
+    if (!root.currentlyLocked()) return
 
     lockRequested = false
     pendingSessionLock = false
@@ -133,14 +133,14 @@ SWITCH_PROC = """  Process {
 
 LOCK_IPC = """    function lock(): string {
       if (!root.passwordPamConfigured) return "missing-pam"
-      if (!root.locked && !root.beginLock()) return "failed"
+      if (!root.currentlyLocked() && !root.beginLock()) return "failed"
       return "ok"
     }
 """
 
 SWITCH_IPC = """    function lock(): string {
       if (!root.passwordPamConfigured) return "missing-pam"
-      if (!root.locked && !root.beginLock()) return "failed"
+      if (!root.currentlyLocked() && !root.beginLock()) return "failed"
       return "ok"
     }
 

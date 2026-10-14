@@ -158,7 +158,7 @@ monarchy_source_root_checked() {
 # into the working prefix except bin/, which is the overlay with a real copy
 # of omarchy-update. Rebuilt per run, so the copy is the installed version.
 monarchy_build_update_root() {
-    local root=$1 entry
+    local root=$1 entry name
     case "$root" in
         ''|/) monarchy_die "refusing to rebuild an update root at '$root'" ;;
     esac
@@ -169,8 +169,14 @@ monarchy_build_update_root() {
         monarchy_sudo ln -s "$entry" "$root/$(basename "$entry")"
     done
     monarchy_sudo cp -a "$MONARCHY_PATH/bin" "$root/bin"
-    monarchy_sudo rm -f "$root/bin/omarchy-update"
-    monarchy_sudo install -m 755 "$(readlink -e "$MONARCHY_SRC/bin/omarchy-update")" "$root/bin/omarchy-update"
+    # The commands that check their source root, copied from the package
+    # tree as it is now rather than taken from the overlay, which the apply
+    # only rebuilds after this run.
+    while read -r name; do
+        [ "$name" = omarchy-update ] || ! monarchy_overrides "$name" || continue
+        monarchy_sudo rm -f "$root/bin/$name"
+        monarchy_sudo install -m 755 "$(readlink -e "$MONARCHY_SRC/bin/$name")" "$root/bin/$name"
+    done < <(monarchy_source_root_checked "$MONARCHY_SRC/bin")
 }
 
 # Commands Omarchy calls that belong to tools this host replaces, mapped onto
