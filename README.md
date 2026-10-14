@@ -99,6 +99,26 @@ Feature flags can't be removed once enabled, and old ZBM images (and older live 
 - `sanoid.timer` snapshots `zpcachyos/ROOT/cos/home` (`autosnap_*`, retention in `etc/sanoid/sanoid.conf`). Data-only, not bootable.
 - The pacman hook (`etc/pacman.d/hooks/zfs-snapshot.hook`) recursively snapshots `zpcachyos/ROOT/cos` before every transaction (`pre-update-*`, keeps 3 per dataset). The `root` snapshots are bootable recovery points: boot them read-only from the ZFSBootMenu menu; clone + promote to make a rollback permanent.
 
+`zpcachyos/games`, mounted at `/games`, is in neither: it sits beside `ROOT`, so the recursive pacman snapshot cannot reach it, and any snapshot that turns up there is destroyed on the next apply. See [Shared game library](#shared-game-library) and ADR 0006.
+
+### Shared game library
+
+`lib/games.sh` creates `/games` on every machine and shares Steam's game files between the king, queen and kids in `/etc/monarchy/users.conf`. They are put in the `games` group, which takes effect at their next login. `/games/steam/common` is bind-mounted over each player's `~/.local/share/Steam/steamapps/common`, so every game Steam installs lands there. Each player's `steamapps/downloading` is bind-mounted from their own `/games/steam/downloading/<user>`, so no `/home` snapshot holds a half-finished download. Everything else in `steamapps` stays per user: manifests, temp files, shader cache, Proton prefixes and the saves in them.
+
+A `common` or `downloading` that already holds files is not mounted over; the apply warns instead. Move them across once, with Steam closed:
+
+```fish
+sudo systemctl stop sanoid.timer
+mv ~/.local/share/Steam/steamapps/common/* /games/steam/common/
+mv ~/.local/share/Steam/steamapps/downloading/* /games/steam/downloading/$USER/
+monarchy-update
+sudo systemctl start sanoid.timer
+```
+
+`monarchy-update` then mounts the library and gives the `games` group write access to what was moved. The moved games keep taking space in `/home` until every `/home` snapshot taken before the move has gone (`zfs list -t snapshot zpcachyos/ROOT/cos/home`). The move itself needs that much free space, because the originals are still held while the copies are written.
+
+When another player's Steam first sees a shared game, it shows it as not installed. Install it to the default library: Steam finds the files already there, checks them, and downloads only what differs.
+
 ### First Boot Setups (todo: shift this to the chroot step)
 
 1. Enable CachyOS updater from greeter and install the gaming packages.

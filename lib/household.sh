@@ -164,5 +164,9 @@ household_refresh() {
     monarchy_step "ZFS monitoring and snapshots"
     "$LIB_DIR/zfs.sh"
 
+    # shellcheck source=games.sh
+    source "$LIB_DIR/games.sh"
+    games_apply
+
     household_ksystemstats
 }
