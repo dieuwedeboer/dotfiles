@@ -65,34 +65,18 @@ ICON_CALL_NEW = (
     "  var threshold = chargeThresholdActive(d, onBattery, states, hasChargeLimit)\n"
 )
 
-MODE_OLD = """function modeLabel(device, onBattery, states) {
-  var d = device || {}
-  if (!d.isPresent) return ""
+# modeLabel takes upstream's translator as its fourth argument, so
+# hasChargeLimit goes after it. Each anchor is one line: whole function
+# bodies broke on every upstream edit.
+MODE_SIG_OLD = "function modeLabel(device, onBattery, states, tr) {\n"
+MODE_SIG_NEW = "function modeLabel(device, onBattery, states, tr, hasChargeLimit) {\n"
 
-  var percentage = d.isPresent ? d.percentage : 0
-  if (chargeThresholdActive(d, onBattery, states)) return "Threshold"
-"""
+MODE_CALL_OLD = "  if (chargeThresholdActive(d, onBattery, states)) return "
+MODE_CALL_NEW = "  if (chargeThresholdActive(d, onBattery, states, hasChargeLimit)) return "
 
-MODE_NEW = """function modeLabel(device, onBattery, states, hasChargeLimit) {
-  var d = device || {}
-  if (!d.isPresent) return ""
+PANEL_GATE_ANCHOR = "  function batteryIcon() {\n"
 
-  var percentage = d.isPresent ? d.percentage : 0
-  if (chargeThresholdActive(d, onBattery, states, hasChargeLimit)) return "Threshold"
-"""
-
-PANEL_FUNCS_OLD = """  function batteryIcon() {
-    var device = UPower.displayDevice
-    return Model.batteryIcon(device, root.discharging, upowerStates())
-  }
-
-  function modeLabel() {
-    var device = UPower.displayDevice
-    return Model.modeLabel(device, root.discharging, upowerStates())
-  }
-"""
-
-PANEL_FUNCS_NEW = """  // Monarchy: whether this machine has a charge limit at all. The panel is
+PANEL_GATE_NEW = """  // Monarchy: whether this machine has a charge limit at all. The panel is
   // the only place that knows -- omarchy-battery-status prints `threshold`
   // only when the kernel exposes charge_control_*. undefined before the first
   // status read, so the bar icon keeps stock behaviour instead of reading an
@@ -103,15 +87,13 @@ PANEL_FUNCS_NEW = """  // Monarchy: whether this machine has a charge limit at a
   }
 
   function batteryIcon() {
-    var device = UPower.displayDevice
-    return Model.batteryIcon(device, root.discharging, upowerStates(), root.hasChargeLimit)
-  }
-
-  function modeLabel() {
-    var device = UPower.displayDevice
-    return Model.modeLabel(device, root.discharging, upowerStates(), root.hasChargeLimit)
-  }
 """
+
+PANEL_ICON_OLD = "Model.batteryIcon(device, root.discharging, upowerStates())"
+PANEL_ICON_NEW = "Model.batteryIcon(device, root.discharging, upowerStates(), root.hasChargeLimit)"
+
+PANEL_MODE_OLD = "Model.modeLabel(device, root.discharging, upowerStates(), Commons.I18n.t)"
+PANEL_MODE_NEW = "Model.modeLabel(device, root.discharging, upowerStates(), Commons.I18n.t, root.hasChargeLimit)"
 
 PANEL_ACTIVE_OLD = """  readonly property bool chargeThresholdActive: {
     var device = UPower.displayDevice
@@ -175,12 +157,15 @@ def patch_model(content: str) -> str:
     content = must_replace(content, THRESHOLD_OLD, THRESHOLD_NEW, "chargeThresholdActive")
     content = must_replace(content, ICON_OLD, ICON_NEW, "batteryIcon signature")
     content = must_replace(content, ICON_CALL_OLD, ICON_CALL_NEW, "batteryIcon threshold call")
-    content = must_replace(content, MODE_OLD, MODE_NEW, "modeLabel")
+    content = must_replace(content, MODE_SIG_OLD, MODE_SIG_NEW, "modeLabel signature")
+    content = must_replace(content, MODE_CALL_OLD, MODE_CALL_NEW, "modeLabel threshold call")
     return content
 
 
 def patch_panel(content: str) -> str:
-    content = must_replace(content, PANEL_FUNCS_OLD, PANEL_FUNCS_NEW, "batteryIcon/modeLabel")
+    content = must_replace(content, PANEL_GATE_ANCHOR, PANEL_GATE_NEW, "batteryIcon function")
+    content = must_replace(content, PANEL_ICON_OLD, PANEL_ICON_NEW, "batteryIcon call")
+    content = must_replace(content, PANEL_MODE_OLD, PANEL_MODE_NEW, "modeLabel call")
     content = must_replace(content, PANEL_ACTIVE_OLD, PANEL_ACTIVE_NEW, "chargeThresholdActive property")
     content = must_replace(content, PANEL_SEED_OLD, PANEL_SEED_NEW, "battery status seed")
     return content
