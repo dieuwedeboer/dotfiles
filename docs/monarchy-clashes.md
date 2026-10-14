@@ -9,7 +9,7 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 | Clash | Who owns it | Bridging resolution | Named function |
 | --- | --- | --- | --- |
 | `omarchy-refresh-pacman` replaces `/etc/pacman.conf` and CachyOS mirrorlists | CachyOS | Never call it. Marker-block `[omarchy]` only. Stub the command | `monarchy_preserve_pacman_conf`, `monarchy_add_omarchy_repo` |
-| `linux` vs `linux-cachyos` + `linux-cachyos-zfs` | CachyOS | Deny stock `linux` | `monarchy_refuse_kernel_swap` |
+| `linux-omarchy` (and stock `linux`) vs `linux-cachyos` + `linux-cachyos-zfs` | CachyOS | Any kernel may boot while one with a packaged ZFS module stays installed (ADR 0008). `linux-omarchy` is installed with `zfs-dkms`. Stock `linux` stays in `packages.deny` | `monarchy_require_fallback_kernel`, `etc/pacman.d/hooks/zfs-*.hook` |
 | archzfs vs CachyOS ZFS (`linux-cachyos-zfs` and `zfs-dkms` both from Calamares) | CachyOS | Keep both CachyOS packages. No `[archzfs]` | `monarchy_refuse_archzfs` |
 | Limine vs rEFInd + ZFSBootMenu | King | Never install limine. Stub `omarchy-refresh-limine` | `monarchy_refuse_bootloader` |
 | Snapper vs sanoid + pacman ZFS hook | King | Never install snapper | `monarchy_refuse_snapper` |
@@ -43,7 +43,7 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 | `usbguard` | Follow Omarchy, which dropped it with USB approval on 14 October 2026. It is no longer an Omarchy package; migration `1791769486.sh` removes it where Omarchy granted it |
 | `gliff` | Install. Remote desktop over SSH; inert until used |
 | Migrations in general | Run, unless one cannot run without a brick risk (ADR 0005). `migrations.deny` and `migrations.allow` hold the reviewed ones, each with its reason |
-| Migration `1789325478.sh` installs `linux-omarchy` | Deny. The root pool's ZFS module comes from `linux-cachyos-zfs`; this kernel would rely on `zfs-dkms`, and ZFSBootMenu may boot it as the newest |
+| Migration `1789325478.sh` installs `linux-omarchy` | Deny. It ends on `limine-entry-tool`, which this host lacks, so it can never complete. The kernel itself is wanted and comes from `PACMAN_PACKAGES` (ADR 0008) |
 | Migration `1791403252.sh` moves `[omarchy]` above every other repo, then runs a full upgrade | Deny. `[omarchy]` stays after CachyOS (`monarchy_preserve_pacman_conf`); its packages would otherwise shadow CachyOS builds |
 | Omarchy's Limine command-line fixes, `initramfs_async=0` and `systemd.tty.term.console=dumb` | Taken, on `org.zfsbootmenu:commandline` (`lib/zbm/boot.sh`), since `settings.skip` drops the Limine drop-ins that carry them upstream |
 | NVIDIA 580xx-dkms vs `chwd` | Never run Omarchy `nvidia.sh` |

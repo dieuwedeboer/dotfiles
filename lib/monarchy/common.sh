@@ -277,20 +277,18 @@ monarchy_refuse_snapper() {
     return 0
 }
 
-monarchy_refuse_kernel_swap() {
-    if monarchy_pkg_installed linux && ! monarchy_pkg_installed linux-cachyos; then
-        monarchy_die "stock linux is installed without linux-cachyos"
-    fi
-    local pkgbase=""
-    if [ -r /usr/lib/modules/"$(uname -r)"/pkgbase ]; then
-        pkgbase=$(cat /usr/lib/modules/"$(uname -r)"/pkgbase)
-    fi
-    case "$pkgbase" in
-        linux-cachyos*) ;;
-        "") monarchy_log "warning: could not read running pkgbase" ;;
-        *) monarchy_die "running pkgbase is '$pkgbase', expected linux-cachyos*" ;;
-    esac
-    return 0
+# Any kernel may run, Omarchy's included, while one stays installed whose ZFS
+# module comes from a package rather than DKMS. ADR 0008. The pacman hooks in
+# etc/pacman.d/hooks hold the same line during a transaction; this catches a
+# box that lost its fallback some other way.
+monarchy_require_fallback_kernel() {
+    # shellcheck source=../zfs-kernel.sh
+    source "$MONARCHY_DOTFILES/lib/zfs-kernel.sh"
+    local fallback
+    fallback=$(zk_fallback_kvers)
+    [ -n "$fallback" ] \
+        || monarchy_die "no kernel with a packaged ZFS module is installed; install linux-cachyos and linux-cachyos-zfs before anything else (ADR 0008)"
+    monarchy_trace "fallback kernels: $(printf '%s' "$fallback" | awk '{ print $2 }' | paste -sd' ')"
 }
 
 # `omarchy` or `omarchy-dev` is installed on purpose now; neither has a

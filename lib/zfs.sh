@@ -17,7 +17,9 @@ monarchy_log "/etc drop-ins"
 sudo mkdir -p /etc/sanoid
 sudo cp -f "$DOTFILES_DIR/etc/sanoid/sanoid.conf" /etc/sanoid/sanoid.conf
 sudo mkdir -p /etc/pacman.d/hooks
-sudo cp -f "$DOTFILES_DIR/etc/pacman.d/hooks/zfs-snapshot.hook" /etc/pacman.d/hooks/
+# The kernel hooks run this; install it first so no hook lands without it.
+sudo install -Dm755 "$DOTFILES_DIR/lib/zfs-kernel.sh" /usr/local/lib/monarchy/zfs-kernel
+sudo cp -f "$DOTFILES_DIR"/etc/pacman.d/hooks/*.hook /etc/pacman.d/hooks/
 
 monarchy_log "ARC cap"
 # Upstream's default zfs_arc_max is all of RAM. On a desktop the ARC then holds

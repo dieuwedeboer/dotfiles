@@ -1,0 +1,18 @@
+# Refuse a kernel the root pool cannot be imported by. ADR 0008.
+# Sorts before zfs-snapshot.hook, so a refused transaction takes no snapshot.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/lib/modules/*/vmlinuz
+Target = usr/lib/modules/*/zfs.ko*
+Target = usr/lib/modules/*/extramodules/zfs.ko*
+Target = usr/lib/modules/*/updates/zfs.ko*
+Target = usr/src/zfs-*/META
+
+[Action]
+Description = Checking every incoming kernel has a ZFS module...
+When = PreTransaction
+Exec = /usr/local/lib/monarchy/zfs-kernel check-install
+NeedsTargets
+AbortOnFail

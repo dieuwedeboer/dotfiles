@@ -464,7 +464,7 @@ These abort apply or check when the host has drifted. Full clash rows are `docs/
 | `monarchy_add_omarchy_repo` | Recv+lsign key once. Marker-block append. `omarchy-keyring`. `pacman -Sy`. |
 | `monarchy_refuse_archzfs` | Fail if `[archzfs]` appears. |
 | `monarchy_refuse_omarchy_zfs_repo` | Fail if `[omarchy-zfs]` is present. |
-| `monarchy_refuse_kernel_swap` | Never install `linux` / `linux-headers`. Running pkgbase is `linux-cachyos*`. |
+| `monarchy_require_fallback_kernel` | One installed kernel has a ZFS module owned by a package, not built by DKMS. Any kernel may be the running one. ADR 0008. |
 | `monarchy_refuse_bootloader` | rEFInd at `/boot/efi/EFI/refind`, ZBM at `/boot/efi/EFI/zbm`. Refuse a package *named* `limine*` (not our stub, which only provides the name) and refuse `/etc/pacman.d/hooks/90-mkinitcpio-install.hook`. |
 | `monarchy_refuse_snapper` | Refuse a package named `snapper`. Keep sanoid + pacman hook. |
 | `monarchy_refuse_dataset_rename` | Never run clone `install/config/zfs.sh`. Never write `/etc/pam.d/zfs-key`. |

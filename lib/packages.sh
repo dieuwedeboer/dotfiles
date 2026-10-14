@@ -30,6 +30,13 @@ PACMAN_PACKAGES=(
     aws-cli-v2
     glab
     gdu
+    # Omarchy's kernel, beside linux-cachyos rather than instead of it: its
+    # ZFS module is built by zfs-dkms, and linux-cachyos-zfs stays the
+    # fallback that needs no build. ADR 0008. Omarchy's own migration for
+    # this (1789325478.sh) ends on Limine and stays denied.
+    linux-omarchy
+    linux-omarchy-headers
+    zfs-dkms
     # tests/run.sh lints lib/, tests/, hardware/ and install.sh with this, and
     # skips that arm when it is absent -- which reads as a pass.
     shellcheck

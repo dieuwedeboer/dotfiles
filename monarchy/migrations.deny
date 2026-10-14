@@ -4,9 +4,10 @@
 # Every migration runs unless it cannot run without a risk of bricking this
 # ZFS host (ADR 0005). Each row says which risk.
 
-# Installs linux-omarchy and its headers. The root pool's ZFS module comes
-# from linux-cachyos-zfs; this kernel would rely on zfs-dkms building one, and
-# ZFSBootMenu may pick it as the newest kernel.
+# Installs linux-omarchy and its headers, then rebuilds and checks its Limine
+# entry with limine-entry-tool, which this host deliberately lacks, so it can
+# never complete here. The kernel itself is wanted (ADR 0008): PACMAN_PACKAGES
+# installs it with zfs-dkms, beside the linux-cachyos fallback.
 1789325478.sh
 
 # Moves [omarchy] above every other repository and runs a full upgrade.

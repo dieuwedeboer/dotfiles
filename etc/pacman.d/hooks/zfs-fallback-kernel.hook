@@ -1,0 +1,12 @@
+# Keep one kernel whose ZFS module does not need DKMS. ADR 0008.
+[Trigger]
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Keeping a fallback kernel with a packaged ZFS module...
+When = PreTransaction
+Exec = /usr/local/lib/monarchy/zfs-kernel check-remove
+NeedsTargets
+AbortOnFail

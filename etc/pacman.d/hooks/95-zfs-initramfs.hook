@@ -1,0 +1,16 @@
+# Warn when a kernel's initramfs has no zfs module. ADR 0008.
+# 95 sorts after 70-dkms-* and 90-mkinitcpio-install.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/lib/modules/*/vmlinuz
+Target = usr/lib/modules/*/zfs.ko*
+Target = usr/lib/modules/*/extramodules/zfs.ko*
+Target = usr/lib/modules/*/updates/zfs.ko*
+Target = usr/src/zfs-*/META
+
+[Action]
+Description = Checking every initramfs can import the root pool...
+When = PostTransaction
+Exec = /usr/local/lib/monarchy/zfs-kernel check-initramfs

@@ -124,7 +124,7 @@ monarchy_guards_check() {
     monarchy_assert_os_release
     monarchy_refuse_bootloader
     monarchy_refuse_snapper
-    monarchy_refuse_kernel_swap
+    monarchy_require_fallback_kernel
     monarchy_skip_os_release_clobber
     monarchy_skip_autologin
     monarchy_skip_plymouth_zfs
