@@ -24,6 +24,10 @@ for arg in "$@"; do
         --splash-only) MODE=splash ;;
         -y|--yes)
             OMARCHY_UPDATE_ARGS+=(-y)
+            # read by monarchy_update_plugins: -y means do not ask, and a
+            # plugin update that is not asked about is not made
+            # shellcheck disable=SC2034
+            MONARCHY_ASSUME_YES=1
             ;;
         --no-omarchy-update)
             # read below

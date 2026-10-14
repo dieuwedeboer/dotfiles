@@ -9,6 +9,11 @@
 # only as absence from shell.json and an enable on every apply would overturn
 # it every update. Switch one back on with `omarchy plugin enable <id>`.
 #
+# Updates: monarchy-update runs `omarchy plugin update <id>` for every
+# git-managed plugin with upstream changes, without --yes, so each diff is
+# shown and confirmed. Plugins are unreviewed third-party code; with no
+# terminal or with -y they are left as they are and listed in the summary.
+#
 # Deleting a row here stops nothing that is already installed. To be rid of a
 # plugin: drop the row, then `omarchy plugin remove <id>`.
 #

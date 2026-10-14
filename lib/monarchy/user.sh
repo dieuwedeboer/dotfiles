@@ -522,6 +522,7 @@ monarchy_setup_user() {
     monarchy_clear_terminal_override
     monarchy_user_omarchy_defaults
     monarchy_install_plugins
+    monarchy_update_plugins
     monarchy_user_xcompose
     monarchy_user_git
     monarchy_user_theme

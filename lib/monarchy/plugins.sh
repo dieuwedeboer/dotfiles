@@ -349,3 +349,56 @@ monarchy_install_plugins() {
         "$MONARCHY_PATH/bin/omarchy-shell" -q shell rescanPlugins || true
     fi
 }
+
+# Pull upstream changes into installed plugins, but only past a person.
+#
+# A plugin is someone else's code running in the shell, unreviewed, the same
+# trust problem as an AUR PKGBUILD. `omarchy plugin update <id>` without --yes
+# already shows the diff and asks, so that is the whole review; this only
+# decides when it may run. With no terminal (the Omarchy menu) there is nobody
+# to show the diff to, and -y promises not to ask -- neither is consent to new
+# code, so both leave the plugin where it is and say what is waiting.
+#
+# Every git-managed plugin, not just the rows in monarchy/plugins: a plugin
+# added by hand is just as unreviewed and just as stale without this.
+#
+# Nothing here dies. An unreachable remote or a checkout with local commits
+# is one plugin left behind, not a reason to stop the rest of the update.
+monarchy_update_plugins() {
+    local plugins_dir dir id before after waiting=""
+    local update="$MONARCHY_PATH/bin/omarchy-plugin-update"
+    plugins_dir=$(monarchy_plugin_user_dir)
+    [ -d "$plugins_dir" ] || return 0
+    if [ ! -x "$update" ]; then
+        monarchy_warn "missing $update; plugins not updated"
+        return 0
+    fi
+    export GIT_TERMINAL_PROMPT=0
+    for dir in "$plugins_dir"/*/; do
+        dir=${dir%/}
+        [ -d "$dir/.git" ] || continue
+        id=${dir##*/}
+        if ! git -C "$dir" fetch --quiet origin HEAD 2>/dev/null; then
+            monarchy_warn "plugin $id: fetch failed; not updated"
+            continue
+        fi
+        before=$(git -C "$dir" rev-parse HEAD)
+        [ "$before" != "$(git -C "$dir" rev-parse FETCH_HEAD)" ] || continue
+        if [ "${MONARCHY_ASSUME_YES:-0}" = 1 ] || ! monarchy_can_prompt; then
+            waiting="$waiting $id"
+            continue
+        fi
+        # Its own fetch and ff-only merge, with rollback on failed
+        # validation. A non-zero exit is a plugin it could not update, which
+        # it has already explained on stderr.
+        "$update" "$id" || monarchy_warn "plugin $id: update failed; see above"
+        after=$(git -C "$dir" rev-parse HEAD)
+        if [ "$after" != "$before" ]; then
+            monarchy_changed "updated plugin $id"
+        else
+            monarchy_left_alone "plugin $id — update declined"
+        fi
+    done
+    [ -n "$waiting" ] || return 0
+    monarchy_left_alone "plugin updates waiting for review:$waiting. Run monarchy-update in a terminal, without -y"
+}
