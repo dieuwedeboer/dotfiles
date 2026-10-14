@@ -113,12 +113,13 @@ for name in "${PLAIN[@]}"; do
 done
 
 # Every packaged name is reachable, override or not, and the overlay carries
-# nothing beyond them but yay.
+# nothing beyond them but yay and the bin.alias names.
 names_in() { find "$1" -mindepth 1 -maxdepth 1 -printf '%f\n' | LC_ALL=C sort; }
 missing=$(comm -23 <(names_in "$MONARCHY_SRC/bin") <(names_in "$dest"))
 [ -z "$missing" ] || fail "packaged names missing from the overlay: $missing"
 extra=$(comm -13 <(names_in "$MONARCHY_SRC/bin") <(names_in "$dest"))
-[ "$extra" = yay ] || fail "overlay carries names the package does not ship: $extra"
+expected=$(printf '%s\n' yay "${MONARCHY_BIN_ALIAS[@]}" | LC_ALL=C sort)
+[ "$extra" = "$expected" ] || fail "overlay carries names the package does not ship: $extra"
 
 # The packaged tree comes out of a rebuild byte-for-byte as it went in.
 diff -r "$tmp/src-reference" "$MONARCHY_SRC/bin" >/dev/null \

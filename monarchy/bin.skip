@@ -31,11 +31,3 @@ omarchy-update-dev
 # later. Afterwards both are right, and it owns the shell restart at that
 # point: monarchy_restart_shell stands down via MONARCHY_DEFER_SHELL_RESTART.
 omarchy-update-restart
-
-# Migrations are classified before they are allowed to run: migrations.deny
-# halts an apply until a new hazardous one has been looked at, and the marker
-# that keeps a denied one out of --pending is written during apply. Upstream
-# runs this immediately after the upgrade that ships it, which is before
-# monarchy has had either chance. Monarchy runs the real one itself, after
-# classification.
-omarchy-migrate

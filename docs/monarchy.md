@@ -321,8 +321,9 @@ lib/monarchy/
   ui.sh                  # one voice, and the changed/left-alone/warned ledger
   common.sh              # logging, snapshot-first, layout guards, seed ledger
   pacman.sh              # preserve CachyOS, append [omarchy]
-  denylist.sh            # loads packages.deny, bin.*, migrations.deny, applications.drop,
-                         #   launcher.unhides
+  denylist.sh            # loads packages.deny, bin.*, migrations.deny/.allow,
+                         #   applications.drop, launcher.unhides
+  migrate.sh             # /usr/local/bin/monarchy-migrate and the migration brick check
   overlay.sh             # rebuild overlay bin, hazard scan, explode-and-patch
   overlay-lock.py        # Super+Ctrl+U hunks; --check fails if upstream drifted
   overlay-power.py       # power panel: "Holding" needs a charge limit to exist
@@ -360,7 +361,10 @@ monarchy/
   agent-marks/           # AI panel marks omarchy does not ship (none at present)
   bin.wrap
   bin.deny
+  bin.skip
+  bin.alias              # limine-mkinitcpio and friends, mapped onto what this host runs
   migrations.deny
+  migrations.allow
   settings.skip
   omarchy.desktop
   10-monarchy
@@ -477,9 +481,9 @@ Install scripts the bridge never invokes, even when a binary of the same name is
 
 `omarchy-provision-first-run` is allowlisted. Apply seeds `~/.local/state/omarchy/first-run-user` so a later run no-ops. That also skips the first-run invitations (voxtype, fingerprint, default agent) and speaker tuning; the Dictate wrap sends a missing voxtype to `omarchy-voxtype-install` instead.
 
-`monarchy/migrations.deny` is both a classification list and an enforcement list, and the two halves sit in different units.
+Every Omarchy migration runs unless it cannot run without a risk of bricking this host (ADR 0005). `lib/monarchy/migrate.sh` holds the check: a short list of brick paths (boot loader and initramfs config, Omarchy's kernel packages, ZFS, package sources, PAM, sudoers, SDDM, USB authorisation), plus any call to a `bin.deny` or `bin.wrap` name and any `omarchy-pkg-add` of a `packages.deny` package. Limine and snapper are not on it: upstream's migrations check for them before acting, and `bin.alias` maps the Limine rebuild onto `mkinitcpio -P`.
 
-`monarchy_check_migrations` (the `prefix` unit, and `monarchy_classify_check`) fails any migration body matching `limine-mkinitcpio`, `omarchy-refresh-pacman` or `use_omarchy_pacman_config` that is not already classified. That halts the apply until a human decides. It is the only thing that notices a deny row going stale, which is why marking never covers a row upstream has dropped.
+A pending migration that matches and has no row in `migrations.deny` or `migrations.allow` stops two things until a human classifies it: `monarchy_check_migrations` (the `prefix` unit, and `monarchy_classify_check`), and `omarchy-migrate` itself. The overlay wraps that name onto `/usr/local/bin/monarchy-migrate`, which reads its rules from `/var/lib/monarchy/migration-rules` because it runs in every account; the notification's "click to run" goes through it. Inside the real `omarchy-update` the wrap does nothing, and `monarchy_after_omarchy_update` calls it once classification is done.
 
 `monarchy_mark_denied_migrations` (the `user` unit) is what makes the decision bite. Omarchy records completion as an empty per-user marker under `~/.local/state/omarchy/migrations/`, and the `omarchy` package pre-marks all of them into `/etc/skel`, so a fresh account skips every migration that predates it. Marking a denied one complete is the same mechanism, and `omarchy-migrate` then drops it from `--pending`.
 

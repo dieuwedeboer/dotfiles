@@ -1,0 +1,12 @@
+# Commands Omarchy calls that belong to tools this host replaces. Each is a
+# stub in lib/monarchy/stubs/alias-*.sh that says what it maps onto and runs
+# that instead, as yay runs paru. Installed into the overlay and into
+# /usr/local/bin, which sudo's secure_path reaches. ADR 0005.
+#
+# Not here, on purpose: limine-entry-tool, which edits ESP boot entries and
+# has no counterpart, and snapper, because Omarchy checks `command -v snapper`
+# and would then set snapper up. Snapshots go to ZFS through omarchy-snapshot.
+
+limine-mkinitcpio
+limine-update
+limine-snapper-sync

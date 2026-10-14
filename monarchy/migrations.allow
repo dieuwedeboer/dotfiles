@@ -1,0 +1,25 @@
+# Omarchy migrations that match a brick path in lib/monarchy/migrate.sh and
+# have been read and found safe to run here. Each row says why. ADR 0005.
+
+# Calls omarchy-sudo-passwordless __migration-complete and __migrate, which
+# the wrap passes to the real helper: they only remove legacy grants.
+1788163635.sh
+
+# Rewrites /etc/pam.d/polkit-1 only when it is one exact vulnerable stack,
+# to restore faillock. Backs up and verifies.
+1788256455.sh
+
+# Adds vi. ex-vi-compat provides it and omarchy-pkg-add checks pacman -Q,
+# which resolves the provider, so nothing is installed.
+1788596255.sh
+
+# Adds headers only for linux-omarchy or linux-t2 when already installed.
+1789444024.sh
+
+# Acts only when /etc/pam.d/omarchy-lock-fingerprint exists.
+1791125650.sh
+
+# Removes Omarchy's withdrawn USB and Thunderbolt approval. The Limine and
+# Bolt branches need files this host does not have. usbguard is disabled and
+# removed only where Omarchy granted it, which matches Omarchy's default.
+1791769486.sh

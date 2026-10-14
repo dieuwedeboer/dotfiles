@@ -1,11 +1,15 @@
-1784476564.sh
-1784917531.sh
-1785944594.sh
-1786482992.sh
-1786605598.sh
+# Omarchy migrations that must never run here. The user unit marks each one
+# complete for every account, so omarchy-migrate stops offering it.
+#
+# Every migration runs unless it cannot run without a risk of bricking this
+# ZFS host (ADR 0005). Each row says which risk.
+
+# Installs linux-omarchy and its headers. The root pool's ZFS module comes
+# from linux-cachyos-zfs; this kernel would rely on zfs-dkms building one, and
+# ZFSBootMenu may pick it as the newest kernel.
 1789325478.sh
+
+# Moves [omarchy] above every other repository and runs a full upgrade.
+# [omarchy] carries quickshell, nvidia dkms builds, kernels and the real
+# limine packages, which would then win over CachyOS and the boot stub.
 1791403252.sh
-1787589206.sh
-1788112314.sh
-1791123731.sh
-1791581004.sh

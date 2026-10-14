@@ -27,7 +27,7 @@ Shipped in `lib/zfs.sh` (every machine) and Monarchy apply from `install.sh` (Pl
 
 | Item | Where | What |
 | --- | --- | --- |
-| Quiet host cmdline | `org.zfsbootmenu:commandline` on the pool | Merge `rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0` |
+| Quiet host cmdline | `org.zfsbootmenu:commandline` on the pool | Merge `rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0 initramfs_async=0 systemd.tty.term.console=dumb` |
 | Quiet ZBM image | `/etc/zfsbootmenu/config.yaml` `Kernel.CommandLine` | Merge `ro quiet loglevel=0 vt.global_cursor_default=0 fbcon=logo-count:0 rd.udev.log_level=0`, then `generate-zbm` if the file changed |
 | Plymouth covers pool import | mkinitcpio HOOKS | `plymouth` immediately **before** `zfs` when the keyfile is in `FILES` and exists on disk. Otherwise **after** `zfs` so a missing keyfile still prompts on the console |
 | Hold the splash | `plymouth-quit.service.d` | `plymouth quit --retain-splash` so SDDM paints over the logo, not a tty |

@@ -10,11 +10,11 @@ source "$ZBM_LIB/boot.sh"
 
 
 got=$(zbm_merge_cmdline "rw quiet splash" "${ZBM_HOST_TOKENS[@]}")
-[ "$got" = "rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0" ] \
+[ "$got" = "rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0 initramfs_async=0 systemd.tty.term.console=dumb" ] \
     || fail "host merge got '$got'"
 
 got=$(zbm_merge_cmdline "$got" "${ZBM_HOST_TOKENS[@]}")
-[ "$got" = "rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0" ] \
+[ "$got" = "rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0 initramfs_async=0 systemd.tty.term.console=dumb" ] \
     || fail "host merge not idempotent: '$got'"
 
 got=$(zbm_merge_cmdline "rw quiet splash extra=1" loglevel=0)

@@ -2,6 +2,7 @@ omarchy-agent-usage-update
 omarchy-battery-status
 omarchy-disk-speedtest
 omarchy-display-text-size
+omarchy-migrate
 omarchy-plymouth-reset
 omarchy-plymouth-set
 omarchy-refresh-plymouth

@@ -7,6 +7,12 @@ ZBM_HOST_TOKENS=(
     systemd.show_status=false
     rd.udev.log_level=0
     vt.global_cursor_default=0
+    # Omarchy's Plymouth fixes, which it ships as Limine drop-ins. The first
+    # keeps the initramfs unpacking before /init, so plymouthd can read
+    # /proc/cmdline; the second stops systemd waiting on a console size reply
+    # Plymouth may never send, a black screen on about one boot in ten.
+    initramfs_async=0
+    systemd.tty.term.console=dumb
 )
 ZBM_IMAGE_TOKENS=(
     ro quiet loglevel=0

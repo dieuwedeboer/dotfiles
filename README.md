@@ -49,7 +49,7 @@ After initial install, configure ZFSBootMenu properties:
 sudo zfs get encryption
 sudo zfs set org.zfsbootmenu:bootfs="zpcachyos/ROOT/cos/root" zpcachyos
 sudo zfs set org.zfsbootmenu:rootprefix="root=ZFS=" zpcachyos
-sudo zfs set org.zfsbootmenu:commandline="rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0" zpcachyos
+sudo zfs set org.zfsbootmenu:commandline="rw quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0 initramfs_async=0 systemd.tty.term.console=dumb" zpcachyos
 # Check mountpoint first, likly set to /tmp after a fresh install
 sudo zfs get mountpoint
 sudo zfs mount zpcachyos/ROOT/cos/root

@@ -7,6 +7,14 @@ if [ "${1:-}" = --active ] && [ $# -eq 1 ]; then
     exit 3
 fi
 
+# Migration 1788163635 calls these two. They only remove the legacy grants
+# this wrap exists to keep off the box, so the real helper runs them.
+case "${1:-}" in
+    __migration-complete|__migrate)
+        [ $# -eq 1 ] && exec "${MONARCHY_SRC:-/usr/share/omarchy}/bin/omarchy-sudo-passwordless" "$1"
+        ;;
+esac
+
 name=$(basename -- "$0")
 echo "monarchy: blocked $name" >&2
 if command -v logger >/dev/null 2>&1; then

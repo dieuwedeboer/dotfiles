@@ -41,6 +41,9 @@ monarchy_wrap_stub_for() {
         omarchy-sudo-passwordless)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-sudo-passwordless.sh"
             ;;
+        omarchy-migrate)
+            printf '%s\n' "$monarchy_lib_dir/stubs/wrap-migrate.sh"
+            ;;
         *)
             monarchy_die "no wrap stub for $name"
             ;;
@@ -77,7 +80,7 @@ monarchy_rebuild_overlay() {
     local stub="$monarchy_lib_dir/stubs/deny.sh"
     local skip="$monarchy_lib_dir/stubs/skip.sh"
     local yay="$monarchy_lib_dir/stubs/yay.sh"
-    local name parent wrap_stub
+    local name parent wrap_stub alias_stub
 
     [ -d "$src_bin" ] || monarchy_die "omarchy package bin/ missing at $src_bin"
     [ -f "$stub" ] || monarchy_die "missing $stub"
@@ -100,6 +103,11 @@ monarchy_rebuild_overlay() {
         monarchy_write_to "$parent" install -m 755 "$wrap_stub" "$dest/$name"
     done
     monarchy_write_to "$parent" install -m 755 "$yay" "$dest/yay"
+    for name in "${MONARCHY_BIN_ALIAS[@]}"; do
+        alias_stub=$(monarchy_alias_stub_for "$name")
+        [ -f "$alias_stub" ] || monarchy_die "missing $alias_stub"
+        monarchy_write_to "$parent" install -m 755 "$alias_stub" "$dest/$name"
+    done
 
     if [ "${MONARCHY_INSTALL_SUDO_STUBS:-1}" = 1 ]; then
         monarchy_sudo mkdir -p /usr/local/bin
@@ -113,12 +121,47 @@ monarchy_rebuild_overlay() {
             wrap_stub=$(monarchy_wrap_stub_for "$name")
             monarchy_sudo install -m 755 "$wrap_stub" "/usr/local/bin/$name"
         done
+        # Upstream runs these under sudo, whose secure_path has /usr/local/bin.
+        for name in "${MONARCHY_BIN_ALIAS[@]}"; do
+            monarchy_sudo install -m 755 "$(monarchy_alias_stub_for "$name")" "/usr/local/bin/$name"
+        done
         # A previous apply symlinked every allowed name here, pointing into
         # the clone that no longer exists. Those are dangling now, and a
         # dangling /usr/local/bin entry shadows the real /usr/bin one.
         monarchy_prune_stale_overlay_links
         monarchy_install_update
+        monarchy_install_migrate
     fi
+}
+
+# Commands Omarchy calls that belong to tools this host replaces, mapped onto
+# the tool that does the job here. monarchy/bin.alias lists the names.
+monarchy_alias_stub_for() {
+    case "$1" in
+        limine-mkinitcpio|limine-update)
+            printf '%s\n' "$monarchy_lib_dir/stubs/alias-limine-mkinitcpio.sh" ;;
+        limine-snapper-sync)
+            printf '%s\n' "$monarchy_lib_dir/stubs/alias-limine-snapper-sync.sh" ;;
+        *) monarchy_die "no alias stub for $1" ;;
+    esac
+}
+
+# monarchy-migrate and its rules, readable from every account.
+monarchy_install_migrate() {
+    local src="$monarchy_lib_dir/migrate.sh" rules tmp
+    [ -f "$src" ] || monarchy_die "missing $src"
+    if monarchy_install_if_changed 755 "$src" /usr/local/bin/monarchy-migrate; then
+        monarchy_changed "installed /usr/local/bin/monarchy-migrate"
+    fi
+    rules=/var/lib/monarchy/migration-rules
+    tmp=$(mktemp)
+    monarchy_write_migration_rules >"$tmp"
+    monarchy_sudo mkdir -p /var/lib/monarchy
+    if ! monarchy_sudo cmp -s "$tmp" "$rules"; then
+        monarchy_sudo install -m 644 "$tmp" "$rules"
+        monarchy_changed "wrote $rules"
+    fi
+    rm -f "$tmp"
 }
 
 # Remove /usr/local/bin/omarchy-* symlinks that no longer resolve, and any

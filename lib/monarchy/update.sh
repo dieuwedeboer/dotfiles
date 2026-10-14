@@ -5,22 +5,43 @@
 # That is what SC2030/SC2031 are pointing at, and it is the intent.
 # shellcheck disable=SC2154,SC2153,SC2030,SC2031
 
+# The same check monarchy-migrate makes, over what is pending for this account,
+# so an update stops on a new brick-path migration before anything runs it.
+# lib/monarchy/migrate.sh holds the rules; ADR 0005.
 monarchy_check_migrations() {
-    local dir="$MONARCHY_SRC/migrations"
+    local dir="$MONARCHY_SRC/migrations" found
     [ -d "$dir" ] || return 0
-    local f base
-    for f in "$dir"/*.sh; do
-        [ -f "$f" ] || continue
-        base=$(basename "$f")
-        if monarchy_in_list "$base" "${MONARCHY_MIGRATE_DENY[@]}"; then
-            continue
-        fi
-        if grep -Eq 'limine-mkinitcpio|omarchy-refresh-pacman|use_omarchy_pacman_config|/etc/pacman\.conf|omarchy-update-system-pkgs' "$f"; then
-            echo "migration not in migrations.deny but touches limine/pacman: $base" >&2
-            monarchy_die "classify $base into migrations.deny"
-        fi
-    done
+    # shellcheck source=migrate.sh
+    source "$monarchy_lib_dir/migrate.sh"
+    monarchy_fill_migration_rules
+    # --pending exits 1 when nothing is pending.
+    found=$( { OMARCHY_PATH="$MONARCHY_SRC" "$MONARCHY_SRC/bin/omarchy-migrate" --pending 2>/dev/null || true; } \
+        | monarchy_unclassified_hazards "$dir")
+    if [ -n "$found" ]; then
+        printf '  %s\n' "${found//$'\n'/$'\n'  }" >&2
+        monarchy_die "classify the migrations above into migrations.allow or migrations.deny"
+    fi
     return 0
+}
+
+# The arrays lib/monarchy/migrate.sh reads, from the repo's lists.
+monarchy_fill_migration_rules() {
+    MONARCHY_MIGRATION_DENIED=("${MONARCHY_MIGRATE_DENY[@]}")
+    MONARCHY_MIGRATION_ALLOWED=("${MONARCHY_MIGRATE_ALLOW[@]}")
+    MONARCHY_MIGRATION_BINARIES=("${MONARCHY_BIN_DENY[@]}" "${MONARCHY_BIN_WRAP[@]}")
+    MONARCHY_MIGRATION_PKG_DENY=("${MONARCHY_PKG_DENY[@]}")
+}
+
+# What /usr/local/bin/monarchy-migrate reads in every account.
+monarchy_write_migration_rules() {
+    local name
+    monarchy_fill_migration_rules
+    {
+        for name in "${MONARCHY_MIGRATION_DENIED[@]}"; do printf 'deny %s\n' "$name"; done
+        for name in "${MONARCHY_MIGRATION_ALLOWED[@]}"; do printf 'allow %s\n' "$name"; done
+        for name in "${MONARCHY_MIGRATION_BINARIES[@]}"; do printf 'binary %s\n' "$name"; done
+        for name in "${MONARCHY_MIGRATION_PKG_DENY[@]}"; do printf 'pkg-deny %s\n' "$name"; done
+    }
 }
 
 monarchy_check_packages_deny() {
@@ -458,7 +479,10 @@ monarchy_real_omarchy_update() {
     #
     # In a subshell, so the overlay-first PATH belongs to this command and
     # not to everything install.sh does afterwards.
-    ( export OMARCHY_PATH
+    #
+    # MONARCHY_IN_OMARCHY_UPDATE holds back the omarchy-migrate it calls;
+    # monarchy_after_omarchy_update runs it once classification is done.
+    ( export OMARCHY_PATH MONARCHY_IN_OMARCHY_UPDATE=1
       export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
       "$real" "$@" )
 }
@@ -470,11 +494,12 @@ monarchy_after_omarchy_update() {
     monarchy_section "Omarchy, after classification"
     # Same subshell rule as above: these resolve their siblings through the
     # overlay, and nothing after them should.
-    if [ -x "$MONARCHY_SRC/bin/omarchy-migrate" ]; then
+    # Through the overlay wrap, so monarchy-migrate checks them first.
+    if [ -x "$MONARCHY_PATH/bin/omarchy-migrate" ]; then
         monarchy_step "migrations"
         ( export OMARCHY_PATH
           export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
-          "$MONARCHY_SRC/bin/omarchy-migrate" ) \
+          "$MONARCHY_PATH/bin/omarchy-migrate" ) \
             || monarchy_warn "omarchy-migrate did not complete"
     fi
     # The bar's update widget. Harmless when there is nothing to report, and

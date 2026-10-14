@@ -40,12 +40,12 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 | `vi` | Deny. CachyOS's `ex-vi-compat` already provides `vi` and conflicts with a package of that name |
 | `superwhisper-bin` | Deny. Proprietary dictation app; Voxtype stays the dictation backend. Revisit if the household wants it |
 | `hype`, `monologue` | Install. Basecamp slides and webcam recorder, wanted on this box |
-| `usbguard` | Install. The package alone enables nothing. Upstream withdrew USB approval, and with it `omarchy-usb-authorization-boot`, on 14 October 2026; migration `1791769486.sh` removes what it left, usbguard included |
+| `usbguard` | Follow Omarchy, which dropped it with USB approval on 14 October 2026. It is no longer an Omarchy package; migration `1791769486.sh` removes it where Omarchy granted it |
 | `gliff` | Install. Remote desktop over SSH; inert until used |
-| Migrations `1787589206.sh`, `1788112314.sh` edit `pacman.conf` | Deny. Both are no-ops here: one drops a `SigLevel` override Monarchy never writes, the other only acts on an rc mirror |
-| Migration `1791123731.sh` appends a transparency example to `~/.config/hypr/looknfeel.lua` | Deny. chezmoi owns that file (ADR 0001), so the append would only show up as drift |
-| Migration `1791581004.sh` rebuilds the Limine boot image so `systemd.tty.term.console=dumb` reaches the kernel command line | Deny. This host boots rEFInd → ZFSBootMenu, and `settings.skip` already drops the `limine-entry-tool.d` file it reads |
+| Migrations in general | Run, unless one cannot run without a brick risk (ADR 0005). `migrations.deny` and `migrations.allow` hold the reviewed ones, each with its reason |
+| Migration `1789325478.sh` installs `linux-omarchy` | Deny. The root pool's ZFS module comes from `linux-cachyos-zfs`; this kernel would rely on `zfs-dkms`, and ZFSBootMenu may boot it as the newest |
 | Migration `1791403252.sh` moves `[omarchy]` above every other repo, then runs a full upgrade | Deny. `[omarchy]` stays after CachyOS (`monarchy_preserve_pacman_conf`); its packages would otherwise shadow CachyOS builds |
+| Omarchy's Limine command-line fixes, `initramfs_async=0` and `systemd.tty.term.console=dumb` | Taken, on `org.zfsbootmenu:commandline` (`lib/zbm/boot.sh`), since `settings.skip` drops the Limine drop-ins that carry them upstream |
 | NVIDIA 580xx-dkms vs `chwd` | Never run Omarchy `nvidia.sh` |
 | `tuxedo-drivers-nocompatcheck-dkms` | Deny the package and the script |
 | `tlp-pd` vs `power-profiles-daemon` | Abort if TLP is installed. Omarchy calls `powerprofilesctl` |
