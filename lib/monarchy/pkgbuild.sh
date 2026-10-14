@@ -347,8 +347,10 @@ monarchy_ensure_settings_pkg() {
         assume=()
     fi
     monarchy_install_built_pkg "$built" "${assume[@]}" "${handover[@]}"
-    [ "${#handover[@]}" -eq 0 ] \
-        || monarchy_changed "$MONARCHY_LOCK_PACKAGE upgraded with omarchy-settings-monarchy, to hand over moved files"
+    if [ "${#handover[@]}" -gt 0 ]; then
+        monarchy_reload_hyprland "after upgrading $MONARCHY_LOCK_PACKAGE"
+        monarchy_changed "$MONARCHY_LOCK_PACKAGE upgraded with omarchy-settings-monarchy, to hand over moved files"
+    fi
 
     # Switching between omarchy and omarchy-dev is the other way out of the
     # old pin: monarchy_ensure_omarchy_pkg replaces the package that holds it.
@@ -363,6 +365,15 @@ monarchy_ensure_settings_pkg() {
             return 0
         fi
         monarchy_die "omarchy-settings-monarchy now tracks $MONARCHY_SETTINGS_UPSTREAM=$ver; installed $MONARCHY_LOCK_PACKAGE still pins $pinned. Run 'omarchy update' (or sudo pacman -Syu) to bring it up to that, then re-run monarchy-update"
+    fi
+}
+
+# While pacman replaces /usr/share/omarchy/default/hypr, a running Hyprland
+# that autoreloads registers no binds and drops into emergency mode, and
+# nothing reloads it once the tree is back.
+monarchy_reload_hyprland() {
+    if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] && command -v hyprctl >/dev/null 2>&1; then
+        hyprctl reload >/dev/null 2>&1 || monarchy_warn "hyprctl reload failed $1; run it by hand"
     fi
 }
 
@@ -452,12 +463,8 @@ monarchy_ensure_omarchy_pkg() {
     monarchy_sudo pacman -S --needed --noconfirm "$want" \
         || monarchy_die "pacman -S $want failed; the other Omarchy package is removed, so install one by hand before logging out"
 
-    # Between -Rdd and -S there is no /usr/share/omarchy/default/hypr. A
-    # running Hyprland that autoreloads in that window registers no binds and
-    # drops into emergency mode, and nothing reloads it once the tree is back.
-    if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] && command -v hyprctl >/dev/null 2>&1; then
-        hyprctl reload >/dev/null 2>&1 || monarchy_warn "hyprctl reload failed after replacing $other; run it by hand"
-    fi
+    # Between -Rdd and -S there is no /usr/share/omarchy/default/hypr.
+    monarchy_reload_hyprland "after replacing $other"
 }
 
 # ---- unit verbs ---------------------------------------------------------

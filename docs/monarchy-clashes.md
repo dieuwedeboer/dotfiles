@@ -40,7 +40,7 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 | `vi` | Deny. CachyOS's `ex-vi-compat` already provides `vi` and conflicts with a package of that name |
 | `superwhisper-bin` | Deny. Proprietary dictation app; Voxtype stays the dictation backend. Revisit if the household wants it |
 | `hype`, `monologue` | Install. Basecamp slides and webcam recorder, wanted on this box |
-| `usbguard` | Install. The package alone enables nothing; the daemon only runs once someone opts in from Setup > Security. "USB at Boot" in that menu stays inert, because `omarchy-usb-authorization-boot` is denied |
+| `usbguard` | Install. The package alone enables nothing. Upstream withdrew USB approval, and with it `omarchy-usb-authorization-boot`, on 14 October 2026; migration `1791769486.sh` removes what it left, usbguard included |
 | `gliff` | Install. Remote desktop over SSH; inert until used |
 | Migrations `1787589206.sh`, `1788112314.sh` edit `pacman.conf` | Deny. Both are no-ops here: one drops a `SigLevel` override Monarchy never writes, the other only acts on an rc mirror |
 | Migration `1791123731.sh` appends a transparency example to `~/.config/hypr/looknfeel.lua` | Deny. chezmoi owns that file (ADR 0001), so the append would only show up as drift |
