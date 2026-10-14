@@ -23,9 +23,12 @@ usr/share/omarchy/config/autostart/limine-snapper-notify.desktop
 etc/snapper
 usr/share/omarchy/default/snapper
 
-# plymouth-before-zfs. lib/monarchy/splash.sh owns the HOOKS rewrite and only
-# moves plymouth ahead of zfs when the keyfile is in mkinitcpio FILES.
-etc/mkinitcpio.conf.d/omarchy_hooks.conf
+# Every mkinitcpio drop-in. They are sourced after mkinitcpio.conf, and on
+# 14 October 2026 00-omarchy-hooks.conf replaced HOOKS with Omarchy's btrfs
+# set, which has no zfs: both initramfs images were built without it.
+# lib/monarchy/splash.sh owns HOOKS here. Skipping the directory, not the
+# file, is what keeps a rename from getting past this.
+etc/mkinitcpio.conf.d
 
 # SDDM. zz-omarchy-sddm.conf has to sort after CachyOS's kde_settings.conf,
 # and these two drop-ins do not.

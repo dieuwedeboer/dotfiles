@@ -57,7 +57,7 @@ monarchy_assert_settings_assets() {
     for rel in \
         etc/limine-entry-tool.d \
         etc/snapper \
-        etc/mkinitcpio.conf.d/omarchy_hooks.conf \
+        etc/mkinitcpio.conf.d \
         usr/share/omarchy/default/applications/mimeapps.list \
         etc/docker/daemon.json \
         etc/profile.d/omarchy.sh; do

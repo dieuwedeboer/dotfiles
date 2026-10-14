@@ -46,17 +46,34 @@ monarchy_plymouth_side() {
     fi
 }
 
-monarchy_splash_refuse_omarchy_hooks_dropin() {
-    local dropin=/etc/mkinitcpio.conf.d/omarchy_hooks.conf
-    [ -e "$dropin" ] && monarchy_die "$dropin exists; refusing Omarchy plymouth-before-zfs drop-in"
-    return 0
+# HOOKS as mkinitcpio ends up with them: mkinitcpio.conf, then every
+# conf.d drop-in in order, each able to replace the array outright.
+monarchy_effective_hooks() {
+    local conf=$1 dir=$2
+    # shellcheck disable=SC2016  # expanded by the inner bash
+    bash -c 'source "$1" || exit 1
+        for f in "$2"/*.conf; do [ -f "$f" ] && { source "$f" || exit 1; }; done
+        printf "%s\n" "${HOOKS[*]}"' _ "$conf" "$dir"
+}
+
+# A drop-in that drops zfs from HOOKS builds initramfs images that cannot
+# import the root pool. Checked against the effective list, so a drop-in of
+# any name is caught.
+monarchy_splash_refuse_hooks_without_zfs() {
+    local dir=${MONARCHY_MKINITCPIO_CONF_D:-/etc/mkinitcpio.conf.d} hooks
+    hooks=$(monarchy_effective_hooks "$MONARCHY_MKINITCPIO_CONF" "$dir") \
+        || monarchy_die "could not evaluate HOOKS from $MONARCHY_MKINITCPIO_CONF and $dir"
+    case " $hooks " in
+        *" zfs "*) return 0 ;;
+    esac
+    monarchy_die "effective mkinitcpio HOOKS have no zfs ($hooks); a drop-in in $dir is overriding mkinitcpio.conf. Remove it and run sudo mkinitcpio -P before rebooting"
 }
 
 monarchy_splash_hooks() {
     local conf=$MONARCHY_MKINITCPIO_CONF
     local line inner newline rebuilt
     [ -f "$conf" ] || monarchy_die "missing $conf"
-    monarchy_splash_refuse_omarchy_hooks_dropin
+    monarchy_splash_refuse_hooks_without_zfs
     line=$(grep -E '^HOOKS=' "$conf" | tail -n 1)
     [ -n "$line" ] || monarchy_die "no HOOKS= in $conf"
     inner=${line#HOOKS=(}
@@ -119,12 +136,37 @@ monarchy_splash_install_theme() {
     fi
 }
 
+# The limine-mkinitcpio command on this host is monarchy's bin.alias shim,
+# which runs mkinitcpio -P. The real hook package is what must not be here.
 monarchy_splash_rebuild() {
-    if monarchy_pkg_installed limine-mkinitcpio-hook || command -v limine-mkinitcpio >/dev/null 2>&1; then
-        monarchy_die "limine-mkinitcpio is present; refusing to rebuild initramfs via Limine"
+    if monarchy_pkg_installed limine-mkinitcpio-hook; then
+        monarchy_die "limine-mkinitcpio-hook is installed; refusing to rebuild initramfs via Limine"
     fi
     monarchy_log "mkinitcpio -P"
     monarchy_sudo mkinitcpio -P
+}
+
+# Initramfs images without the zfs hook cannot import the root pool. Any one
+# found is rebuilt, and the apply stops if a rebuild still leaves one without
+# it. Images are root-only, so the listing is elevated.
+monarchy_initramfs_without_zfs() {
+    local img
+    for img in /boot/initramfs-*.img; do
+        [ -f "$img" ] || continue
+        monarchy_sudo lsinitcpio "$img" 2>/dev/null | grep -qE '(^|/)hooks/zfs$' || printf '%s\n' "$img"
+    done
+}
+
+monarchy_assert_initramfs_zfs() {
+    local missing
+    missing=$(monarchy_initramfs_without_zfs)
+    [ -n "$missing" ] || return 0
+    monarchy_warn "initramfs without the zfs hook: $(paste -sd' ' - <<<"$missing"); rebuilding"
+    monarchy_splash_refuse_hooks_without_zfs
+    monarchy_splash_rebuild
+    missing=$(monarchy_initramfs_without_zfs)
+    [ -z "$missing" ] || monarchy_die "still no zfs hook in: $(paste -sd' ' - <<<"$missing"); do not reboot"
+    monarchy_changed "rebuilt initramfs with the zfs hook"
 }
 
 monarchy_refresh_plymouth() {
@@ -132,7 +174,7 @@ monarchy_refresh_plymouth() {
     local dest=$MONARCHY_PLYMOUTH_THEME_DIR
     [ -f "$src/omarchy.plymouth" ] || monarchy_die "missing $src/omarchy.plymouth"
     monarchy_skip_plymouth_zfs
-    monarchy_splash_refuse_omarchy_hooks_dropin
+    monarchy_splash_refuse_hooks_without_zfs
     monarchy_log "refresh Omarchy plymouth theme"
     monarchy_sudo mkdir -p "$dest"
     monarchy_sudo cp -a "$src/." "$dest/"
@@ -160,7 +202,7 @@ monarchy_plymouth_set() {
     [ -L "$logo_path" ] && monarchy_die "logo file is a symlink, which is not accepted: $logo_path"
 
     monarchy_skip_plymouth_zfs
-    monarchy_splash_refuse_omarchy_hooks_dropin
+    monarchy_splash_refuse_hooks_without_zfs
 
     local bg_r bg_g bg_b
     bg_r=$(awk -v n=$((16#${bg_hex:0:2})) 'BEGIN{printf "%.3f", n/255}')

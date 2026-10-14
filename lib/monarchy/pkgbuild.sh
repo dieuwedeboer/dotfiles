@@ -204,7 +204,9 @@ monarchy_install_built_pkg() {
     shift
     monarchy_plan_overwrites "$pkg"
     monarchy_log "pacman -U $(basename "$pkg")"
-    monarchy_sudo pacman -U --noconfirm --needed \
+    local -a needed=(--needed)
+    [ "${MONARCHY_PKG_REINSTALL:-0}" = 1 ] && needed=()
+    monarchy_sudo pacman -U --noconfirm "${needed[@]}" \
         "${MONARCHY_OVERWRITE_ARGS[@]}" "$@" "$pkg" \
         || monarchy_die "pacman -U failed for $pkg"
 }
@@ -284,14 +286,21 @@ monarchy_ensure_settings_pkg() {
 
     want="${ver}-1"
     have=$(monarchy_installed_pkg_version omarchy-settings-monarchy)
+    skip="$MONARCHY_MISC/settings.skip"
+    [ -f "$skip" ] || monarchy_die "missing $skip"
+    local reinstall=0
     if [ "$have" = "$want" ]; then
-        monarchy_trace "omarchy-settings-monarchy $have already tracks $MONARCHY_SETTINGS_UPSTREAM=$ver"
-        return 0
+        # The same version, built before a row was added to settings.skip,
+        # still carries what the row excludes.
+        if ! monarchy_settings_owns_skipped "$skip"; then
+            monarchy_trace "omarchy-settings-monarchy $have already tracks $MONARCHY_SETTINGS_UPSTREAM=$ver"
+            return 0
+        fi
+        monarchy_log "omarchy-settings-monarchy $have carries a path settings.skip now excludes; rebuilding"
+        reinstall=1
     fi
 
     monarchy_assert_can_makepkg
-    skip="$MONARCHY_MISC/settings.skip"
-    [ -f "$skip" ] || monarchy_die "missing $skip"
 
     tmp=$(mktemp -d)
     monarchy_fetch_official_settings "$full" "$tmp/upstream.pkg.tar.zst"
@@ -346,7 +355,7 @@ monarchy_ensure_settings_pkg() {
         handover=("$locked")
         assume=()
     fi
-    monarchy_install_built_pkg "$built" "${assume[@]}" "${handover[@]}"
+    MONARCHY_PKG_REINSTALL=$reinstall monarchy_install_built_pkg "$built" "${assume[@]}" "${handover[@]}"
     if [ "${#handover[@]}" -gt 0 ]; then
         monarchy_reload_hyprland "after upgrading $MONARCHY_LOCK_PACKAGE"
         monarchy_changed "$MONARCHY_LOCK_PACKAGE upgraded with omarchy-settings-monarchy, to hand over moved files"
@@ -392,6 +401,17 @@ monarchy_fetch_locked_pkg() {
         [ -f "${dir%/}/$file" ] && { printf '%s\n' "${dir%/}/$file"; return 0; }
     done < <(pacman-conf CacheDir)
     monarchy_die "downloaded $file but it is in no pacman CacheDir"
+}
+
+# Whether the installed settings package owns any path settings.skip lists.
+monarchy_settings_owns_skipped() {
+    local skip=$1 owned rel
+    owned=$(pacman -Qlq omarchy-settings-monarchy 2>/dev/null) || return 1
+    while read -r rel; do
+        case "$rel" in ''|\#*) continue ;; esac
+        grep -qxF -e "/$rel" -e "/$rel/" <<<"$owned" && return 0
+    done <"$skip"
+    return 1
 }
 
 # ---- the official omarchy package ---------------------------------------

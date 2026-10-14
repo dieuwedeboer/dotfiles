@@ -309,6 +309,7 @@ monarchy_splash_check() { :; }
 monarchy_splash_apply() {
     monarchy_splash
     monarchy_splash_maybe_theme
+    monarchy_assert_initramfs_zfs
 }
 
 monarchy_assert_only_valid() {
