@@ -168,3 +168,65 @@ monarchy_check_logind() {
     [ -f "$MONARCHY_MISC/logind/20-inhibit-delay.conf" ] \
         || monarchy_die "missing inhibit-delay logind drop-in"
 }
+
+# Keep XDG autostart from racing omarchy-fcitx5.service, on every account.
+#
+# fcitx5 ships /etc/xdg/autostart/org.fcitx.Fcitx5.desktop, and uwsm runs XDG
+# autostart at every login. Whichever fcitx5 comes up second sees the first
+# owning org.fcitx.Fcitx5 and exits 0. If that is the service, Restart=always
+# turns it into a restart every two seconds for the whole session -- thousands
+# of journal lines while the stray instance does the actual work.
+#
+# Omarchy's answer is a Hidden=true override in config/autostart, but it only
+# reaches an account through /etc/skel, at creation. Its migration onto the
+# service never writes it for an account that already existed, so every such
+# account races at each login. This writes the same file upstream ships.
+#
+# Only where the service is enabled. The service is enabled per account, and
+# hiding the autostart entry on an account without it leaves that account
+# with no input method at all. The destination is the marker (ADR 0002): an
+# override already there, Omarchy's or a hand-edited one, is left as it is.
+#
+# Written as the account, never as root into someone's home: a symlink there
+# must not be able to redirect a root write.
+monarchy_hide_fcitx5_autostart() {
+    local src="$MONARCHY_PATH/config/autostart/org.fcitx.Fcitx5.desktop"
+    local user home rc
+    if [ ! -f "$src" ]; then
+        monarchy_trace "no $src; fcitx5 autostart left as Omarchy ships it"
+        return 0
+    fi
+    while IFS=: read -r user home; do
+        [ -d "$home" ] || continue
+        rc=0
+        # Single quotes on purpose: $HOME is the account's, expanded in its
+        # own shell, not this one's.
+        # shellcheck disable=SC2016
+        monarchy_as_account "$user" sh -c '
+            ls "$HOME"/.config/systemd/user/*.wants/omarchy-fcitx5.service >/dev/null 2>&1 || exit 3
+            dest="$HOME/.config/autostart/org.fcitx.Fcitx5.desktop"
+            [ ! -e "$dest" ] && [ ! -L "$dest" ] || exit 4
+            mkdir -p "$HOME/.config/autostart" && cp "$1" "$dest"
+        ' sh "$src" || rc=$?
+        case "$rc" in
+            0) monarchy_changed "hid fcitx5 XDG autostart for $user; omarchy-fcitx5.service runs it" ;;
+            3) monarchy_trace "$user has no omarchy-fcitx5.service; fcitx5 autostart left on" ;;
+            4) monarchy_trace "$user already overrides fcitx5 autostart" ;;
+            *) monarchy_warn "could not write the fcitx5 autostart override for $user" ;;
+        esac
+    done < <(getent passwd | awk -F: '$3>=1000 && $3<65534 {print $1 ":" $6}')
+}
+
+# Run a command as a given account, with that account's HOME. No sudo for the
+# account already running apply: sudo to yourself still asks for a password.
+# Plain sudo, not monarchy_sudo: as root that one drops the word sudo and
+# would run `-u` as the command.
+monarchy_as_account() {
+    local user=$1
+    shift
+    if [ "$user" = "$(id -un)" ]; then
+        "$@"
+    else
+        sudo -u "$user" -H -- "$@"
+    fi
+}

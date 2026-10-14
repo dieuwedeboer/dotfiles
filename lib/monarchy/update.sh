@@ -242,7 +242,10 @@ monarchy_session_check() {
     monarchy_check_hidden_hyprland_sessions
 }
 
-monarchy_session_apply() { monarchy_install_omarchy_session; }
+monarchy_session_apply() {
+    monarchy_install_omarchy_session
+    monarchy_hide_fcitx5_autostart
+}
 
 # ---- logind: power key and lid ------------------------------------------
 
