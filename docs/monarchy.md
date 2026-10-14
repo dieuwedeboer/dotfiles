@@ -167,9 +167,9 @@ Server = https://pkgs.omarchy.org/edge/$arch
 
 The path is the box's channel, and `monarchy_load_channel` reads it back from here. To move a box, name the target once: `MONARCHY_OMARCHY_PACKAGE=… MONARCHY_OMARCHY_CHANNEL=… ./install.sh --only=pacman`, then `MONARCHY_OMARCHY_PACKAGE=… monarchy-update` (ADR 0009). CachyOS does not Include drop-ins, so this lives in `pacman.conf` itself. First edit takes `/etc/pacman.conf.monarchy.bak`. `monarchy_preserve_pacman_conf` aborts if `[cachyos]` / `[cachyos-v3]` do not precede `[omarchy]`, or if the CachyOS/Arch mirrorlist Includes are gone.
 
-`monarchy_install_packages` reads `install/omarchy-base.packages` from the package tree, subtracts `monarchy/packages.deny`, `pacman -S --needed --noconfirm`, writes `monarchy/packages.installed` and `/var/lib/monarchy/packages.installed`. Do not install from `omarchy-other.packages`. Hardware stays CachyOS `chwd` plus `hardware/`.
+`monarchy_install_packages` reads `install/omarchy-base.packages` from the package tree, subtracts `monarchy/packages.deny`, `pacman -S --needed --noconfirm`, writes `/var/lib/monarchy/packages.installed`. Do not install from `omarchy-other.packages`. Hardware stays CachyOS `chwd` plus `hardware/`.
 
-`--update` is snapshot, fetch, classify, then apply. `monarchy_classify_check` fails if `omarchy-base.packages` grew a row that is neither denied nor in `packages.installed`. Classify it before applying. Apply then installs the current filtered set with `--needed`.
+`--update` is snapshot, fetch, classify, then apply. `monarchy_classify_check` fails if `omarchy-base.packages` has a row on a brick path (`monarchy_package_hazard`: kernels, boot loaders, snapshots, ZFS, display managers, Omarchy's own package, power daemons) that is in neither `packages.deny` nor `packages.allow`. Every other row is installed (ADR 0010). Apply then installs the current filtered set with `--needed`.
 
 ### Packages
 
@@ -325,7 +325,7 @@ lib/monarchy/
   overlay-lock.py        # Super+Ctrl+U hunks; --check fails if upstream drifted
   overlay-power.py       # power panel: "Holding" needs a charge limit to exist
   switch-user.sh         # /usr/local/bin/monarchy-switch-user
-  packages.sh            # filtered install, writes packages.installed
+  packages.sh            # filtered install
   pkgbuild.sh            # build+install the two local packages, then omarchy
   plugins.sh             # third-party omarchy plugin clone, enable on first sight
   prefix.sh              # working prefix out of /usr/share/omarchy
@@ -350,7 +350,7 @@ tests/
   hardware/              # DMI detection
 monarchy/
   packages.deny
-  packages.installed
+  packages.allow
   applications.drop
   launcher.unhides
   plugins

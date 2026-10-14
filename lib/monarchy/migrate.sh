@@ -25,6 +25,24 @@ MONARCHY_MIGRATION_BRICK_RULES=(
     $'input devices\tusbguard|authorized_default'
 )
 
+# Prints the brick path a package name sits on, or nothing. One set of names
+# for both callers: packages a migration installs, and omarchy-base rows
+# (ADR 0010). Most of Omarchy's base list is wanted as is; these are the kinds
+# that can take the boot path, the root pool, the greeter or CachyOS's power
+# handling from under this host.
+monarchy_package_hazard() {
+    case "$1" in
+        linux-firmware*|linux-api-headers) ;;
+        linux|linux-*) echo kernel ;;
+        limine*|grub|grub-*|systemd-boot*|refind*|efibootmgr|mkinitcpio*|dracut*|booster) echo "boot loader or initramfs" ;;
+        snapper*|snap-pac*|btrfs-assistant) echo "snapshots" ;;
+        zfs|zfs-*|*-zfs|zfsbootmenu) echo ZFS ;;
+        sddm*|gdm|lightdm*|ly|greetd*|plasma-login-manager|lemurs) echo "display manager" ;;
+        omarchy|omarchy-dev|omarchy-settings*) echo "Omarchy's own package" ;;
+        tlp*|auto-cpufreq|tuned|tuned-ppd) echo "power daemon" ;;
+    esac
+}
+
 # Arrays the caller fills: binaries monarchy denies or wraps, and packages.deny.
 MONARCHY_MIGRATION_BINARIES=()
 MONARCHY_MIGRATION_PKG_DENY=()
@@ -47,12 +65,16 @@ monarchy_migration_hazards() {
             && printf 'calls %s, which monarchy denies or wraps\n' "$name"
     done
 
+    local kind
     while read -r pkg; do
         case "$pkg" in
             ''|-*|\$*|\"*) continue ;;
-            linux-firmware*|linux-api-headers) ;;
-            linux|linux-*) printf 'installs kernel %s\n' "$pkg"; continue ;;
         esac
+        kind=$(monarchy_package_hazard "$pkg")
+        if [ -n "$kind" ]; then
+            printf 'installs %s %s\n' "$kind" "$pkg"
+            continue
+        fi
         for name in "${MONARCHY_MIGRATION_PKG_DENY[@]}"; do
             [ "$pkg" = "$name" ] && printf 'installs %s, which is in packages.deny\n' "$pkg"
         done

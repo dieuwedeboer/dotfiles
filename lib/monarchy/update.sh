@@ -55,27 +55,24 @@ monarchy_check_packages_deny() {
             || monarchy_die "$required missing from packages.deny"
     done
 
-    local installed_file="$MONARCHY_MISC/packages.installed"
-    local -a installed=()
-    if [ -f "$installed_file" ]; then
-        mapfile -t installed < <(monarchy_load_list "$installed_file")
-    fi
-
-    local pkg new=0
+    # Every other row is installed unless it sits on a brick path and nobody
+    # has read it yet. ADR 0010.
+    # shellcheck source=migrate.sh
+    source "$monarchy_lib_dir/migrate.sh"
+    local pkg kind new=0
     while read -r pkg; do
         [ -n "$pkg" ] || continue
         case "$pkg" in
             \#*) continue ;;
         esac
-        if monarchy_in_list "$pkg" "${MONARCHY_PKG_DENY[@]}"; then
-            continue
-        fi
-        if [ "${#installed[@]}" -gt 0 ] && ! monarchy_in_list "$pkg" "${installed[@]}"; then
-            echo "package not in packages.deny or packages.installed: $pkg" >&2
+        monarchy_in_list "$pkg" "${MONARCHY_PKG_DENY[@]}" "${MONARCHY_PKG_ALLOW[@]}" && continue
+        kind=$(monarchy_package_hazard "$pkg")
+        if [ -n "$kind" ]; then
+            echo "omarchy-base.packages row on a brick path ($kind): $pkg" >&2
             new=1
         fi
     done <"$list"
-    [ "$new" = 0 ] || monarchy_die "classify new omarchy-base.packages rows into packages.deny or packages.installed"
+    [ "$new" = 0 ] || monarchy_die "classify the rows above into packages.deny or packages.allow"
     return 0
 }
 

@@ -1,0 +1,8 @@
+# omarchy-base.packages rows that sit on a brick path in
+# lib/monarchy/migrate.sh (monarchy_package_hazard) and have been read and
+# found right for this host. Each row says why. Every other base row is
+# installed unless packages.deny names it. ADR 0010.
+
+# Monarchy's greeter. lib/monarchy/sddm.sh configures it and refuses a
+# packages.deny row for it.
+sddm

@@ -16,21 +16,14 @@ monarchy_filtered_packages() {
     done <"$list"
 }
 
-# /var/lib/monarchy holds this box's set. The repo copy is what every channel
-# has classified as installed, so a stable box and an edge box add to it
-# rather than overwrite each other's (ADR 0009). A row upstream drops
-# everywhere is pruned by hand.
+# This box's filtered set. The repo kept a copy once, as the list of rows a
+# human had accepted; ADR 0010 replaced that with packages.allow.
 monarchy_record_packages() {
-    local tmp repo_copy="$MONARCHY_MISC/packages.installed"
+    local tmp
     tmp=$(mktemp)
     monarchy_filtered_packages >"$tmp"
     monarchy_sudo mkdir -p /var/lib/monarchy
     monarchy_sudo install -m 644 "$tmp" /var/lib/monarchy/packages.installed
-    if [ -w "$MONARCHY_MISC" ]; then
-        [ -f "$repo_copy" ] && cat "$repo_copy" >>"$tmp"
-        sort -u "$tmp" -o "$tmp"
-        install -m 644 "$tmp" "$repo_copy"
-    fi
     rm -f "$tmp"
 }
 

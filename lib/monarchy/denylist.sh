@@ -13,6 +13,7 @@ monarchy_load_inventories() {
     mapfile -t MONARCHY_BIN_DENY < <(monarchy_load_list "$MONARCHY_MISC/bin.deny")
     mapfile -t MONARCHY_BIN_SKIP < <(monarchy_load_list "$MONARCHY_MISC/bin.skip")
     mapfile -t MONARCHY_PKG_DENY < <(monarchy_load_list "$MONARCHY_MISC/packages.deny")
+    mapfile -t MONARCHY_PKG_ALLOW < <(monarchy_load_list "$MONARCHY_MISC/packages.allow")
     mapfile -t MONARCHY_MIGRATE_DENY < <(monarchy_load_list "$MONARCHY_MISC/migrations.deny")
     mapfile -t MONARCHY_MIGRATE_ALLOW < <(monarchy_load_list "$MONARCHY_MISC/migrations.allow")
     mapfile -t MONARCHY_BIN_ALIAS < <(monarchy_load_list "$MONARCHY_MISC/bin.alias")
