@@ -12,7 +12,6 @@ omarchy-refresh-pacman
 omarchy-reinstall
 omarchy-reinstall-pkgs
 omarchy-setup-direct-boot
-omarchy-sudo-passwordless
 omarchy-system-factory-reset
 omarchy-system-factory-reset-finish
 omarchy-update-pacman-guard

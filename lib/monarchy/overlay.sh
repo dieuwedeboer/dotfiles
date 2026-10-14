@@ -38,6 +38,9 @@ monarchy_wrap_stub_for() {
         omarchy-snapshot)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-snapshot.sh"
             ;;
+        omarchy-sudo-passwordless)
+            printf '%s\n' "$monarchy_lib_dir/stubs/wrap-sudo-passwordless.sh"
+            ;;
         *)
             monarchy_die "no wrap stub for $name"
             ;;
