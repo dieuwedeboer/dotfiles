@@ -23,3 +23,19 @@
 # Bolt branches need files this host does not have. usbguard is disabled and
 # removed only where Omarchy granted it, which matches Omarchy's default.
 1791769486.sh
+
+# DGX Spark only (aarch64 GB10 plus a DMI match), and then only with Limine.
+1790517230.sh
+
+# N1x only (omarchy-hw-aarch64-n1x).
+1790917620.sh
+
+# Acts only when /etc/limine-entry-tool.d/00-omarchy-n1x-gpu.conf exists,
+# which only an N1x install writes.
+1790950659.sh
+
+# N1x only (omarchy-hw-aarch64-n1x); exits before any package or boot change.
+1791077437.sh
+
+# Acts only when the N1x rescue pacman hook exists.
+1791152480.sh
