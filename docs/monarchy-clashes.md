@@ -49,7 +49,7 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 | NVIDIA 580xx-dkms vs `chwd` | Never run Omarchy `nvidia.sh` |
 | `tuxedo-drivers-nocompatcheck-dkms` | Deny the package and the script |
 | `tlp-pd` vs `power-profiles-daemon` | Abort if TLP is installed. Omarchy calls `powerprofilesctl` |
-| AUR packages that `depends=('omarchy')` | Assume the metapackage at the overlay's version, link `/usr/share/omarchy`. See below |
+| AUR packages that `depends=('omarchy')` | Assume the metapackage at the overlay's version. See below |
 
 ## `packages.deny`
 
@@ -64,14 +64,14 @@ want is the shell QML. flea is the worked example — its PKGBUILD symlinks
 `ui/Commons` and `ui/Ui` into `/usr/share/omarchy/shell/`, and says so in a
 comment.
 
-Both halves are handled in `lib/packages.sh`:
+How this host handles it:
 
 - `OMARCHY_AUR_PACKAGES` is installed with `paru -S --assume-installed
   omarchy=<version>`, reading the version from `$MONARCHY_PATH/version`. paru
   resolves without pulling the metapackage.
-- `packages_link_omarchy_share` links `/usr/share/omarchy` to
-  `$MONARCHY_PATH`, so the hardcoded path resolves. It refuses to replace
-  anything already at that path.
+- The hardcoded `/usr/share/omarchy/shell` path resolves into the installed
+  Omarchy package, which owns that tree. It used to be a symlink to
+  `$MONARCHY_PATH`; `pkgbuild.sh` removes that legacy link.
 
 Do **not** satisfy the dependency with a local package that
 `provides=('omarchy')`. `monarchy_refuse_omarchy` checks with

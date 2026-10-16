@@ -53,9 +53,9 @@ AUR_PACKAGES=(
 # AUR packages for the Omarchy desktop whose PKGBUILD depends on the omarchy
 # metapackage. That package is in packages.deny: it pulls limine,
 # limine-mkinitcpio-hook, limine-snapper-sync and snapper. What these packages
-# actually need is /usr/share/omarchy/shell, which the overlay has under
-# $MONARCHY_PATH, so paru is told to assume omarchy at the overlay's own
-# version and packages_link_omarchy_share makes the hardcoded path resolve.
+# actually need is /usr/share/omarchy/shell, which the installed Omarchy
+# package provides, so paru is told to assume omarchy at the overlay's own
+# version.
 # Installed after apply, because both halves need the overlay on disk.
 OMARCHY_AUR_PACKAGES=(
     flea
@@ -164,26 +164,6 @@ packages_install() {
     fi
 }
 
-# Upstream Omarchy packages hardcode /usr/share/omarchy; the overlay lives at
-# /usr/local/share/omarchy. flea symlinks ui/Commons and ui/Ui into the former
-# at package time, so they dangle without this. One link serves the class.
-# Refuses to touch anything already there: a real directory would mean the
-# denied omarchy package got installed, which is a bigger problem than flea.
-packages_link_omarchy_share() {
-    local link=/usr/share/omarchy
-    if [ -L "$link" ]; then
-        [ "$(readlink "$link")" = "$MONARCHY_PATH" ] && return 0
-        monarchy_warn "$link points elsewhere, leaving it"
-        return 1
-    fi
-    if [ -e "$link" ]; then
-        monarchy_warn "$link is not a symlink, leaving it"
-        return 1
-    fi
-    monarchy_sudo ln -sT "$MONARCHY_PATH" "$link"
-    monarchy_changed "linked $link -> $MONARCHY_PATH"
-}
-
 # Runs after apply, not with the rest of the packages: the version file and
 # the shell QML both come from the overlay.
 packages_install_omarchy_aur() {
@@ -203,8 +183,6 @@ packages_install_omarchy_aur() {
         monarchy_log "no $MONARCHY_PATH/version; Omarchy AUR packages skipped"
         return 0
     fi
-    packages_link_omarchy_share || return 0
-
     monarchy_step "Omarchy AUR packages"
     local pkg
     local -a missing=()
