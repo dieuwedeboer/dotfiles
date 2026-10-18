@@ -299,6 +299,10 @@ monarchy_user_omarchy_defaults() {
         monarchy_log "mise use -g bun@latest"
         mise use -g bun@latest >/dev/null || monarchy_log "warning: mise bun failed"
     fi
+    if command -v mise >/dev/null 2>&1 && ! mise which node >/dev/null 2>&1; then
+        monarchy_log "mise use -g node@lts"
+        mise use -g node@lts >/dev/null || monarchy_log "warning: mise node failed"
+    fi
 }
 
 # migrations.deny records a decision that a migration must never run on this
