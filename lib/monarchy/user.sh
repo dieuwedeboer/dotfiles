@@ -34,23 +34,27 @@ monarchy_seed_hyprland_config() {
         esac
         monarchy_copy_if_missing "$f" "$dest/$base"
     done
-    monarchy_seed_hypr_boot_color
+    # boot-color: first Hyprland frame matches Unlock #1a1b26, not default grey.
+    monarchy_seed_hypr_module boot-color
+    monarchy_seed_hypr_module rehome-workspaces
     monarchy_trace "seeded $dest (existing files left in place)"
 }
 
-# First Hyprland frame matches Unlock #1a1b26 instead of the default grey.
-monarchy_seed_hypr_boot_color() {
-    local src="$MONARCHY_MISC/hypr/boot-color.lua"
-    local dest="$HOME/.config/hypr/boot-color.lua"
+# Copies monarchy/hypr/<name>.lua over the home copy on every apply and
+# requires it from hyprland.lua in its own marked block.
+monarchy_seed_hypr_module() {
+    local name=$1
+    local src="$MONARCHY_MISC/hypr/$name.lua"
+    local dest="$HOME/.config/hypr/$name.lua"
     local hypr="$HOME/.config/hypr/hyprland.lua"
     [ -f "$src" ] || monarchy_die "missing $src"
     mkdir -p "$(dirname "$dest")"
     cp -a "$src" "$dest"
     [ -f "$hypr" ] || return 0
-    monarchy_seed_block "$hypr" boot-color '^require[(]"hypr[.]boot-color"[)]$' <<'EOF'
-require("hypr.boot-color")
+    monarchy_seed_block "$hypr" "$name" "^require[(]\"hypr[.]$name\"[)]\$" <<EOF
+require("hypr.$name")
 EOF
-    monarchy_trace "required hypr.boot-color from $hypr"
+    monarchy_trace "required hypr.$name from $hypr"
 }
 
 monarchy_seed_block() {

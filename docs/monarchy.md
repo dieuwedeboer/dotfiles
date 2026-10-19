@@ -303,7 +303,25 @@ a pacman-owned path now, so check and apply read the same tree and every
 function check reaches also runs during apply. Units whose input is not yet on
 disk return early instead.
 
-King-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, Super+Ctrl+U bind, Super+Shift+E emacsclient (replaces HEY), unbind leftover HEY calendar/compose chords, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), drop `monarchy/applications.drop` (Basecamp, HEY), `omarchy-pkg-add` of `MONARCHY_SEEDED_PKGS` (spotify, signal-desktop, cursor-bin, cursor-cli, omakade), `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland` plus `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
+King-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, `monarchy/hypr/` modules (below), Super+Ctrl+U bind, Super+Shift+E emacsclient (replaces HEY), unbind leftover HEY calendar/compose chords, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), drop `monarchy/applications.drop` (Basecamp, HEY), `omarchy-pkg-add` of `MONARCHY_SEEDED_PKGS` (spotify, signal-desktop, cursor-bin, cursor-cli, omakade), `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland` plus `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
+
+### Hyprland modules
+
+Each `monarchy/hypr/<name>.lua` is copied to `~/.config/hypr/` on every apply
+and required from `hyprland.lua` in a `-- BEGIN monarchy: <name>` block
+(`monarchy_seed_hypr_module`). They are Monarchy's, not chezmoi's: edits in the
+home directory are overwritten.
+
+- `boot-color.lua`: the first compositor frame is Unlock's #1a1b26, not grey.
+- `rehome-workspaces.lua`: moves workspaces left on no monitor onto one that
+  is on. Unplugging the screen the laptop panel mirrors leaves Hyprland with
+  no outputs for a moment, and workspaces parked in that gap stay orphaned
+  once the panel returns. The im0001gt.screens plugin does not handle it, and
+  its `monitors.lua` is rewritten on every Apply, so the fix lives here
+  (decided 2026-10-20). Reproduce with a headless output:
+  `hyprctl output create headless T`, mirror eDP-1 to `T` with
+  `hyprctl eval 'hl.monitor({ output = "eDP-1", mirror = "T", ... })'`,
+  then `hyprctl output remove T`.
 
 `lib/packages.sh` installs the shared set before apply. After apply or `--update` it strips competing copies (pacman emacs/bun/gh, Spotify/Discord flatpaks, curl-pipe cursor-agent, python-pipx, omarchy-emacs, AUR zoom) once `/etc/omarchy.conf` exists, so a box that has not finished apply is still usable. Zoom is the Omarchy webapp (`zoommtg://`), not AUR `zoom`.
 
@@ -367,6 +385,7 @@ monarchy/
   hyprland-portals.conf
   sddm/                  # Main.qml, zz-omarchy-sddm.conf, hyprland.lua
   hypr/boot-color.lua
+  hypr/rehome-workspaces.lua
   logind/
 ```
 
