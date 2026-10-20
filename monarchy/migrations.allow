@@ -39,3 +39,8 @@
 
 # Acts only when the N1x rescue pacman hook exists.
 1791152480.sh
+
+# Rebuilds the initramfs only where an omarchy_vconsole.conf drop-in now keeps
+# vconsole.conf out of FILES. /etc/mkinitcpio.conf.d is empty here, so it exits
+# before rebuilding; were it to run, limine-mkinitcpio is the mkinitcpio -P alias.
+1791621765.sh
