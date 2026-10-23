@@ -1,10 +1,12 @@
 omarchy-apply-hardware
+omarchy-apply-pacman
 omarchy-apply-system
 omarchy-channel-set
 omarchy-dev-link
 omarchy-dev-unlink
 omarchy-hibernation-remove
 omarchy-hibernation-setup
+omarchy-kernel
 omarchy-provision-hardware
 omarchy-provision-owner
 omarchy-refresh-limine
