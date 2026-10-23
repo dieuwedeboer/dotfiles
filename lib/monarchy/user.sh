@@ -5,7 +5,6 @@
 # The checkout owns the personal override files under ~/.config/hypr, linked
 # in by mise. Monarchy used to append to them too, and the two only agreed
 # because the literals matched character for character. See
-# docs/adr/0001-chezmoi-owns-user-config.md and
 # docs/adr/0011-mise-links-user-config.md.
 MONARCHY_DOTFILES_HYPR="bindings.lua looknfeel.lua input.lua autostart.lua"
 

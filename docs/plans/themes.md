@@ -10,7 +10,7 @@ One extra-theme git repo per theme. The overlay installs them the way it install
 
 A theme monorepo. `omarchy theme install <url>` clones the repo as `~/.config/omarchy/themes/<name>/` and expects `colors.toml` at that root. The picker only lists immediate children of `themes/`. A bundle repo would install as one extra named after the repo.
 
-Chezmoi of `~/.config/omarchy/themes/`. Git clones and Aether both write there.
+Managing `~/.config/omarchy/themes/` as dotfiles. Git clones and Aether both write there.
 
 Git-lfs in a theme repo. Install is a plain `git clone`.
 
