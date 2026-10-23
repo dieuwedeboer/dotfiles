@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One entry point. Bare ./install.sh on a fresh box is household bootstrap
 # plus Monarchy apply. After /etc/omarchy.conf exists, bare ./install.sh is
-# the same as --update: household refresh (packages, chezmoi, hardware, ZFS)
+# the same as --update: household refresh (packages, dotfiles, hardware, ZFS)
 # then snapshot, rebuild packages, classify, apply. PATH has monarchy-update
 # (this file, --update).
 set -e
@@ -44,17 +44,17 @@ usage: install.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
        monarchy-update [same flags]
 
   (none)          Household refresh, then Monarchy. On a fresh box: packages,
-                  chezmoi, rEFInd glow, services, hardware, ZFS, then apply.
+                  dotfiles, rEFInd glow, services, hardware, ZFS, then apply.
                   Once /etc/omarchy.conf exists, the same as --update.
   --check         Monarchy dry-run. Writes nothing under /etc or /usr/local.
-  --update        Guards and a ZFS snapshot, household refresh (chezmoi
+  --update        Guards and a ZFS snapshot, household refresh (dotfiles
                   front-loaded), then Omarchy's own `omarchy-update` in full,
                   then rebuild packages, classify and apply over the top.
                   After the first install this is the command; monarchy-update
                   is this file with --update, and the overlay's omarchy-update
                   is a wrapper onto it.
-  --no-packages   Monarchy apply without pacman leaf packages. Still refreshes
-                  chezmoi-managed dotfiles.
+  --no-packages   Monarchy apply without pacman leaf packages. Still links
+                  the dotfiles.
   --splash-only   Omarchy Plymouth theme, plymouth around zfs, retain-splash.
   --only=<unit>   Run one unit only. Combines with --check and --update.
                   Skips the household refresh and Omarchy's own update.
@@ -67,7 +67,7 @@ usage: install.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
                   middle. For iterating on monarchy without a full -Syu.
 
   omarchy-update (Omarchy menu) wraps monarchy-update. That path has no
-  terminal, so chezmoi apply is skipped rather than hanging on a prompt.
+  terminal, so nothing on it asks: omarchy update gets -y.
 
   Every run ends with a summary: what changed, what was left alone, what
   warned. Left alone is a decision, not a failure -- apply seeds, and never
@@ -208,9 +208,8 @@ fi
 case "$MODE" in
     update)
         # Household first, then Omarchy's own update, then monarchy over the
-        # top. Dotfiles are front-loaded on purpose: a template that reads a
-        # package version should see the one the box is about to run, and a
-        # post-update hook Omarchy fires should find chezmoi already applied.
+        # top. Dotfiles are front-loaded on purpose: a post-update hook Omarchy
+        # fires should find them already linked.
         if [ "$MONARCHY_RUN_OMARCHY_UPDATE" = 1 ]; then
             # -y is upstream's promise not to ask anything. The Omarchy menu
             # wrap-execs this with no terminal, and omarchy-update-confirm

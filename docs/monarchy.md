@@ -2,7 +2,7 @@
 
 Omarchy Quattro as a second Wayland session on CachyOS+ZFS+KDE. Plasma stays the family default. The king's user defaults to Omarchy at SDDM.
 
-`install.sh` is the one-shot entry: packages, chezmoi, hardware, ZFS, then Monarchy apply. The library is `lib/monarchy/`. Policy files live in `monarchy/`.
+`install.sh` is the one-shot entry: packages, dotfiles, hardware, ZFS, then Monarchy apply. The library is `lib/monarchy/`. Policy files live in `monarchy/`.
 
 | Doc | What it is |
 | --- | --- |
@@ -14,7 +14,7 @@ Omarchy Quattro as a second Wayland session on CachyOS+ZFS+KDE. Plasma stays the
 
 ## What it is
 
-Household boxes run CachyOS on native-encrypted ZFS with KDE Plasma, rEFInd chainloading ZFSBootMenu, and a repeatable chezmoi install. That base does not change. Monarchy adds Omarchy Quattro (Hyprland 0.56 Lua + Quickshell) on top of it.
+Household boxes run CachyOS on native-encrypted ZFS with KDE Plasma, rEFInd chainloading ZFSBootMenu, and dotfiles linked from this repo by `mise dot` (ADR 0011). That base does not change. Monarchy adds Omarchy Quattro (Hyprland 0.56 Lua + Quickshell) on top of it.
 
 CachyOS owns the OS: kernel, ZFS modules, repos, Plasma, `cachy-update`, sanoid, ZBM. Monarchy owns the Hyprland session, the clash bridge, and branding. Omarchy never owns `pacman.conf`, the bootloader, or `/etc/os-release`.
 
@@ -65,7 +65,7 @@ flowchart TB
     Work --> QS
   end
 
-  PlasmaSession --> KDE[KDE Plasma + chezmoi]
+  PlasmaSession --> KDE[KDE Plasma]
 ```
 
 Three layers:
@@ -124,7 +124,7 @@ Wraps:
 - `omarchy-plymouth-set` / `omarchy-plymouth-reset` / `omarchy-refresh-plymouth` → Monarchy splash helpers (`mkinitcpio -P`, no Limine). plymouth-set restyles the greeter overlay.
 - `omarchy-refresh-sddm` → copy the package theme, overlay `Main.qml`
 - `omarchy-screensaver` → seed `screensaver.txt` from `logo.txt` if missing, then exec the packaged binary
-- `omarchy-display-text-size` → packaged binary, then `omarchy-hook display-text-size`. Chezmoi `hooks/apply-font-size` reads `~/.config/environment.d/monarchy.conf` (`MONARCHY_FONT_PT_OFFSET`, `MONARCHY_ALPHA`) and runs `hooks/font-size.d/*` plus `hooks/alpha.d/*` (foot, Alacritty, Emacs, …)
+- `omarchy-display-text-size` → packaged binary, then `omarchy-hook display-text-size`. The dotfiles' `hooks/apply-font-size` reads `~/.config/environment.d/monarchy.conf` (`MONARCHY_FONT_PT_OFFSET`, `MONARCHY_ALPHA`) and runs `hooks/font-size.d/*` plus `hooks/alpha.d/*` (foot, Alacritty, Emacs, …)
 - `omarchy-disk-speedtest` → packaged binary behind a `findmnt` shim. It resolves the target directory to a `/dev` node and samples that device's `/sys` counters; on ZFS `findmnt` names the dataset, so the test stops at "Cannot find a disk". The shim answers that one lookup with the pool's single data vdev. Multi-device pools are refused rather than measured one disk short.
 - `omarchy-snapshot` → `zfs-snapshot-pre-update.sh` for `create`; `restore` points at ZFSBootMenu and exits 2. Stock drives snapper and `limine-snapper-restore`, and would exit 127 here because `monarchy-boot-stub` ships no snapper binary. This is the one script `berenddeboer/omarchy` genuinely improved, kept without the fork.
 - `omarchy-version` / `omarchy-version-branch` / `omarchy-version-channel` → Fastfetch About. Version is `pacman -Q omarchy`. Stock does the same, but only when `OMARCHY_PATH` is `/usr/share/omarchy`; against a working prefix it decides it is a dev-link and prints `dev`. `$OMARCHY_PATH/version` is not the answer either: the 4.0.2 package still ships a version file reading `4.0.0.alpha`. Branch exits 1 — there is no branch when you track a package, and Fastfetch omits the line, which is what stock does with no dev-link git branch. Channel is the `[omarchy]` pkg repo.
@@ -193,7 +193,7 @@ When upstream moves a file from the Omarchy package into settings, the installed
 
 ## Apply
 
-Entry point: `install.sh` — argument parsing and dispatch only; the household half is `lib/household.sh`. bash, `set -e`, idempotent, sudo only where needed. One pipeline: household refresh (packages, chezmoi, hardware, ZFS), then Monarchy. `--check`, `--splash-only`, and `--only` skip the household refresh; `--update` does not.
+Entry point: `install.sh` — argument parsing and dispatch only; the household half is `lib/household.sh`. bash, `set -e`, idempotent, sudo only where needed. One pipeline: household refresh (packages, dotfiles, hardware, ZFS), then Monarchy. `--check`, `--splash-only`, and `--only` skip the household refresh; `--update` does not.
 
 A run prints one step per household stage and per Monarchy unit (`[ 7/12] sddm`), detail lines indented beneath, and an elapsed figure for any unit over five seconds. `-v` restores the timestamped `monarchy_log` form. It ends with a summary from an `EXIT` trap — so a run that dies partway still reports it — listing what changed, what was **left alone**, and what warned. `NO_COLOR` and a missing tty both drop the escapes. Routine lines --
 "already installed", "already current", "nothing to do" -- go to the log
@@ -226,9 +226,9 @@ package manager**: the absent set is worked out first and handed to `pacman`,
 `paru` or `flatpak` in a single call, so a step that is usually a no-op stops
 costing forty dependency resolutions and forty screens of output. The summary
 bullet names the first six and counts the rest; the log line has them all.
-**One `chezmoi apply`**, in `household_chezmoi`. A second one doubles the
-slowest step and gives a menu-driven update a second chance to hang on a
-prompt.
+**One `mise dot apply`**, in `household_dotfiles`. It never prompts, so the
+menu-driven update links dotfiles too. The hypr assert re-runs it only when
+one of the four hypr files is not linked (ADR 0011).
 
 ```bash
 ./install.sh           # first run: household refresh, then Monarchy apply
@@ -239,7 +239,7 @@ monarchy-update        # this file with --update
 ```
 
 `monarchy-update` brackets the real `omarchy-update` rather than replacing it:
-guards, a ZFS snapshot, the household refresh with chezmoi front-loaded, the
+guards, a ZFS snapshot, the household refresh with dotfiles front-loaded, the
 local packages prepared, then the packaged `omarchy-update` in full, then
 classify and apply over the top, then `omarchy-migrate` and
 `omarchy-update-status`. `omarchy update` owns `pacman -Syu`. Three names are
@@ -248,7 +248,7 @@ deny and wrap, for a name upstream is right to call that has nothing to do
 here and must exit 0 rather than abort a `set -e` flow. See
 `docs/adr/0003-omarchy-owns-the-system-update.md`.
 
-`/usr/local/bin/monarchy-update` is a symlink to `install.sh`. Invoked by that name, a bare run is `--update`. Wrapped `omarchy-update` execs it so the Omarchy Update menu does not run stock Omarchy. That menu has no terminal, so chezmoi apply is skipped rather than hanging on a prompt; an interactive run applies.
+`/usr/local/bin/monarchy-update` is a symlink to `install.sh`. Invoked by that name, a bare run is `--update`. Wrapped `omarchy-update` execs it so the Omarchy Update menu does not run stock Omarchy. That menu has no terminal, so `omarchy update` is passed `-y`; dotfiles apply either way.
 
 Snapshot-first always calls `sudo /root/.local/bin/zfs-snapshot-pre-update.sh`. That helper hard-codes `zpcachyos/ROOT/cos`. If it is missing or still has the varlog-only prune, apply installs the current copy from this repo, then asserts a `@pre-update-*` exists on `zpcachyos/ROOT/cos/root`. The pacman hook uses that installed helper.
 
@@ -303,13 +303,13 @@ a pacman-owned path now, so check and apply read the same tree and every
 function check reaches also runs during apply. Units whose input is not yet on
 disk return early instead.
 
-King-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, `monarchy/hypr/` modules (below), Super+Ctrl+U bind, Super+Shift+E emacsclient (replaces HEY), unbind leftover HEY calendar/compose chords, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), drop `monarchy/applications.drop` (Basecamp, HEY), `omarchy-pkg-add` of `MONARCHY_SEEDED_PKGS` (spotify, signal-desktop, cursor-bin, cursor-cli, omakade), `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland` plus `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
+King-only user setup (`monarchy_setup_user`): seed `~/.config/hypr/*` if missing, `monarchy/hypr/` modules (below), Super+Ctrl+U bind, Super+Shift+E emacsclient (replaces HEY), unbind leftover HEY calendar/compose chords, branding (`logo.txt` → `screensaver.txt`, `icon.txt` → `about.txt`), no `TERMINAL=` override, plugins from `monarchy/plugins`, `omarchy-refresh-applications` (mise agent stubs + webapps), drop `monarchy/applications.drop` (Basecamp, HEY), `omarchy-pkg-add` of `MONARCHY_SEEDED_PKGS` (spotify, signal-desktop, cursor-bin, cursor-cli, omakade), `omarchy-install-browser chrome`, `mise use -g bun`, `emacs-wayland` plus `berenddeboer/omarchy-emacs-theme` (`~/.config/emacs/` from the dotfiles), mark first-run done. Does not copy `default/`, `shell/`, or `bin/` into the home directory. Quickshell is launched with `-p "$OMARCHY_PATH/shell"`.
 
 ### Hyprland modules
 
 Each `monarchy/hypr/<name>.lua` is copied to `~/.config/hypr/` on every apply
 and required from `hyprland.lua` in a `-- BEGIN monarchy: <name>` block
-(`monarchy_seed_hypr_module`). They are Monarchy's, not chezmoi's: edits in the
+(`monarchy_seed_hypr_module`). They are Monarchy's, not the dotfiles': edits in the
 home directory are overwritten.
 
 - `boot-color.lua`: the first compositor frame is Unlock's #1a1b26, not grey.
@@ -330,7 +330,7 @@ home directory are overwritten.
 
 ```text
 install.sh
-lib/household.sh         # packages, chezmoi, rEFInd, services, hardware, ZFS
+lib/household.sh         # packages, dotfiles, rEFInd, services, hardware, ZFS
 lib/monarchy.sh          # sources the library
 lib/monarchy/
   ui.sh                  # one voice, and the changed/left-alone/warned ledger
@@ -590,7 +590,7 @@ ZFS datasets do not change: `zpcachyos/ROOT/cos/{root,home,varcache,varlog}`. Po
 | `/etc/systemd/logind.conf.d/10-monarchy-ignore-power-button.conf` | `HandlePowerKey=ignore`. A Bluetooth headset KEY_POWER has shut a host down. Shutdown is the System menu. |
 | `/usr/share/uwsm/env.d/10-monarchy` | working-prefix bootstrap + mise |
 | `/usr/share/plymouth/themes/omarchy/` | Omarchy Plymouth theme |
-| `~/.config/omarchy/plugins/<id>/` | User plugin checkouts. Not chezmoi. King only. |
+| `~/.config/omarchy/plugins/<id>/` | User plugin checkouts. Not dotfiles. King only. |
 | `/root/.local/bin/zfs-snapshot-pre-update.sh` | snapshot helper. Required. |
 | `/var/log/monarchy-setup.log` | setup + stub invocations, for whoever administers the box |
 | `journalctl -t monarchy` | the same lines whenever the file cannot be written, and every deny-stub block from any account |
@@ -620,4 +620,4 @@ Rollback: boot `zpcachyos/ROOT/cos/root@pre-update-*` from ZFSBootMenu, or clone
 
 Upstream Omarchy hardcodes Limine and Btrfs, and `omarchy-settings` rewrites `/etc` from its scriptlet. That is why `omarchy-settings-monarchy` and `monarchy-boot-stub` exist. PAM homes, a plymouth-before-zfs mkinitcpio rewrite, and archzfs stay refused regardless.
 
-NVIDIA and Tuxedo/Clevo quirks stay in `hardware/system76-bonw9/apply.sh` / `chwd`. The king's fish, paru, tealdeer, chezmoi nvim, ghostty, docker group, and per-box ufw enable/disable stay.
+NVIDIA and Tuxedo/Clevo quirks stay in `hardware/system76-bonw9/apply.sh` / `chwd`. The king's fish, paru, tealdeer, nvim dotfiles, ghostty, docker group, and per-box ufw enable/disable stay.

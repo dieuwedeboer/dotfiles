@@ -132,9 +132,8 @@ monarchy_sudo() {
 # user on a temp prefix in tests and as root on a real box; this is the only
 # difference between those two paths.
 # True when there is a real terminal to ask on. The Omarchy menu wraps
-# omarchy-update, which execs monarchy-update with no tty, and chezmoi apply
-# prompts whenever a target has been modified. With a tty we can fix things;
-# without one we can only report and stop.
+# omarchy-update, which execs monarchy-update with no tty, so anything that
+# asks has to know whether anyone can answer.
 monarchy_can_prompt() {
     [ "${MONARCHY_NONINTERACTIVE:-0}" != 1 ] || return 1
     [ -t 0 ] && [ -t 1 ]
@@ -225,7 +224,7 @@ monarchy_assert_root_pre_update_snapshot() {
 
 monarchy_install_snapshot_helper() {
     local helper=/root/.local/bin/zfs-snapshot-pre-update.sh
-    local src="$MONARCHY_DOTFILES/chezmoi/dot_local/bin/executable_zfs-snapshot-pre-update"
+    local src="$MONARCHY_DOTFILES/home/.local/bin/zfs-snapshot-pre-update"
     [ -f "$src" ] || monarchy_die "missing $src"
     if monarchy_sudo test -x "$helper" && monarchy_sudo grep -q ROOT_DATASET "$helper"; then
         return 0

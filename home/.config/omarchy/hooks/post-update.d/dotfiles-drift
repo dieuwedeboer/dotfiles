@@ -1,0 +1,52 @@
+#!/bin/bash
+# omarchy-update runs `omarchy-hook post-update` on the line straight after
+# omarchy-migrate, so this sees exactly what the migrations just did.
+#
+# Migrations edit dotfiles by design and without knowing they are ours. Every
+# dotfile is a link into the dotfiles checkout, so an edit made through the
+# link is already a diff in git, and one made by rename (sed -i, most editors)
+# leaves a regular file where the link was. Under chezmoi both were silently
+# reverted by the next apply -- that is how foot dropped from 12pt back to
+# 9pt, and how a migration left alacritty.toml unparseable for days.
+#
+# So: report while the cause is still on screen. This never repairs and never
+# commits. Deciding whether a migration's change is wanted is the point, and
+# that is a judgement call. The next monarchy-update folds replaced links back
+# into the checkout so they show up in `git diff` too.
+set -uo pipefail
+
+# Deployed as a link into the checkout, so its own path finds the repo.
+self=$(readlink -f "${BASH_SOURCE[0]}")
+root=$(cd "$(dirname "$self")/../../../.." && pwd)
+[[ -f $root/.config/omarchy/hooks/post-update.d/dotfiles-drift ]] || exit 0
+repo=$(dirname "$root")
+
+replaced=""
+while IFS= read -r -d '' rel; do
+  rel=${rel#./}
+  [[ $rel == .claude/settings.json ]] && continue
+  target=$HOME/$rel
+  [[ -f $target && ! -L $target ]] || continue
+  cmp -s "$target" "$root/$rel" && continue
+  replaced+="$rel"$'\n'
+done < <(cd "$root" && find . \( -type f -o -type l \) -print0)
+replaced=${replaced%$'\n'}
+
+changed=$(git -C "$repo" status --short -- home 2>/dev/null | awk '{print $NF}' | sed 's|^home/||')
+
+files=$(printf '%s\n%s\n' "$replaced" "$changed" | grep -v '^$' | sort -u)
+[[ -n $files ]] || exit 0
+
+echo "dotfiles have changed since the last commit:"
+printf '%s\n' "$files" | sed 's/^/  /'
+echo "  Review: git -C $repo diff home/"
+[[ -z $replaced ]] || echo "  Replaced links are folded back into the checkout by the next monarchy-update."
+echo "  Commit what you want to keep; git checkout the rest."
+
+# The terminal line above scrolls past once. The notification outlives it.
+if command -v omarchy-notification-send >/dev/null 2>&1; then
+  omarchy-notification-send -u critical -g 󰇮 \
+    "Omarchy changed dotfiles" \
+    "$(printf '%s' "$files" | paste -sd', ' -) — review git diff before committing" \
+    2>/dev/null || true
+fi

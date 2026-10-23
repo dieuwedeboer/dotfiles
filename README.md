@@ -132,16 +132,14 @@ cd dotfiles
 ```
 
 The install script will:
-- Install chezmoi if not present
-- Link dotfiles via chezmoi
-- Apply chezmoi (including agent instructions) and restore global skills from the lock (see [Agent Configuration](#agent-configuration))
+- Link every file in `home/` into your home directory with `mise dot` (including agent instructions), and restore global skills from the lock (see [Agent Configuration](#agent-configuration)). Live edits to a dotfile are edits to this checkout: review them with `git diff home/` and commit what you want to keep
 - Install packages and configure system
 - Optionally configure rEFInd with a custom theme (glow) if no custom theme is present
 - Quiet the ZFSBootMenu and host kernel command lines (`docs/boot-flow.md`)
 - Apply hardware quirks when DMI or a device node matches
 - Install Monarchy (Omarchy Quattro as a second session. Family default stays Plasma)
 
-`./install.sh --check` is a Monarchy dry-run. After the first install, `./install.sh` and `monarchy-update` are the same command: they refresh chezmoi-managed dotfiles, then the overlay. Operator notes and rollback are in `docs/monarchy-install.md`.
+`./install.sh --check` is a Monarchy dry-run. After the first install, `./install.sh` and `monarchy-update` are the same command: they relink the dotfiles, then the overlay. Operator notes and rollback are in `docs/monarchy-install.md`.
 
 ### Double Password Solution
 

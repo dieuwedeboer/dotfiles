@@ -1,6 +1,6 @@
 # shellcheck shell=bash
-# The household half of a run: packages, agent home, chezmoi-managed
-# dotfiles, rEFInd, services, groups, firewall, system tweaks, hardware
+# The household half of a run: packages, agent home, dotfiles linked by
+# mise, rEFInd, services, groups, firewall, system tweaks, hardware
 # quirks, ZFS. Everything that is true of the box regardless of Omarchy.
 #
 # Sourced by install.sh, which is argument parsing and dispatch and nothing
@@ -15,56 +15,132 @@
 # Requires lib/monarchy.sh and lib/packages.sh already sourced, and
 # DOTFILES_DIR and LIB_DIR set.
 
-# chezmoi apply prompts when a target has been modified. The Omarchy menu
-# wraps omarchy-update with no terminal, so that path reports drift and
-# continues rather than hanging. An interactive ./install.sh or a hand-run
-# monarchy-update has a tty and just applies. See ADR 0001.
-household_chezmoi() {
-    monarchy_step "dotfiles (chezmoi)"
-    if [ ! -L "$HOME/.local/share/chezmoi" ]; then
-        if [ -d "$HOME/.local/share/chezmoi" ]; then
-            mv "$HOME/.local/share/chezmoi" "$HOME/.local/share/chezmoi.bk"
-            monarchy_changed "moved an existing chezmoi aside to ~/.local/share/chezmoi.bk"
+# mise links every file in home/ into $HOME, so a live edit is an edit to this
+# checkout and shows up in `git status`. mise never commits and never prompts;
+# the king commits, by hand. See ADR 0011.
+#
+# An older mise rejects [bootstrap.hooks] post-dotfiles, and an unknown key in
+# a conf.d file stops every mise command from parsing -- the coding agents'
+# shims included. So the config is linked in only once mise can read it.
+HOUSEHOLD_MISE_MIN=2026.10.4
+
+# Run from $HOME so a mise.toml in whatever directory the run started from
+# cannot add itself to the config.
+household_mise() {
+    (cd "$HOME" && mise "$@")
+}
+
+household_dotfiles() {
+    monarchy_step "dotfiles (mise)"
+    local root="$DOTFILES_DIR/home"
+    local conf="$HOME/.config/mise/conf.d/20-dotfiles.toml"
+    local have
+
+    household_retire_chezmoi
+
+    # Not a die: the files from the last apply are still in place.
+    if ! command -v mise >/dev/null 2>&1; then
+        monarchy_warn "mise not installed; dotfiles not applied"
+        return 0
+    fi
+    have=$(household_mise --version 2>/dev/null | awk '{print $1}')
+    if [ "$(printf '%s\n%s\n' "$HOUSEHOLD_MISE_MIN" "$have" | sort -V | head -n1)" != "$HOUSEHOLD_MISE_MIN" ]; then
+        monarchy_warn "mise $have is older than $HOUSEHOLD_MISE_MIN; dotfiles not applied"
+        return 0
+    fi
+
+    if [ "$(readlink "$conf" 2>/dev/null)" != "$DOTFILES_DIR/mise/dotfiles.toml" ]; then
+        mkdir -p "$(dirname "$conf")"
+        ln -sfn "$DOTFILES_DIR/mise/dotfiles.toml" "$conf"
+        monarchy_changed "linked $conf"
+    fi
+    # Where the checkout sits is a fact about the box, so it goes in the
+    # king's ~/.config/mise/config.toml and never in the repo.
+    if [ "$(household_mise settings get dotfiles.root 2>/dev/null)" != "$root" ]; then
+        household_mise settings set dotfiles.root "$root"
+        monarchy_changed "set mise dotfiles.root to $root"
+    fi
+
+    household_dotfiles_fold_back "$root" || return 0
+
+    local before=0
+    household_mise dot status --missing >/dev/null 2>&1 || before=1
+    if ! household_mise dot apply --yes --force; then
+        monarchy_warn "mise dot apply failed; re-running is the fix. Run: mise dot apply --yes"
+        return 0
+    fi
+    if ! household_mise dot status --missing >/dev/null 2>&1; then
+        monarchy_warn "dotfiles are not all in place. Run: mise dot status"
+    elif [ "$before" = 1 ]; then
+        monarchy_changed "linked dotfiles from $root"
+    fi
+
+    local dirty
+    dirty=$(git -C "$DOTFILES_DIR" status --short -- home mise | awk '{print $NF}' | paste -sd' ' -)
+    if [ -n "$dirty" ]; then
+        monarchy_left_alone "uncommitted dotfile changes, commit or discard them: $dirty"
+    fi
+}
+
+# A tool that saves by rename -- sed -i, most editors, KConfig -- swaps the
+# link for a regular file, and chezmoi left a copy at every target. --force
+# would throw either away, so a live file is copied over its source first and
+# turns up in `git diff`. mise's own status names only the first such file in
+# a group, so this walks home/ itself.
+household_dotfiles_fold_back() {
+    local root=$1 rel target src conflict=""
+    local -a stale=()
+    while IFS= read -r -d '' rel; do
+        rel=${rel#./}
+        [ "$rel" != .claude/settings.json ] || continue
+        target="$HOME/$rel"
+        src=$(readlink -f "$root/$rel")
+        # A link carries no content of its own, whoever made it.
+        if [ -L "$target" ] || [ ! -f "$target" ]; then
+            continue
         fi
-        ln -s "$DOTFILES_DIR/chezmoi" "$HOME/.local/share/chezmoi"
-        monarchy_changed "linked ~/.local/share/chezmoi at $DOTFILES_DIR/chezmoi"
+        cmp -s "$target" "$src" && continue
+        # Content this repo has committed before is a stale copy, not an edit.
+        # That is every chezmoi copy on a box whose checkout has since been
+        # pulled; folding those back would revert the pull.
+        if git -C "$root" cat-file -e "$(git hash-object "$target")" 2>/dev/null; then
+            stale+=("$target")
+            continue
+        fi
+        if [ -n "$(git -C "$root" status --porcelain -- "$src")" ]; then
+            conflict="$conflict $target"
+            continue
+        fi
+        cp -- "$target" "$src"
+        monarchy_changed "folded $target back into the checkout"
+    done < <(cd "$root" && find . \( -type f -o -type l \) -print0)
+    if [ "${#stale[@]}" -gt 0 ]; then
+        monarchy_left_alone "${#stale[@]} older committed copies, linked over: $(monarchy_ui_some "${stale[@]}")"
     fi
-
-    if ! command -v chezmoi >/dev/null 2>&1; then
-        monarchy_warn "chezmoi not installed; dotfiles not applied"
-        return 0
+    if [ -n "$conflict" ]; then
+        monarchy_warn "these and their sources in $root both have uncommitted changes:$conflict. Keep one, then re-run; dotfiles not applied"
+        return 1
     fi
+}
 
-    # A failing `chezmoi status` must not read as clean. chezmoi writes its
-    # errors to stderr and leaves stdout empty when the source directory is
-    # missing or a template will not render, so testing only whether stdout
-    # was empty turns a broken tree into "already applied" -- nothing applied,
-    # nothing reported. ADR 0001 records the same trap for the hypr assert;
-    # this is the household half of it.
-    local status rc=0
-    status=$(chezmoi status 2>&1) || rc=$?
-    if [ "$rc" -ne 0 ]; then
-        printf '%s\n' "$status" >&2
-        monarchy_warn "chezmoi status failed; dotfiles not applied. Run: chezmoi apply"
-        return 0
+# What chezmoi left behind that would otherwise keep running: the source link
+# (a chezmoi still installed would apply a tree that is gone) and its drift
+# hook, which Omarchy fires after every update. Its state database goes too;
+# rollback is `chezmoi init`, not that file.
+household_retire_chezmoi() {
+    local hook="$HOME/.config/omarchy/hooks/post-update.d/chezmoi-drift"
+    if [ -L "$HOME/.local/share/chezmoi" ]; then
+        rm -f "$HOME/.local/share/chezmoi"
+        monarchy_changed "removed the ~/.local/share/chezmoi link"
     fi
-
-    # `run_after_` scripts are listed by every status and re-run by every
-    # apply, so on this tree status is never empty and "has anything actually
-    # drifted" is what is left once those rows are dropped. Without this the
-    # no-terminal path warned about drift on every single run, and the
-    # interactive path reported a change it had not made.
-    local drift
-    drift=$(printf '%s\n' "$status" | grep -vE '^ R ' || true)
-
-    if ! monarchy_can_prompt; then
-        [ -z "$drift" ] || monarchy_warn \
-            "chezmoi has drifted and there is no terminal to apply on. Run: chezmoi apply"
-        return 0
+    if [ -f "$hook" ] && [ ! -L "$hook" ]; then
+        rm -f "$hook"
+        monarchy_changed "removed the chezmoi-drift hook"
     fi
-    chezmoi apply
-    if [ -n "$drift" ]; then
-        monarchy_changed "applied chezmoi-managed dotfiles"
+    if [ -f "$HOME/.config/chezmoi/chezmoistate.boltdb" ]; then
+        rm -f "$HOME/.config/chezmoi/chezmoistate.boltdb"
+        rmdir "$HOME/.config/chezmoi" 2>/dev/null || true
+        monarchy_changed "removed chezmoi's state"
     fi
 }
 
@@ -122,7 +198,7 @@ household_refresh() {
     monarchy_step "agent home (~/.agents)"
     agents_materialize_home
 
-    household_chezmoi
+    household_dotfiles
 
     monarchy_step "agent skills from lock"
     agents_restore_skills

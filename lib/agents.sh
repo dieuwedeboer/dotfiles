@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Home-level agent config. ~/.agents is a real directory (chezmoi + skills
-# CLI), not a symlink into this repo. Canonical instructions are
-# ~/.agents/AGENTS.md; Claude and OpenCode symlink to it via chezmoi.
+# Home-level agent config. ~/.agents is a real directory (mise dotfiles +
+# skills CLI), not a symlink into this repo. Canonical instructions are
+# ~/.agents/AGENTS.md; Claude and OpenCode link to it via mise dotfiles.
 
 agents_materialize_home() {
     local src tmp

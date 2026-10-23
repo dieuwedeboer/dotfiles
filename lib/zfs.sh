@@ -38,7 +38,7 @@ sudo systemd-tmpfiles --create "$arc_conf"
 
 monarchy_log "pre-update snapshot script"
 sudo mkdir -p /root/.local/bin
-sudo install -m 755 "$DOTFILES_DIR/chezmoi/dot_local/bin/executable_zfs-snapshot-pre-update" /root/.local/bin/zfs-snapshot-pre-update.sh
+sudo install -m 755 "$DOTFILES_DIR/home/.local/bin/zfs-snapshot-pre-update" /root/.local/bin/zfs-snapshot-pre-update.sh
 
 monarchy_log "sanoid.timer"
 sudo systemctl enable --now sanoid.timer

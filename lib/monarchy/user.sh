@@ -2,10 +2,12 @@
 # Sourced into one shell by lib/monarchy.sh; common.sh state is in scope.
 # shellcheck disable=SC2153
 
-# chezmoi owns the personal override files under ~/.config/hypr. Monarchy used
-# to append to them too, and the two only agreed because the literals matched
-# character for character. See docs/adr/0001-chezmoi-owns-user-config.md.
-MONARCHY_CHEZMOI_HYPR="bindings.lua looknfeel.lua input.lua autostart.lua"
+# The checkout owns the personal override files under ~/.config/hypr, linked
+# in by mise. Monarchy used to append to them too, and the two only agreed
+# because the literals matched character for character. See
+# docs/adr/0001-chezmoi-owns-user-config.md and
+# docs/adr/0011-mise-links-user-config.md.
+MONARCHY_DOTFILES_HYPR="bindings.lua looknfeel.lua input.lua autostart.lua"
 
 monarchy_copy_if_missing() {
     local src=$1
@@ -27,9 +29,10 @@ monarchy_seed_hyprland_config() {
     for f in "$src"/*; do
         [ -e "$f" ] || continue
         base=$(basename "$f")
-        # chezmoi owns these. Copying the package's stock version over a missing
-        # one would turn "run chezmoi apply" into a silent content mismatch.
-        case " $MONARCHY_CHEZMOI_HYPR " in
+        # The checkout owns these. Copying the package's stock version over a
+        # missing one would leave a file where the dotfiles step expects to put
+        # a link, and fold Omarchy's stock content into the repo.
+        case " $MONARCHY_DOTFILES_HYPR " in
             *" $base "*) continue ;;
         esac
         monarchy_copy_if_missing "$f" "$dest/$base"
@@ -126,7 +129,7 @@ monarchy_clear_terminal_override() {
     fi
 }
 
-# ~/.emacs.d shadows ~/.config/emacs. Chezmoi owns init.el under XDG;
+# ~/.emacs.d shadows ~/.config/emacs. The checkout owns init.el under XDG;
 # move a leftover ~/.emacs.d aside so Emacs reads the XDG layout.
 monarchy_prefer_xdg_emacs() {
     local src="$HOME/.emacs.d"
@@ -415,111 +418,37 @@ monarchy_drop_webapps() {
 }
 
 
-# Plugins keep their own marked blocks in these files -- the screens plugin
-# writes `-- BEGIN im0001gt.screens` ... `-- END im0001gt.screens` into
-# bindings.lua, the same shape monarchy_seed_block uses. Those lines belong to
-# whoever wrote them, not to chezmoi, so they are not drift. Without stripping
-# them the assert below saw drift on every update, ran chezmoi apply, and took
-# the plugin's scale bindings with it.
-monarchy_strip_marked_blocks() {
-    awk '
-        /^-- BEGIN ./ { id = substr($0, 10); skip = 1; next }
-        skip && $0 == "-- END " id { skip = 0; next }
-        skip { next }
-        { print }
-        # An unterminated block would swallow the rest of the file and make
-        # genuine drift below it invisible. Fail instead, so the caller
-        # reports the file rather than trusting a truncated comparison.
-        END { if (skip) exit 1 }
-    '
+# The dotfiles step links these four into the checkout. A plugin that writes
+# its marked block into bindings.lua -- the screens plugin's
+# `-- BEGIN im0001gt.screens` -- writes the checkout, so that shows up as an
+# ordinary diff rather than as drift. One that saves by rename leaves a file
+# where the link was, and the next dotfiles step folds it back.
+monarchy_hypr_linked() {
+    local name=$1
+    local target="$HOME/.config/hypr/$name"
+    local src="$MONARCHY_DOTFILES/home/.config/hypr/$name"
+    [ -L "$target" ] && [ "$(readlink -f "$target")" = "$(readlink -f "$src")" ]
 }
 
-# One chezmoi status line, minus its two status characters and the space.
-# True when the difference it reports survives stripping marked blocks, or
-# when it is not a content difference at all (a mode change reports clean
-# content and still needs an apply).
-monarchy_hypr_line_is_real_drift() {
-    local rel=${1:3}
-    local target="$HOME/$rel"
-    local want
-    [ -f "$target" ] || return 0
-    grep -Eq '^-- BEGIN .' "$target" || return 0
-    local stripped_want stripped_got
-    want=$(chezmoi cat "$target" 2>/dev/null) || return 0
-    stripped_want=$(printf '%s\n' "$want" | monarchy_strip_marked_blocks) || return 0
-    stripped_got=$(monarchy_strip_marked_blocks <"$target") || return 0
-    [ "$stripped_want" != "$stripped_got" ]
-}
-
-# Drop the chezmoi status lines whose only difference is a marked block.
-monarchy_hypr_drop_block_drift() {
-    local line kept=""
-    while IFS= read -r line; do
-        [ -n "$line" ] || continue
-        if monarchy_hypr_line_is_real_drift "$line"; then
-            kept="$kept$line
-"
-        else
-            # monarchy_log echoes to stdout, and stdout here is the return
-            # value. To stderr, so the log file still gets the line.
-            monarchy_log "ignoring marked-block drift in ${line:3}" >&2
-        fi
-    done <<EOF
-$1
-EOF
-    printf '%s' "$kept"
-}
-
-# Never run chezmoi apply from here: it prompts when a target has been
-# modified, and omarchy-update reaches this through the Omarchy menu with no
-# terminal to answer on. Report, name the command, stop.
-# chezmoi owns these files, so chezmoi is what fixes them. With a terminal,
-# just run it: an interactive install or a hand-run monarchy-update can answer
-# the overwrite prompt. Without one, report and stop rather than hang a
-# menu-driven update on a question nobody can see.
-monarchy_chezmoi_apply_hypr() {
-    local why=$1
+monarchy_assert_dotfiles_hypr() {
     local dir="$HOME/.config/hypr"
-    if ! monarchy_can_prompt; then
-        monarchy_die "$why. Run: chezmoi apply ~/.config/hypr"
-    fi
-    monarchy_log "$why; running chezmoi apply $dir"
-    chezmoi apply "$dir" \
-        || monarchy_die "chezmoi apply $dir failed. Fix it, then re-run."
-}
-
-monarchy_assert_chezmoi_hypr() {
-    local dir="$HOME/.config/hypr"
-    local name missing="" status
-    if ! command -v chezmoi >/dev/null 2>&1; then
-        monarchy_die "chezmoi is not installed; ~/.config/hypr is chezmoi-managed"
-    fi
-    for name in $MONARCHY_CHEZMOI_HYPR; do
-        [ -f "$dir/$name" ] || missing="$missing $name"
+    local name unlinked=""
+    for name in $MONARCHY_DOTFILES_HYPR; do
+        monarchy_hypr_linked "$name" || unlinked="$unlinked $name"
     done
-    if [ -n "$missing" ]; then
-        monarchy_chezmoi_apply_hypr "missing in $dir:$missing" || return 1
-        missing=""
-    fi
-    # Keep stderr and the exit code. chezmoi status prints its errors to
-    # stderr and leaves stdout empty when the source dir is missing, so
-    # discarding both made "chezmoi is not managing anything here" look
-    # identical to "clean".
-    if ! status=$(chezmoi status "$dir" 2>&1); then
-        printf '%s\n' "$status" >&2
-        monarchy_die "chezmoi status failed for $dir; is chezmoi linked? Run: chezmoi apply ~/.config/hypr"
-    fi
-    if [ -n "$status" ]; then
-        status=$(monarchy_hypr_drop_block_drift "$status")
-    fi
-    if [ -n "$status" ]; then
-        printf '%s\n' "$status" >&2
-        monarchy_chezmoi_apply_hypr "$dir has drifted from chezmoi" || return 1
-        status=$(chezmoi status "$dir" 2>&1) || true
-        status=$(monarchy_hypr_drop_block_drift "$status")
-        [ -z "$status" ] || monarchy_die "$dir still differs after chezmoi apply"
-    fi
-    monarchy_trace "chezmoi owns $dir"
+    [ -n "$unlinked" ] || { monarchy_trace "the checkout owns $dir"; return 0; }
+    # Only install.sh sources the household half. Anything else reaching here
+    # has no dotfiles step to run, and says what would.
+    declare -F household_dotfiles >/dev/null \
+        || monarchy_die "not linked into the checkout in $dir:$unlinked. Run: monarchy-update"
+    monarchy_log "not linked into the checkout in $dir:$unlinked; running the dotfiles step"
+    household_dotfiles
+    unlinked=""
+    for name in $MONARCHY_DOTFILES_HYPR; do
+        monarchy_hypr_linked "$name" || unlinked="$unlinked $name"
+    done
+    [ -z "$unlinked" ] \
+        || monarchy_die "still not linked into the checkout in $dir:$unlinked. Run: mise dot status"
 }
 
 monarchy_user_git() {
@@ -532,7 +461,7 @@ monarchy_setup_user() {
     [ "$USER" != "root" ] || monarchy_die "user setup must not run as root"
     monarchy_seed_ledger_bootstrap
     monarchy_seed_hyprland_config
-    monarchy_assert_chezmoi_hypr
+    monarchy_assert_dotfiles_hypr
     monarchy_seed_branding
     monarchy_clear_terminal_override
     monarchy_user_omarchy_defaults

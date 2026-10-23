@@ -13,7 +13,6 @@ PACMAN_PACKAGES=(
     vlc
     qbittorrent
     gimp
-    chezmoi
     direnv
     zellij
     starship
@@ -138,6 +137,12 @@ packages_install() {
     fi
 
     monarchy_step "unwanted packages"
+    # mise links the dotfiles now. A chezmoi left installed would only offer
+    # to apply a source tree that no longer exists. ADR 0011.
+    if pacman -Q chezmoi &> /dev/null; then
+        monarchy_sudo pacman -R --noconfirm chezmoi
+        monarchy_changed "removed chezmoi"
+    fi
     if pacman -Q cachyos-wallpapers &> /dev/null; then
         monarchy_sudo pacman -R --noconfirm cachyos-wallpapers
         monarchy_changed "removed cachyos-wallpapers"

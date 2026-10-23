@@ -13,7 +13,7 @@ source "$TEST_DIR/../helpers.sh"
 
 conf=${MONARCHY_USERS_CONF:-/etc/monarchy/users.conf}
 
-# chezmoi/ is the user's own home directory content and is out of scope:
+# home/ is the king's own home directory content and is out of scope:
 # a dotfile that greets its owner by name is not a leak of anyone else.
 scan=(lib monarchy docs tests install.sh README.md AGENTS.md CONTEXT.md)
 

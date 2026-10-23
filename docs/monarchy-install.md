@@ -1,6 +1,6 @@
 # Monarchy install
 
-Omarchy Quattro as a second Wayland session on a CachyOS+ZFS+KDE box. `./install.sh` is the one entry point: household refresh (packages, chezmoi, hardware, ZFS), then Monarchy apply. After `/etc/omarchy.conf` exists, a bare `./install.sh` is the same as `--update`. Plasma stays the family default. The king picks Omarchy at the greeter.
+Omarchy Quattro as a second Wayland session on a CachyOS+ZFS+KDE box. `./install.sh` is the one entry point: household refresh (packages, dotfiles, hardware, ZFS), then Monarchy apply. After `/etc/omarchy.conf` exists, a bare `./install.sh` is the same as `--update`. Plasma stays the family default. The king picks Omarchy at the greeter.
 
 ## Where to run it
 
@@ -59,7 +59,7 @@ If Hyprland fails, stay on Plasma, boot a `pre-update-*` snapshot from ZFSBootMe
 - Register `/usr/share/wayland-sessions/omarchy.desktop` (`TryExec=uwsm`, `DesktopNames=Hyprland`). Exec is the real `uwsm start … hyprland.desktop` once that file exists, otherwise the session probe
 - Install `/usr/share/uwsm/env.d/10-monarchy` (stock 10-omarchy with the working-prefix bootstrap + mise) and Hyprland portal defaults if missing
 - Install omarchy-settings files (`etc/` drop-ins, user systemd units, fontconfig, icons) minus `monarchy/settings.skip`. Enable cups/avahi/docker.socket/oomd when the units exist. Seed chromium native hosts, gnome-keyring, gtk theme, and user units
-- Seed `~/.config/hypr/*` (no overwrite), branding (`screensaver.txt` from `logo.txt`, `about.txt` from `icon.txt`). Do not override `TERMINAL`. Run `omarchy-refresh-applications` (mise agent stubs + webapps), drop Basecamp and HEY from `monarchy/applications.drop`, `omarchy-pkg-add` of spotify, signal-desktop, cursor-bin, cursor-cli, omakade, `omarchy-install-browser chrome`, `mise use -g bun`, `mise use -g node@lts`, `emacs-wayland`, and `berenddeboer/omarchy-emacs-theme` (chezmoi `~/.config/emacs/`). `omarchy-provision-user` is allowed for a later finalize
+- Seed `~/.config/hypr/*` (no overwrite), branding (`screensaver.txt` from `logo.txt`, `about.txt` from `icon.txt`). Do not override `TERMINAL`. Run `omarchy-refresh-applications` (mise agent stubs + webapps), drop Basecamp and HEY from `monarchy/applications.drop`, `omarchy-pkg-add` of spotify, signal-desktop, cursor-bin, cursor-cli, omakade, `omarchy-install-browser chrome`, `mise use -g bun`, `mise use -g node@lts`, `emacs-wayland`, and `berenddeboer/omarchy-emacs-theme` (`~/.config/emacs/` from the dotfiles). `omarchy-provision-user` is allowed for a later finalize
 - Install `monarchy/plugins` into `~/.config/omarchy/plugins/<id>/`. The file is the list: OmaStats, Screens, and Sandman, each with `--enable`. `--enable` writes the row the shell would write: a bar widget goes into `shell.json` `bar.layout` under the section its manifest asks for, just after that section's anchor widget; a panel, overlay, menu or service goes into `plugins[]`. A widget already somewhere in the bar keeps its place and its settings. Grok is a provider in the stock Agents panel. Does not need a live Omarchy session. Add more rows to that list to grow the collection. An existing checkout is updated by `monarchy-update` through `omarchy plugin update` without `--yes`, so each plugin's diff is shown and confirmed first; with no terminal, or with `-y`, nothing is pulled and the summary lists the plugins waiting for review. Sandman's hibernate helper is not installed; hibernation stays refused.
 - Install `OMARCHY_AUR_PACKAGES` from `lib/packages.sh` (currently `flea`) with `paru -S --assume-installed omarchy=<overlay version>`. The paths those PKGBUILDs hardcode under `/usr/share/omarchy` resolve into the installed Omarchy package. Runs after apply because the version comes from the overlay. See `docs/monarchy-clashes.md`
 - Run `omarchy-apply-lock` so `/etc/pam.d/omarchy-lock-password` exists. Super+Ctrl+L is a no-op without it (`lock-denied: missing-pam`). SDDM staying up after login is expected. It is not the locker.
@@ -70,9 +70,9 @@ If Hyprland fails, stay on Plasma, boot a `pre-update-*` snapshot from ZFSBootMe
 
 `--splash-only` is the same Plymouth step without redoing packages or user config.
 
-`--no-packages` skips the leaf set (still does overlay, repo, session, and chezmoi).
+`--no-packages` skips the leaf set (still does overlay, repo, session, and dotfiles).
 
-After apply, `./install.sh` and `monarchy-update` are the same PATH command (`install.sh --update`): household refresh, then snapshot, rebuild, check, apply. The Omarchy menu's `omarchy-update` wraps it; that path has no terminal, so chezmoi apply is skipped rather than hanging.
+After apply, `./install.sh` and `monarchy-update` are the same PATH command (`install.sh --update`): household refresh, then snapshot, rebuild, check, apply. The Omarchy menu's `omarchy-update` wraps it; that path has no terminal, so `omarchy update` gets `-y`. Dotfiles are linked on both paths.
 
 ## Check (review only)
 
@@ -81,6 +81,24 @@ After apply, `./install.sh` and `monarchy-update` are the same PATH command (`in
 ```
 
 Units whose input is not on disk yet return early, so a dry run works before the first apply. Writes nothing under `/etc` or `/usr/local`.
+
+## Dotfiles
+
+Every file in `home/` is a link into this checkout, made by `mise dot` (ADR
+0011). An app or a migration that edits one edits the working tree; the run
+summary and the `dotfiles-drift` notification list what changed. Review with
+`git diff home/`, commit what you want to keep, `git checkout` the rest.
+
+The first update after the switch from chezmoi needs no hand steps. It finds
+chezmoi's copies at every target: a copy matching any version the repo has
+committed is linked over, and a genuine live edit is copied into the checkout
+first, so it shows up in `git diff home/`. chezmoi's source link, drift hook
+and state are removed, and the package goes with the unwanted packages. If a
+live file and its source both have uncommitted changes, the step names the
+file and applies nothing until one is kept.
+
+mise below 2026.10.4 skips the dotfiles step with a warning; update mise and
+re-run.
 
 ## Rollback
 

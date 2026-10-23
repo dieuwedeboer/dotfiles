@@ -1,5 +1,9 @@
 # chezmoi owns ~/.config/hypr; Monarchy asserts and never applies it
 
+Superseded by ADR 0011: mise links the dotfiles and never prompts, so the
+terminal gate below is gone. The rule that Monarchy never writes the four
+hypr files stands.
+
 `~/.config/hypr/*.lua` was written by two subsystems: chezmoi, from
 `chezmoi/dot_config/hypr/`, and `monarchy_setup_user`, which appended binds and
 detected prior state by grepping for an exact literal. That converged only

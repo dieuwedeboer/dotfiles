@@ -1,0 +1,37 @@
+# Every dotfile in home/, linked into $HOME. Monarchy links this file in as
+# ~/.config/mise/conf.d/20-dotfiles.toml and sets dotfiles.root to this
+# checkout's home/, which is a fact about the box and so never lives here.
+# See docs/adr/0011-mise-links-user-config.md.
+#
+# No relative `source` anywhere in this file: mise resolves one against the
+# directory of the conf.d link, not this repo. Group roots resolve against
+# dotfiles.root, and so does a merge entry without a source.
+
+[dotfile_groups.home]
+root = "."
+# Claude Code rewrites settings.json itself, and herdr's hook path names the
+# account. Linked, every one of those writes would land in a public repo.
+# The merge entry below sets the owned keys instead.
+exclude = [".claude/settings.json"]
+
+[dotfiles]
+# ~/.agents/skills is the skills CLI's, not the repo's, so a link committed
+# in home/ would have nothing to resolve to. A `~` source is the one way to
+# spell it.
+"~/.claude/skills" = { source = "~/.agents/skills" }
+"~/.claude/settings.json/monarchy" = { merge = true }
+
+[settings]
+# mise never commits. The king does, by hand, in this checkout.
+history.enabled = false
+
+[bootstrap.hooks]
+# herdr ships its Claude Code hook itself: `herdr integration install claude`
+# writes ~/.claude/hooks/herdr-agent-state.sh and merges the SessionStart hook
+# into ~/.claude/settings.json. Neither is tracked here; this only asks herdr
+# to put them back when they are missing or out of date.
+post-dotfiles = """
+command -v herdr >/dev/null || exit 0
+herdr integration status 2>/dev/null | grep -q '^claude: current' && exit 0
+herdr integration install claude
+"""

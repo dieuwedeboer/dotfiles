@@ -1,6 +1,6 @@
 # Plan: replace chezmoi with mise dotfiles
 
-- **Status:** plan. Not scheduled. Needs mise 2026.10.4 or later on the box; the `[omarchy]` repo ships 2026.9.12 as of 2026-10-16.
+- **Status:** done, 2026-10-23. The record is `docs/adr/0011-mise-links-user-config.md`; where this plan and the ADR differ, the ADR is what shipped. Corrections found while implementing on mise 2026.10.17: history is `[settings] history.enabled`, the hook is `[bootstrap.hooks] post-dotfiles`, `CLAUDE.md` and the opencode `AGENTS.md` are relative links in `home/` (a `~` source is missing on a fresh box, and mise checks every source before writing), fold-back walks `home/` itself (`status --json` names only the first file per group), stale chezmoi copies are recognised by their committed blob, and the font hooks use `sed -i --follow-symlinks`. The Plasma dotfiles were dropped.
 - **Audience:** whoever implements the switch, and whoever reviews the ADR that supersedes ADR 0001
 - **Scope:** full conversion. chezmoi, its source tree, its hook and every reference to it go.
 

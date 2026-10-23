@@ -28,9 +28,8 @@ be the thing that asserts and brackets, not the thing that replaces.
    The guards above it only read — they refuse by dying, having changed
    nothing — so the order between those two is a matter of failing fast, not
    of recoverability.
-3. **Household refresh, chezmoi front-loaded.** A template that reads a
-   package version should see the one the box is about to run, and a
-   post-update hook Omarchy fires should find chezmoi already applied.
+3. **Household refresh, dotfiles front-loaded.** A post-update hook Omarchy
+   fires should find the dotfiles already linked (ADR 0011).
 4. **Prepare the local packages.** See the hazard below. This is the step
    that cannot move.
 5. **The real `omarchy-update`,** by absolute path out of the package tree.
