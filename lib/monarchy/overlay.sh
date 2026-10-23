@@ -561,7 +561,7 @@ monarchy_overlay_power_panel() {
 #
 # The AI panel draws a tab's mark from its own assets/<id>.svg (and an
 # <id>-light.svg twin for light surfaces) and from nowhere else, so a plugin
-# that adds an agent -- Grok, from monarchy/plugins -- cannot bring its mark.
+# that adds an agent cannot bring its mark. Grok's mark ships with omarchy.
 # monarchy/agent-marks holds the ones omarchy does not ship.
 
 monarchy_agent_marks_dir() {
