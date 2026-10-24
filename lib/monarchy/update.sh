@@ -522,11 +522,62 @@ monarchy_after_omarchy_update() {
     # Hyprland-updated prompt, and the restart-*-required marker sweep. It
     # also owns the shell restart at this point; monarchy_restart_shell stood
     # down for it.
-    if [ -x "$MONARCHY_SRC/bin/omarchy-update-restart" ]; then
-        monarchy_step "reboot and service restarts"
+    #
+    # Split around the deferred steps: service restarts can need sudo, so
+    # they go while the run still holds it; the reboot prompt goes last.
+    local restart="$MONARCHY_SRC/bin/omarchy-update-restart"
+    if [ "${MONARCHY_ASSUME_YES:-0}" = 1 ] || ! monarchy_can_prompt; then
+        export OMARCHY_UPDATE_UNATTENDED=1
+    fi
+    if [ -x "$restart" ]; then
+        monarchy_step "service restarts"
         ( export OMARCHY_PATH
           export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
-          "$MONARCHY_SRC/bin/omarchy-update-restart" ) \
-            || monarchy_trace "omarchy-update-restart did not complete"
+          "$restart" --services-only ) \
+            || monarchy_trace "omarchy-update-restart --services-only did not complete"
     fi
+    local boot_verified=1
+    if [ "${MONARCHY_RUN_OMARCHY_UPDATE:-0}" = 1 ]; then
+        monarchy_deferred_update_steps || boot_verified=0
+    fi
+    if [ "$boot_verified" = 1 ] && [ -x "$restart" ]; then
+        monarchy_step "reboot"
+        ( export OMARCHY_PATH
+          export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
+          "$restart" --reboot-only ) \
+            || monarchy_trace "omarchy-update-restart --reboot-only did not complete"
+    fi
+}
+
+# The AUR pass and the boot-chain check, held out of the real omarchy-update
+# by MONARCHY_UPDATE_DEFERRED and run here, after everything that has to
+# finish for the desktop to work. Upstream's rule still holds: AUR builds run
+# third-party code, so they never see a cached authorization. The run's hold
+# is dropped and its ticket revoked first, and each sudo call goes through
+# upstream's no-update wrapper, which asks every time.
+#
+# Returns 1 only when the boot check failed, which is upstream's signal not to
+# offer a reboot. An AUR failure is a warning: nothing else depends on it.
+monarchy_deferred_update_steps() {
+    local wrapper="$MONARCHY_SRC/default/omarchy/sudo-no-update"
+    monarchy_sudo_release
+    sudo -k 2>/dev/null || true
+    if [ -x "$MONARCHY_SRC/bin/omarchy-update-aur-pkgs" ]; then
+        monarchy_step "AUR packages"
+        ( export OMARCHY_PATH OMARCHY_SUDO_NO_UPDATE=1
+          export PATH="$wrapper:$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
+          "$MONARCHY_SRC/bin/omarchy-update-aur-pkgs" ) \
+            || monarchy_warn "AUR packages were not updated; run omarchy-update-aur-pkgs when ready"
+        sudo -k 2>/dev/null || true
+    fi
+    [ -x "$MONARCHY_SRC/bin/omarchy-update-boot" ] || return 0
+    monarchy_step "boot files"
+    if ! ( export OMARCHY_PATH OMARCHY_SUDO_NO_UPDATE=1
+           export PATH="$wrapper:$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
+           "$MONARCHY_SRC/bin/omarchy-update-boot" ); then
+        sudo -k 2>/dev/null || true
+        monarchy_warn "boot files did not pass verification; do not reboot until omarchy-update-boot passes"
+        return 1
+    fi
+    sudo -k 2>/dev/null || true
 }

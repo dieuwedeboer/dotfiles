@@ -91,6 +91,25 @@ Three rows, each with its reason in the file. Two matter:
   and the `restart-*-required` sweep, none of which monarchy has an
   equivalent for, and which matter more now that this decision makes kernel
   upgrades part of the flow.
+- **`omarchy-update-aur-pkgs` and `omarchy-update-boot`** are skipped in
+  the update root only (`MONARCHY_UPDATE_DEFERRED`), not system-wide, and run
+  from `monarchy_deferred_update_steps` after the apply. Upstream revokes its
+  sudo ticket before them and they ask for a password per command. Left in
+  place, an unanswered prompt there failed the run between the upgrade and
+  monarchy's apply, leaving new packages under an old overlay. Moved, it
+  costs an AUR update and nothing else. Upstream's rule is kept: the run's
+  own ticket is dropped and revoked first, and both go through the
+  `sudo-no-update` wrapper.
+
+**One password for monarchy (October 2026).** `monarchy_sudo_hold` asks once
+at the start and keeps the timestamp fresh in the background. Upstream's
+`sudo -k` only clears its own record, and it runs under `script` on its own
+pty, so the hold survives Omarchy's update. That leaves three prompts at
+most: monarchy's at the start, Omarchy's when its update begins, and the
+deferred AUR and boot steps at the end. A run that stops between Omarchy's
+upgrade and the end of the apply leaves
+`~/.local/state/monarchy/apply-incomplete`, and the next run names the
+recovery command.
 
 ## Consequences
 

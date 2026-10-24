@@ -177,7 +177,19 @@ monarchy_build_update_root() {
         monarchy_sudo rm -f "$root/bin/$name"
         monarchy_sudo install -m 755 "$(readlink -e "$MONARCHY_SRC/bin/$name")" "$root/bin/$name"
     done < <(monarchy_source_root_checked "$MONARCHY_SRC/bin")
+    # Skipped in this root only, not system-wide as bin.skip is: they still
+    # run, from monarchy_after_omarchy_update, once the overlay is back.
+    for name in "${MONARCHY_UPDATE_DEFERRED[@]}"; do
+        monarchy_sudo install -m 755 "$monarchy_lib_dir/stubs/skip.sh" "$root/bin/$name"
+    done
 }
+
+# What the real omarchy-update asks a password for after it has revoked its
+# own: every sudo call in an AUR build, then the boot-chain check. Run where
+# upstream puts them, an unanswered prompt failed the update between the
+# upgrade and monarchy's apply over it. Moved to after the apply, the same
+# unanswered prompt costs an AUR update and nothing else.
+MONARCHY_UPDATE_DEFERRED=(omarchy-update-aur-pkgs omarchy-update-boot)
 
 # Commands Omarchy calls that belong to tools this host replaces, mapped onto
 # the tool that does the job here. monarchy/bin.alias lists the names.

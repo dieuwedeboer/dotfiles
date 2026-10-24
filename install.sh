@@ -28,6 +28,10 @@ for arg in "$@"; do
             # plugin update that is not asked about is not made
             # shellcheck disable=SC2034
             MONARCHY_ASSUME_YES=1
+            # The fingerprint is pinned and checked before this is consulted;
+            # -y only drops the question. Read by monarchy_confirm_omarchy_key.
+            # shellcheck disable=SC2034
+            MONARCHY_TRUST_OMARCHY_KEY=1
             ;;
         --no-omarchy-update)
             # read below
@@ -60,7 +64,12 @@ usage: install.sh [--check] [--update] [--no-packages] [--splash-only] [-v]
                   Skips the household refresh and Omarchy's own update.
                   Units: guards pacman packaging prefix overlay leaves
                   settings sddm session logind portals user splash
-  -y              Passed to `omarchy update`: do not ask anything.
+  -y              Do not ask anything: passed to `omarchy update`, trusts
+                  the pinned packaging key, prints reboot advice instead of
+                  prompting. Plugin updates still wait for a run without -y.
+                  The password is asked once at the start; Omarchy's own
+                  update asks once more, and AUR builds ask per command at
+                  the very end, after monarchy has been applied.
   --no-omarchy-update
                   Monarchy only. Household refresh, snapshot, classify,
                   apply -- without running Omarchy's own update in the
