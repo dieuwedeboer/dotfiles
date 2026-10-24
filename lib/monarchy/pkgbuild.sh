@@ -140,12 +140,25 @@ monarchy_probe_paths() {
 # MONARCHY_ROOT is empty on a real box and a temp prefix in the tests.
 monarchy_plan_overwrites() {
     local pkg=$1
-    local f p owner root_canon parent_canon expected_parent
+    local f p owner root_canon parent_canon expected_parent probed
     local -a clashes=() escapes=()
     MONARCHY_OVERWRITE_ARGS=()
     MONARCHY_HANDOVER_PATHS=()
     root_canon=$(realpath -m "${MONARCHY_ROOT:-/}" 2>/dev/null) || root_canon=/
     root_canon=${root_canon%/}
+
+    # Captured rather than read from a process substitution, whose status is
+    # lost. A probe that could not elevate prints nothing, which read exactly
+    # like "no file exists yet": no --overwrite was planned and pacman then
+    # refused the transaction with a message that named neither cause.
+    probed=$(
+        bsdtar tf "$pkg" 2>/dev/null \
+            | while IFS= read -r f; do
+                case "$f" in ''|.*|*/) continue ;; esac
+                printf '%s\n' "${MONARCHY_ROOT:-}/$f"
+            done \
+            | monarchy_probe_paths
+    ) || monarchy_die "could not check which of $(basename "$pkg")'s paths already exist (sudo refused?)"
 
     while IFS=$'\t' read -r p parent_canon; do
         [ -n "$p" ] || continue
@@ -173,18 +186,11 @@ monarchy_plan_overwrites() {
                     MONARCHY_HANDOVER_PATHS+=("$p")
                     continue ;;
             esac
-            clashes+=("$p (owned by $owner)")
+            clashes+=("$p (owned by $(printf '%q' "$owner"))")
             continue
         fi
         MONARCHY_OVERWRITE_ARGS+=("--overwrite=$p")
-    done < <(
-        bsdtar tf "$pkg" 2>/dev/null \
-            | while IFS= read -r f; do
-                case "$f" in ''|.*|*/) continue ;; esac
-                printf '%s\n' "${MONARCHY_ROOT:-}/$f"
-            done \
-            | monarchy_probe_paths
-    )
+    done <<<"$probed"
 
     if [ "${#escapes[@]}" -gt 0 ]; then
         printf '  %s\n' "${escapes[@]}" >&2

@@ -111,7 +111,8 @@ source "$LIB_DIR/household.sh"
 # to change and what it deliberately left alone before it stopped. That is the
 # half of the report that used to be missing entirely: silence read the same
 # whether monarchy had looked at something and declined, or never looked.
-trap monarchy_summary EXIT
+# The keepalive is stopped first so nothing elevated outlives the run.
+trap 'monarchy_sudo_release; monarchy_report_incomplete; monarchy_summary' EXIT
 
 monarchy_cli() {
     case "$1" in
@@ -183,6 +184,7 @@ case "$MODE" in
 esac
 
 printf '%sWelcome back, commander.%s\n' "$MONARCHY_UI_BOLD" "$MONARCHY_UI_OFF"
+monarchy_sudo_hold
 
 # Whether Omarchy's own update runs this time. The pre phase prepares for it,
 # so both have to agree; they used to be two separate conditions and the pre
@@ -226,6 +228,7 @@ case "$MODE" in
             # one. The re-apply is what closes that window, so it runs whether
             # or not Omarchy's update finished happily.
             omarchy_rc=0
+            monarchy_mark_incomplete
             monarchy_real_omarchy_update "${OMARCHY_UPDATE_ARGS[@]}" || omarchy_rc=$?
             if [ "$omarchy_rc" -ne 0 ]; then
                 monarchy_warn "omarchy-update exited $omarchy_rc; applying monarchy over the tree it left"
@@ -242,6 +245,9 @@ case "$MODE" in
         exit 2
         ;;
 esac
+
+# A single unit is not the whole overlay, so --only cannot vouch for it.
+[ -n "${MONARCHY_ONLY:-}" ] || monarchy_clear_incomplete
 
 monarchy_section "Done"
 printf '  Reboot so SDDM is the greeter. Plasma stays the family default.\n'

@@ -127,6 +127,58 @@ monarchy_sudo() {
     fi
 }
 
+# Ask for the password once and keep sudo's timestamp fresh until the run
+# ends. Without this the timestamp lapsed during the long unprivileged
+# stretches -- makepkg, the AUR and mise passes -- and the next elevated step
+# asked again. Nobody watching meant that step timed out, after Omarchy's
+# upgrade had landed and before the overlay was rebuilt over it.
+#
+# Not a temporary NOPASSWD drop-in: a run killed partway would leave it behind.
+MONARCHY_SUDO_HOLD_PID=
+monarchy_sudo_hold() {
+    [ "${EUID:-$(id -u)}" -ne 0 ] || return 0
+    command -v sudo >/dev/null 2>&1 || return 0
+    if ! sudo -n -v 2>/dev/null; then
+        monarchy_can_prompt || return 0
+        sudo -v || monarchy_die "sudo is needed for the update"
+    fi
+    # Detached from the terminal's stdout so a wrapper that waits for EOF
+    # does not wait on this, and watching $$ so it cannot outlive the run.
+    (
+        while kill -0 "$$" 2>/dev/null; do
+            sudo -n -v 2>/dev/null || exit 0
+            sleep 50
+        done
+    ) </dev/null >/dev/null 2>&1 &
+    MONARCHY_SUDO_HOLD_PID=$!
+}
+
+monarchy_sudo_release() {
+    [ -n "$MONARCHY_SUDO_HOLD_PID" ] || return 0
+    kill "$MONARCHY_SUDO_HOLD_PID" 2>/dev/null || true
+    MONARCHY_SUDO_HOLD_PID=
+}
+
+# Set before Omarchy's upgrade and cleared only once monarchy has been applied
+# over it. Between those two points the box runs new upstream packages under
+# an old overlay, which is how a launcher binding goes missing. A run that
+# stops there leaves this behind, so the next run says what happened.
+MONARCHY_INCOMPLETE="${MONARCHY_INCOMPLETE:-${XDG_STATE_HOME:-$HOME/.local/state}/monarchy/apply-incomplete}"
+
+monarchy_mark_incomplete() {
+    mkdir -p "$(dirname "$MONARCHY_INCOMPLETE")"
+    date -Iseconds >"$MONARCHY_INCOMPLETE"
+}
+
+monarchy_clear_incomplete() {
+    rm -f "$MONARCHY_INCOMPLETE"
+}
+
+monarchy_report_incomplete() {
+    [ -f "$MONARCHY_INCOMPLETE" ] || return 0
+    monarchy_warn "Omarchy's update landed but monarchy was not applied over it; run: monarchy-update --no-omarchy-update"
+}
+
 # Run one command against a destination, elevating only when the directory
 # that has to be written is not already writable. The overlay is built as the
 # user on a temp prefix in tests and as root on a real box; this is the only
