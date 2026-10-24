@@ -140,7 +140,7 @@ monarchy_probe_paths() {
 # MONARCHY_ROOT is empty on a real box and a temp prefix in the tests.
 monarchy_plan_overwrites() {
     local pkg=$1
-    local f p owner root_canon parent_canon expected_parent probed
+    local f p owner rc root_canon parent_canon expected_parent probed
     local -a clashes=() escapes=()
     MONARCHY_OVERWRITE_ARGS=()
     MONARCHY_HANDOVER_PATHS=()
@@ -175,7 +175,14 @@ monarchy_plan_overwrites() {
             continue
         fi
 
-        owner=$(pacman -Qoq "$p" 2>/dev/null || true)
+        # Exit 1 is "no owner". Anything else (pacman segfaulted here once)
+        # must not read as unowned, or the clash check is skipped and the
+        # file is planned as an --overwrite.
+        owner=$(pacman -Qoq "$p" 2>/dev/null) && rc=0 || rc=$?
+        case "$rc" in
+            0|1) ;;
+            *) monarchy_die "pacman -Qoq failed (exit $rc) on $p; cannot tell who owns it" ;;
+        esac
         if [ -n "$owner" ]; then
             case "$owner" in
                 monarchy-boot-stub|omarchy-settings-monarchy) continue ;;
