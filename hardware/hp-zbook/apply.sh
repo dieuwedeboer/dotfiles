@@ -138,11 +138,16 @@ zbook_print_probe() {
     fi
 }
 
+# Said only under -v. An update that changes nothing here should say nothing.
+say() { [ "${VERBOSE:-0}" != 1 ] || echo "$@"; }
+
+# Returns 1 when the file was already current, so callers restart and advise
+# only on what changed.
 install_file() {
     local src=$1 dest=$2 mode=$3
     if [ -f "$dest" ] && cmp -s "$src" "$dest"; then
-        echo "  $dest already current"
-        return
+        say "  $dest already current"
+        return 1
     fi
     sudo install -m "$mode" "$src" "$dest"
     echo "  wrote $dest"
@@ -154,40 +159,41 @@ if [ "${1:-}" = "--check" ]; then
     exit 0
 fi
 
-printf '      ZBook-specific setup\n'
-zbook_print_probe
-
 if ! zbook_detected; then
-    echo "  not an HP ZBook (DMI), skipping"
+    say "  not an HP ZBook (DMI), skipping"
     exit 0
 fi
+[ "${VERBOSE:-0}" != 1 ] || zbook_print_probe
 
-echo "Installing helper into $DEST_LIB..."
+restart=0
 sudo mkdir -p "$DEST_LIB"
-install_file "$LIB/battery-rate" "$DEST_LIB/battery-rate" 755
-install_file "$LIB/rapl-perms.sh" "$DEST_LIB/rapl-perms.sh" 755
-install_file "$LIB/detect.sh" "$DEST_LIB/detect.sh" 644
+install_file "$LIB/battery-rate" "$DEST_LIB/battery-rate" 755 && restart=1
+install_file "$LIB/rapl-perms.sh" "$DEST_LIB/rapl-perms.sh" 755 && restart=1
+install_file "$LIB/detect.sh" "$DEST_LIB/detect.sh" 644 && restart=1
 
-echo "Installing systemd unit..."
-install_file "$HW_DIR/zbook-battery-rate.service" "$SERVICE" 644
-sudo systemctl daemon-reload
+if install_file "$HW_DIR/zbook-battery-rate.service" "$SERVICE" 644; then
+    sudo systemctl daemon-reload
+    restart=1
+fi
 if ! systemctl is-enabled zbook-battery-rate.service >/dev/null 2>&1; then
     sudo systemctl enable zbook-battery-rate.service
     echo "  enabled zbook-battery-rate.service"
-else
-    echo "  zbook-battery-rate.service already enabled"
+    restart=1
 fi
-sudo systemctl restart zbook-battery-rate.service
+# A dead helper is the one unchanged state still worth acting on.
+systemctl is-active --quiet zbook-battery-rate.service || restart=1
+if [ "$restart" = 1 ]; then
+    sudo systemctl restart zbook-battery-rate.service
+    echo "  restarted zbook-battery-rate.service"
+fi
 
-echo "Installing RAPL udev rule..."
-install_file "$HW_DIR/99-zbook-rapl.rules" "$UDEV_RULE" 644
-sudo udevadm control --reload
-sudo "$DEST_LIB/rapl-perms.sh" || true
+if install_file "$HW_DIR/99-zbook-rapl.rules" "$UDEV_RULE" 644; then
+    sudo udevadm control --reload
+fi
+sudo "$DEST_LIB/rapl-perms.sh" >/dev/null 2>&1 || true
 
-echo "Installing UWSM env for Omarchy battery path..."
 sudo mkdir -p "$(dirname "$UWSM_ENV")"
-install_file "$HW_DIR/20-zbook-battery" "$UWSM_ENV" 644
-
-echo "Log out of Omarchy and back in so UWSM picks up OMARCHY_POWER_SUPPLY_PATH."
-echo "omarchy-restart-shell is not enough on the first apply."
-echo "Immediate check: OMARCHY_POWER_SUPPLY_PATH=/run/zbook-battery/power_supply omarchy-battery-status"
+if install_file "$HW_DIR/20-zbook-battery" "$UWSM_ENV" 644; then
+    echo "  Log out of Omarchy and back in so UWSM picks up OMARCHY_POWER_SUPPLY_PATH;"
+    echo "  omarchy-restart-shell is not enough."
+fi

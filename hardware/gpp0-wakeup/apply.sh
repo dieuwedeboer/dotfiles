@@ -8,7 +8,7 @@ HW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HW_DIR/detect.sh"
 
 if ! gpp0_wakeup_detected; then
-    echo "  GPP0 not in /proc/acpi/wakeup, skipping"
+    [ "${VERBOSE:-0}" != 1 ] || echo "  GPP0 not in /proc/acpi/wakeup, skipping"
     exit 0
 fi
 
@@ -16,7 +16,7 @@ SERVICE_FILE=/etc/systemd/system/disable-gpp0-wakeup.service
 SRC="$HW_DIR/disable-gpp0-wakeup.service"
 
 if [ -f "$SERVICE_FILE" ] && cmp -s "$SRC" "$SERVICE_FILE"; then
-    echo "  disable-gpp0-wakeup.service already current"
+    [ "${VERBOSE:-0}" != 1 ] || echo "  disable-gpp0-wakeup.service already current"
     exit 0
 fi
 

@@ -179,12 +179,15 @@ HW_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=detect.sh
 source "$HW_DIR/detect.sh"
 
+# Said only under -v. An update that changes nothing here should say nothing.
+say() { [ "${VERBOSE:-0}" != 1 ] || echo "$@"; }
+
 if ! bonw9_detected; then
-    echo "  not a System76 Bonobo WS (bonw9), skipping"
+    say "  not a System76 Bonobo WS (bonw9), skipping"
     exit 0
 fi
 
-printf '      bonw9 (System76 Bonobo WS) setup\n'
+say '      bonw9 (System76 Bonobo WS) setup'
 
 # -------------------------------------------------------------------------
 # AUR packages: Tuxedo Control Center for the EC fan curve.
@@ -196,7 +199,7 @@ AUR_PACKAGES=(
 if command -v paru &> /dev/null; then
     for pkg in "${AUR_PACKAGES[@]}"; do
         if paru -Q "$pkg" &> /dev/null; then
-            echo "  $pkg already installed"
+            say "  $pkg already installed"
         else
             echo "  Installing $pkg..."
             paru -S --noconfirm "$pkg"
@@ -207,11 +210,11 @@ else
     exit 1
 fi
 
-echo "Enabling tccd (Tuxedo Control Center daemon) for EC fan curves..."
 if ! systemctl is-enabled tccd &> /dev/null; then
     sudo systemctl enable --now tccd
+    echo "  enabled tccd"
 else
-    echo "  tccd already enabled"
+    say "  tccd already enabled"
 fi
 
 # -------------------------------------------------------------------------
@@ -221,20 +224,18 @@ fi
 TCC_SETTINGS=/etc/tcc/settings
 TCC_PROFILES=/etc/tcc/profiles
 
-echo "Configuring TCC profile + keyboard backlight persistence..."
-
 # Stop tccd before editing config files so it doesn't overwrite our
 # changes on exit.
-echo "  Stopping tccd to edit config files..."
 sudo systemctl stop tccd
 
 # 1. Set custom profile fanProfile to "Quiet"
 if [ -f "$TCC_PROFILES" ] && sudo jq empty "$TCC_PROFILES" 2>/dev/null; then
     CURRENT_FAN=$(sudo jq -r '.[0].fan.fanProfile // empty' "$TCC_PROFILES")
     if [ "$CURRENT_FAN" = "Quiet" ]; then
-        echo "  Custom profile fanProfile already 'Quiet' — no change"
+        say "  Custom profile fanProfile already 'Quiet' — no change"
     else
         echo "  Updating custom profile fanProfile: '$CURRENT_FAN' → 'Quiet'"
+        profile_changed=1
         sudo jq '.[0].fan.fanProfile = "Quiet"' "$TCC_PROFILES" | sudo tee "${TCC_PROFILES}.tmp" > /dev/null && sudo mv "${TCC_PROFILES}.tmp" "$TCC_PROFILES"
     fi
 else
@@ -259,18 +260,16 @@ if [ -r /sys/class/leds/rgb:kbd_backlight/multi_intensity ]; then
         echo "    sysfs: R=$KBD_RED G=$KBD_GREEN B=$KBD_BLUE brightness=$KBD_BRIGHTNESS"
         sudo jq '.keyboardBacklightStates = '"$LIVE_KBD" "$TCC_SETTINGS" | sudo tee "${TCC_SETTINGS}.tmp" > /dev/null && sudo mv "${TCC_SETTINGS}.tmp" "$TCC_SETTINGS"
     else
-        echo "  Keyboard backlight states already in sync"
+        say "  Keyboard backlight states already in sync"
     fi
 else
-    echo "  rgb:kbd_backlight sysfs not present — skipping keyboard backlight sync"
+    say "  rgb:kbd_backlight sysfs not present — skipping keyboard backlight sync"
 fi
 
 # Restart tccd to apply the updated config
-echo "  Restarting tccd..."
 sudo systemctl start tccd
 
-echo "Reboot recommended for tccd to apply profile on next boot."
-echo "After reboot, verify:"
-echo "  systemctl status tccd"
-echo "  journalctl -u tccd --no-pager | tail -40"
-echo "  tuxedo-control-center  # GUI: confirm fans tracked on temp curve"
+if [ "${profile_changed:-0}" = 1 ]; then
+    echo "  Reboot so tccd applies the profile; then check systemctl status tccd"
+    echo "  and confirm in tuxedo-control-center that fans follow the temp curve."
+fi

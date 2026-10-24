@@ -8,6 +8,6 @@ HW_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 for apply in "$HW_ROOT"/*/apply.sh; do
     [ -f "$apply" ] || continue
     name=$(basename "$(dirname "$apply")")
-    printf '  hardware: %s\n' "$name"
+    [ "${VERBOSE:-0}" != 1 ] || printf '  hardware: %s\n' "$name"
     bash "$apply"
 done

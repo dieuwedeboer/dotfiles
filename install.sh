@@ -104,6 +104,11 @@ if [ "$(basename -- "$0")" = monarchy-update ] && [ "$MODE" = full ]; then
     MODE=update
 fi
 
+# Captured before anything writes it: the closing notes are for the run that
+# provisions the box, not for every update after it.
+MONARCHY_PROVISIONING=1
+[ ! -f /etc/omarchy.conf ] || MONARCHY_PROVISIONING=0
+
 # A provisioned box: bare ./install.sh is the same as --update.
 if [ "$MODE" = full ] && [ -z "${MONARCHY_ONLY:-}" ] && [ -f /etc/omarchy.conf ]; then
     MODE=update
@@ -258,6 +263,8 @@ esac
 # A single unit is not the whole overlay, so --only cannot vouch for it.
 [ -n "${MONARCHY_ONLY:-}" ] || monarchy_clear_incomplete
 
-monarchy_section "Done"
-printf '  Reboot so SDDM is the greeter. Plasma stays the family default.\n'
-printf '  The king'"'"'s user defaults to Omarchy. See docs/monarchy-install.md\n' 
+if [ "$MONARCHY_PROVISIONING" = 1 ]; then
+    monarchy_section "Done"
+    printf '  Reboot so SDDM is the greeter. Plasma stays the family default.\n'
+    printf '  The king'"'"'s user defaults to Omarchy. See docs/monarchy-install.md\n'
+fi
