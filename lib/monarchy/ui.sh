@@ -54,9 +54,31 @@ MONARCHY_UI_STARTED=${MONARCHY_UI_STARTED:-$SECONDS}
 MONARCHY_UI_STEPS=0
 
 # A heading for a phase of the run. Blank line above, so phases separate
-# without anything having to print one by hand.
+# without anything having to print one by hand. Green, as Omarchy's own update
+# draws its phases; the `==` marker is for a reader without colour.
 monarchy_section() {
-    printf '\n%s== %s%s\n' "$MONARCHY_UI_BOLD" "$*" "$MONARCHY_UI_OFF"
+    if [ -n "$MONARCHY_UI_GREEN" ]; then
+        printf '\n%s%s%s%s\n' "$MONARCHY_UI_BOLD" "$MONARCHY_UI_GREEN" "$*" "$MONARCHY_UI_OFF"
+    else
+        printf '\n== %s\n' "$*"
+    fi
+}
+
+# Omarchy's update opens on a cleared screen and its logo in green; this is
+# the same opening with ours. Only when someone is watching a terminal wide
+# enough to hold it: a wrapped logo is worse than none.
+monarchy_banner() {
+    local art="${BASH_SOURCE[0]%/*}/../../art/monarchy.txt" width
+    if [ -n "$MONARCHY_UI_GREEN" ] && [ "${VERBOSE:-0}" != 1 ] && [ -f "$art" ]; then
+        width=$(awk '{ if (length > w) w = length } END { print w + 0 }' "$art")
+        if [ "$(tput cols 2>/dev/null || echo 0)" -ge "$width" ]; then
+            clear
+            printf '%s' "$MONARCHY_UI_GREEN"
+            cat "$art"
+            printf '%s\n' "$MONARCHY_UI_OFF"
+        fi
+    fi
+    printf '%sWelcome back, commander.%s\n' "$MONARCHY_UI_BOLD" "$MONARCHY_UI_OFF"
 }
 
 # One step within a phase. $1 name, $2 index, $3 total; the counter is

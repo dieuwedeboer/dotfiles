@@ -197,7 +197,7 @@ case "$MODE" in
         ;;
 esac
 
-printf '%sWelcome back, commander.%s\n' "$MONARCHY_UI_BOLD" "$MONARCHY_UI_OFF"
+monarchy_banner
 monarchy_sudo_hold
 
 # Whether Omarchy's own update runs this time. The pre phase prepares for it,
