@@ -73,7 +73,8 @@ monarchy_build_pkg() {
     # This function returns the built package path on stdout, so everything
     # else it emits has to go to stderr. monarchy_log echoes to stdout.
     monarchy_log "makepkg $name" >&2
-    ( cd "$build" && makepkg --force --clean --nodeps --noconfirm >/dev/null ) \
+    ( cd "$build" && monarchy_spin "Building $name" \
+        makepkg --force --clean --nodeps --noconfirm >/dev/null ) \
         || monarchy_die "makepkg failed for $name (see $build)"
 
     # Not a glob over $build: a source can itself be a package, as

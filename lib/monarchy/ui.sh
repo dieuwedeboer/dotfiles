@@ -46,6 +46,18 @@ else
     MONARCHY_UI_OFF=""
 fi
 
+# The current theme's gum colours, as omarchy-launch-floating-terminal-with-
+# presentation loads them, so the boxes and prompts below and upstream's own
+# gum confirm all match the theme rather than gum's pink defaults.
+MONARCHY_UI_GUM=0
+if [ -n "$MONARCHY_UI_GREEN" ] && command -v gum >/dev/null 2>&1; then
+    MONARCHY_UI_GUM=1
+    if command -v omarchy-restart-gum >/dev/null 2>&1; then
+        # shellcheck source=/dev/null
+        source "$(command -v omarchy-restart-gum)" || true
+    fi
+fi
+
 MONARCHY_UI_CHANGED=()
 MONARCHY_UI_LEFT=()
 MONARCHY_UI_WARNED=()
@@ -66,9 +78,11 @@ monarchy_section() {
 
 # Omarchy's update opens on a cleared screen and its logo in green; this is
 # the same opening with ours. Only when someone is watching a terminal wide
-# enough to hold it: a wrapped logo is worse than none.
+# enough to hold it: a wrapped logo is worse than none. The width is read
+# once, before Hyprland has shrunk the update widget's floating terminal, so
+# the banner has to fit that window (80 columns), not whatever was measured.
 monarchy_banner() {
-    local art="${BASH_SOURCE[0]%/*}/../../art/monarchy.txt" width
+    local art="${BASH_SOURCE[0]%/*}/../../art/monarchy-banner.txt" width
     if [ -n "$MONARCHY_UI_GREEN" ] && [ "${VERBOSE:-0}" != 1 ] && [ -f "$art" ]; then
         width=$(awk '{ if (length > w) w = length } END { print w + 0 }' "$art")
         if [ "$(tput cols 2>/dev/null || echo 0)" -ge "$width" ]; then
@@ -111,6 +125,21 @@ monarchy_ui_duration() {
         printf '%ds' "$s"
     else
         printf '%dm %02ds' "$((s / 60))" "$((s % 60))"
+    fi
+}
+
+# A long silent wait shown as a spinner, its output kept back unless it
+# fails. Only for commands that never ask for anything: gum gives a spun
+# command no terminal to read, so a password prompt there would hang unseen.
+monarchy_spin() {
+    local title=$1
+    shift
+    if [ "$MONARCHY_UI_GUM" = 1 ] && [ "${VERBOSE:-0}" != 1 ]; then
+        # On stderr, which is where the spinner draws: a caller may be
+        # returning a value on stdout, as monarchy_build_pkg does.
+        gum spin --show-error --title "$title" -- "$@" >&2
+    else
+        "$@"
     fi
 }
 
@@ -190,9 +219,23 @@ monarchy_ui_list() {
 monarchy_summary() {
     [ "${MONARCHY_UI_SUMMARISED:-0}" = 0 ] || return 0
     MONARCHY_UI_SUMMARISED=1
-    local elapsed=$((SECONDS - MONARCHY_UI_STARTED))
-
+    local body
+    if [ "$MONARCHY_UI_GUM" = 1 ]; then
+        # One card at the end, in the theme's border colour. The body's own
+        # leading blank lines are what the plain layout separates with.
+        body=$(monarchy_summary_body | sed '1{/^$/d}; s/^  //')
+        printf '\n'
+        gum style --border rounded --padding "0 1" --margin "0 2" \
+            "${MONARCHY_UI_BOLD}Summary${MONARCHY_UI_OFF}" "" "$body" 2>/dev/null \
+            || printf '%s\n' "$body"
+        return 0
+    fi
     monarchy_section "Summary"
+    monarchy_summary_body
+}
+
+monarchy_summary_body() {
+    local elapsed=$((SECONDS - MONARCHY_UI_STARTED))
     if [ "${#MONARCHY_UI_CHANGED[@]}" -eq 0 ] \
         && [ "${#MONARCHY_UI_LEFT[@]}" -eq 0 ] \
         && [ "${#MONARCHY_UI_WARNED[@]}" -eq 0 ] \
