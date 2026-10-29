@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Gigabyte B550 GAMING X V2 (kingfisher desktop).
-# it87 for the ITE IT8689E SuperIO, OpenRGB, CoolerControl.
+# it87 for the ITE IT8689E SuperIO, OpenRGB and its effects plugin, CoolerControl.
 set -e
 [ "${VERBOSE:-0}" = 1 ] && set -x
 
@@ -23,6 +23,17 @@ if ! pacman -Q openrgb &> /dev/null; then
     sudo pacman -S --noconfirm openrgb
 else
     say "  openrgb already installed"
+fi
+
+if ! pacman -Q openrgb-plugin-effects &> /dev/null; then
+    if command -v paru &> /dev/null; then
+        paru -S --noconfirm --needed openrgb-plugin-effects
+    else
+        echo "  paru not found, skipping openrgb-plugin-effects" >&2
+        exit 1
+    fi
+else
+    say "  openrgb-plugin-effects already installed"
 fi
 
 if ! pacman -Q coolercontrol &> /dev/null; then
