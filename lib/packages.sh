@@ -28,6 +28,7 @@ PACMAN_PACKAGES=(
     audacity
     aws-cli-v2
     glab
+    strata
     # Omarchy's kernel, beside linux-cachyos rather than instead of it: its
     # ZFS module is built by zfs-dkms, and linux-cachyos-zfs stays the
     # fallback that needs no build. ADR 0008. Omarchy's own migration for

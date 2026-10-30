@@ -42,6 +42,14 @@ hl.unbind("SUPER + SHIFT + ALT + E")
 -- still binds both. Super+Q is free here; Super+Ctrl+Q stays Calculator.
 o.bind("SUPER + Q", "Close window", hl.dsp.window.close())
 
+-- Omarchy binds its file manager chords to Nautilus. Strata takes them here;
+-- Nautilus keeps a chord of its own for as long as it is installed.
+o.rebind("SUPER + SHIFT + F", "Files", { launch = "strata" })
+o.rebind("SUPER + ALT + SHIFT + F", "Files (cwd)", o.launch('strata "$(omarchy-cmd-terminal-cwd)"'))
+if o.cmd_present("nautilus") then
+  o.bind("SUPER + CTRL + SHIFT + F", "Nautilus", { omarchy = "nautilus" })
+end
+
 -- BEGIN im0001gt.screens
 hl.unbind("SUPER + SLASH")
 hl.unbind("SUPER + ALT + SLASH")
