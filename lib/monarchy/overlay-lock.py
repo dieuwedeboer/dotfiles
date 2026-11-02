@@ -63,13 +63,12 @@ WAKE_NEW = (
 )
 
 # Anchored on the tail of finishUnlock, which stable and edge share; its
-# opening guard differs between them (root.locked vs currentlyLocked()).
+# opening guard differs between them (root.locked vs currentlyLocked()), and
+# the signature of armBlankTimer after it changed in r7555.
 FINISH_OLD = """    sessionLock.locked = false
     logEvent("unlocked")
     runWake()
   }
-
-  function armBlankTimer() {
 """
 
 FINISH_NEW = """    sessionLock.locked = false
@@ -83,8 +82,6 @@ FINISH_NEW = """    sessionLock.locked = false
     root.runWake()
     if (!switchUserProc.running) switchUserProc.running = true
   }
-
-  function armBlankTimer() {
 """
 
 # Since Quickshell 0.3.2 no lockStateChanged arrives when the shell unlocks, so
