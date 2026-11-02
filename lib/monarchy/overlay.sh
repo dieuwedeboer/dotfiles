@@ -17,6 +17,9 @@ monarchy_wrap_stub_for() {
         omarchy-refresh-sddm)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-sddm.sh"
             ;;
+        omarchy-keyboard-toprow)
+            printf '%s\n' "$monarchy_lib_dir/stubs/wrap-keyboard-toprow.sh"
+            ;;
         omarchy-display-text-size)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-display-text-size.sh"
             ;;
@@ -166,14 +169,16 @@ monarchy_build_update_root() {
         monarchy_sudo ln -s "$entry" "$root/$(basename "$entry")"
     done
     monarchy_sudo cp -a "$MONARCHY_PATH/bin" "$root/bin"
-    # The commands that check their source root, copied from the package
-    # tree as it is now rather than taken from the overlay, which the apply
-    # only rebuilds after this run.
+    # omarchy-update always, whether or not upstream still checks its source
+    # root: the overlay's copy is the wrap, and running it here recurses into
+    # monarchy-update. Then the other commands that check their source root.
+    # All copied from the package tree as it is now rather than taken from
+    # the overlay, which the apply only rebuilds after this run.
     while read -r name; do
         [ "$name" = omarchy-update ] || ! monarchy_overrides "$name" || continue
         monarchy_sudo rm -f "$root/bin/$name"
         monarchy_sudo install -m 755 "$(readlink -e "$MONARCHY_SRC/bin/$name")" "$root/bin/$name"
-    done < <(monarchy_source_root_checked "$MONARCHY_SRC/bin")
+    done < <({ echo omarchy-update; monarchy_source_root_checked "$MONARCHY_SRC/bin"; } | sort -u)
     # Skipped in this root only, not system-wide as bin.skip is: they still
     # run, from monarchy_after_omarchy_update, once the overlay is back.
     for name in "${MONARCHY_UPDATE_DEFERRED[@]}"; do

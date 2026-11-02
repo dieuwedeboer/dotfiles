@@ -7,6 +7,13 @@
 #
 # omarchy-update-system-pkgs is no longer wrapped onto this, because the real
 # omarchy-update calls it and that would recurse.
+#
+# Inside monarchy-update's own run of the real omarchy-update, reaching this
+# wrap means that run called itself back, and carrying on loops forever.
+if [ "${MONARCHY_IN_OMARCHY_UPDATE:-0}" = 1 ]; then
+    echo "monarchy: omarchy-update reached the overlay wrap from inside monarchy-update; refusing to recurse" >&2
+    exit 1
+fi
 cmd=${MONARCHY_UPDATE:-/usr/local/bin/monarchy-update}
 if [ ! -x "$cmd" ]; then
     echo "monarchy-update: $cmd is missing" >&2

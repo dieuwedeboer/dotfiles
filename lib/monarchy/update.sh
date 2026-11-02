@@ -484,7 +484,11 @@ monarchy_real_omarchy_update() {
     # MONARCHY_IN_OMARCHY_UPDATE holds back the omarchy-migrate it calls;
     # monarchy_after_omarchy_update runs it once classification is done.
     monarchy_build_update_root "$root"
-    ( export OMARCHY_PATH="$root" MONARCHY_IN_OMARCHY_UPDATE=1
+    # omarchy-update re-runs itself under `script -c`, which starts $SHELL.
+    # A login shell like fish reads its config there and puts the packaged
+    # bin ahead of $root/bin, and the children then fail their source-root
+    # check. Non-interactive bash leaves PATH as it is.
+    ( export OMARCHY_PATH="$root" MONARCHY_IN_OMARCHY_UPDATE=1 SHELL=/usr/bin/bash
       export PATH="$root/bin:${PATH:-/usr/bin}"
       "$root/bin/omarchy-update" "$@" )
 }
