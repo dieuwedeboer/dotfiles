@@ -50,3 +50,46 @@ holds both is one monarchy runs itself.
   `omarchy-settings=` pin, so the `--assume-installed` handoff is not used.
 - `omarchy update` still runs straight after and finds the Omarchy package
   already current.
+
+## Amendment, 2 November 2026: every release, not only a handover
+
+Settings and the Omarchy package are now always upgraded in one transaction,
+whenever [omarchy] has a newer Omarchy package than the one installed. The
+handover above is one reason for that, no longer the only one.
+
+### What forced it
+
+`omarchy-update` sources `omarchy-security-functions`, which settings has
+shipped since r6975. The two are written against each other at the same
+upstream commit. On 2 November 2026 upstream r7555 removed
+`omarchy_security_install_sudo_cleanup_traps` from the security functions and
+removed the call to it from `omarchy-update`. `monarchy_ensure_settings_pkg`
+installed settings r7555 on its own, as this ADR allowed when no file moved.
+`omarchy-dev` pins no settings version, so nothing held it back. The installed
+r7409 `omarchy-update` then ran against the r7555 library and exited 127
+before reaching its own `pacman -Syu`. A run that has upgraded only one of
+the two packages cannot repair itself through `omarchy update`.
+
+Installing them in the same transaction is the only order that cannot leave
+the two out of step. Settings first breaks the old `omarchy-update`. Leaving
+settings behind breaks the new one the same way in reverse.
+
+### Changes from the original decision
+
+- `monarchy_ensure_settings_pkg` fetches the Omarchy package and installs it
+  in the same `pacman -U` as the built settings package whenever the installed
+  version is older than the sync DB's, as well as when a path moves.
+- If settings is already current and the Omarchy package is not, which is
+  what an interrupted earlier run leaves, `monarchy_catch_up_locked_pkg`
+  installs the Omarchy package on its own.
+- On stable `omarchy`, the same transaction satisfies the exact
+  `omarchy-settings=` pin, so the stop telling the operator to run a full
+  upgrade, and the `MONARCHY_EXPECT_FULL_UPGRADE` note that replaced it during
+  `update-pre`, are gone. `--assume-installed` is still used when the
+  *other* Omarchy package is installed and `monarchy_ensure_omarchy_pkg` is
+  about to replace it.
+- `omarchy update` finds the Omarchy package already current on every release
+  bump, not only on a handover. The partial upgrade is still one package
+  ahead of `-Syu`, with the dependency risk described above, and now happens
+  every release. The local repository considered above remains the clean way
+  out.
