@@ -17,9 +17,6 @@ monarchy_wrap_stub_for() {
         omarchy-refresh-sddm)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-sddm.sh"
             ;;
-        omarchy-screensaver)
-            printf '%s\n' "$monarchy_lib_dir/stubs/wrap-screensaver.sh"
-            ;;
         omarchy-display-text-size)
             printf '%s\n' "$monarchy_lib_dir/stubs/wrap-display-text-size.sh"
             ;;

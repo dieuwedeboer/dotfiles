@@ -123,7 +123,6 @@ Wraps:
 - `omarchy-update` / `omarchy-update-system-pkgs` → `monarchy-update`. The Omarchy menu still calls these names. The command to type is `monarchy-update`.
 - `omarchy-plymouth-set` / `omarchy-plymouth-reset` / `omarchy-refresh-plymouth` → Monarchy splash helpers (`mkinitcpio -P`, no Limine). plymouth-set restyles the greeter overlay.
 - `omarchy-refresh-sddm` → copy the package theme, overlay `Main.qml`
-- `omarchy-screensaver` → seed `screensaver.txt` from `logo.txt` if missing, then exec the packaged binary
 - `omarchy-display-text-size` → packaged binary, then `omarchy-hook display-text-size`. The dotfiles' `hooks/apply-font-size` reads `~/.config/environment.d/monarchy.conf` (`MONARCHY_FONT_PT_OFFSET`, `MONARCHY_ALPHA`) and runs `hooks/font-size.d/*` plus `hooks/alpha.d/*` (foot, Alacritty, Emacs, …)
 - `omarchy-disk-speedtest` → packaged binary behind a `findmnt` shim. It resolves the target directory to a `/dev` node and samples that device's `/sys` counters; on ZFS `findmnt` names the dataset, so the test stops at "Cannot find a disk". The shim answers that one lookup with the pool's single data vdev. Multi-device pools are refused rather than measured one disk short.
 - `omarchy-snapshot` → `zfs-snapshot-pre-update.sh` for `create`; `restore` points at ZFSBootMenu and exits 2. Stock drives snapper and `limine-snapper-restore`, and would exit 127 here because `monarchy-boot-stub` ships no snapper binary. This is the one script `berenddeboer/omarchy` genuinely improved, kept without the fork.
