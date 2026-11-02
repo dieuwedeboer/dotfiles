@@ -41,6 +41,39 @@ PACMAN_PACKAGES=(
     shellcheck
 )
 
+# Removed with their now-unneeded dependencies. CachyOS tooling that does
+# nothing under Omarchy, kept off the box one package at a time (ADR 0007).
+# Not here, on purpose: the KDE settings and themes, because queen and kid are
+# still on Plasma; cachyos-settings, which carries ntsync, game-performance and
+# the zram config; cachyos-hooks, which writes os-release; cachyos-rate-mirrors.
+UNWANTED_PACKAGES=(
+    # mise links the dotfiles now. A chezmoi left installed would only offer
+    # to apply a source tree that no longer exists. ADR 0011.
+    chezmoi
+    cachyos-wallpapers
+    cachyos-hello
+    cachyos-kernel-manager
+    cachyos-packageinstaller
+    octopi
+    # config.fish no longer sources it; starship draws the prompt.
+    cachyos-fish-config
+    cachyos-micro-settings
+    # Plymouth runs Omarchy's theme.
+    cachyos-plymouth-bootanimation
+    # omarchy-update owns the system upgrade. ADR 0003.
+    cachy-update
+)
+# Came in as dependencies of the packages above and are wanted on their own.
+# Marked explicit first, so -Rs leaves them. fish is the king's login shell;
+# eza, expac and tldr are in Omarchy's base set, and Omarchy's bash aliases
+# call eza.
+UNWANTED_KEEP_DEPS=(
+    fish
+    eza
+    expac
+    tealdeer
+)
+
 AUR_PACKAGES=(
     bible-kjv
     cura-bin
@@ -138,15 +171,19 @@ packages_install() {
     fi
 
     monarchy_step "unwanted packages"
-    # mise links the dotfiles now. A chezmoi left installed would only offer
-    # to apply a source tree that no longer exists. ADR 0011.
-    if pacman -Q chezmoi &> /dev/null; then
-        monarchy_sudo pacman -R --noconfirm chezmoi
-        monarchy_changed "removed chezmoi"
-    fi
-    if pacman -Q cachyos-wallpapers &> /dev/null; then
-        monarchy_sudo pacman -R --noconfirm cachyos-wallpapers
-        monarchy_changed "removed cachyos-wallpapers"
+    local -a unwanted=()
+    for pkg in "${UNWANTED_PACKAGES[@]}"; do
+        pacman -Q "$pkg" &> /dev/null && unwanted+=("$pkg")
+    done
+    if [ "${#unwanted[@]}" -gt 0 ]; then
+        local -a keep=()
+        for pkg in "${UNWANTED_KEEP_DEPS[@]}"; do
+            pacman -Qqd "$pkg" &> /dev/null && keep+=("$pkg")
+        done
+        [ "${#keep[@]}" -eq 0 ] \
+            || monarchy_sudo pacman -D --asexplicit "${keep[@]}" >/dev/null
+        monarchy_sudo pacman -Rs --noconfirm "${unwanted[@]}"
+        monarchy_changed_many removed "unwanted packages" "${unwanted[@]}"
     fi
 
     # Curl-pipe grok used ~/.grok/bin and stole the `agent` name from Cursor.
