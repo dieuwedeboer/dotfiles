@@ -14,3 +14,9 @@
 # [omarchy] carries quickshell, nvidia dkms builds, kernels and the real
 # limine packages, which would then win over CachyOS and the boot stub.
 1791403252.sh
+
+# Renames the hibernation resume device to a UUID and reruns
+# omarchy-hibernation-setup, which is denied. Exits early here: there is no
+# /etc/limine-entry-tool.d/resume.conf. Were it to run, it would rebuild a
+# Limine resume setup this host does not have.
+1792965062.sh

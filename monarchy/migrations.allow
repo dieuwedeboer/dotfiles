@@ -40,6 +40,11 @@
 # Acts only when the N1x rescue pacman hook exists.
 1791152480.sh
 
+# Swaps CachyOS's power-profiles-daemon for [omarchy]'s build with CPPC support.
+# Written for ARM but not gated on it, so it runs here too. Not boot-critical,
+# and the Omarchy build provides power-profiles-daemon for its dependents.
+1791554699.sh
+
 # Rebuilds the initramfs only where an omarchy_vconsole.conf drop-in now keeps
 # vconsole.conf out of FILES. /etc/mkinitcpio.conf.d is empty here, so it exits
 # before rebuilding; were it to run, limine-mkinitcpio is the mkinitcpio -P alias.
