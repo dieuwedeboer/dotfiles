@@ -36,6 +36,8 @@ PACMAN_PACKAGES=(
     linux-omarchy
     linux-omarchy-headers
     zfs-dkms
+    # lib/refind.sh copies its binary to the ESP for rEFInd's tools row.
+    memtest86+-efi
     # tests/run.sh lints lib/, tests/, hardware/ and install.sh with this, and
     # skips that arm when it is absent -- which reads as a pass.
     shellcheck
