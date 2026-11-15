@@ -518,6 +518,24 @@ monarchy_restart_shell() {
     return 0
 }
 
+# Installing a package that ships the shell's files pulls them out from under
+# it for a moment. The running shell sees default/omarchy/shortcuts vanish,
+# drops every global shortcut it registered, and loses its watch on the file,
+# so SUPER+SPACE stays dead after the file comes back. Only a restart brings
+# them back.
+monarchy_shell_files_replaced() {
+    MONARCHY_SHELL_DIRTY=1
+}
+
+# From the EXIT trap. A run that died after replacing those files never reached
+# monarchy_restart_shell or the omarchy-update-restart it defers to, and left
+# the session without its hotkeys. Whatever stopped the run, the shell comes
+# back before it ends.
+monarchy_restart_shell_on_exit() {
+    [ "${MONARCHY_SHELL_DIRTY:-0}" = 1 ] || return 0
+    MONARCHY_DEFER_SHELL_RESTART=0 monarchy_restart_shell || true
+}
+
 # ---- power panel --------------------------------------------------------
 #
 # The panel calls UPower's pending-charge a hold at a charge limit without

@@ -369,6 +369,7 @@ monarchy_ensure_settings_pkg() {
         handover=("$locked")
         assume=()
     fi
+    monarchy_shell_files_replaced
     MONARCHY_PKG_REINSTALL=$reinstall monarchy_install_built_pkg "$built" "${assume[@]}" "${handover[@]}"
     if [ "${#handover[@]}" -gt 0 ]; then
         monarchy_reload_hyprland "after upgrading $MONARCHY_OMARCHY_PACKAGE"
@@ -523,6 +524,7 @@ monarchy_ensure_omarchy_pkg() {
     fi
 
     monarchy_log "pacman -S $want"
+    monarchy_shell_files_replaced
     monarchy_sudo pacman -S --needed --noconfirm "$want" \
         || monarchy_die "pacman -S $want failed; the other Omarchy package is removed, so install one by hand before logging out"
 

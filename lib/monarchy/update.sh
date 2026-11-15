@@ -535,6 +535,9 @@ monarchy_after_omarchy_update() {
           export PATH="$MONARCHY_PATH/bin:${PATH:-/usr/bin}"
           "$restart" --services-only ) \
             || monarchy_trace "omarchy-update-restart --services-only did not complete"
+        # It restarted the shell; the EXIT trap need not do it again.
+        # shellcheck disable=SC2034
+        MONARCHY_SHELL_DIRTY=0
     fi
     local boot_verified=1
     if [ "${MONARCHY_RUN_OMARCHY_UPDATE:-0}" = 1 ]; then

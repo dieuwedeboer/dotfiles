@@ -126,7 +126,7 @@ source "$LIB_DIR/household.sh"
 # half of the report that used to be missing entirely: silence read the same
 # whether monarchy had looked at something and declined, or never looked.
 # The keepalive is stopped first so nothing elevated outlives the run.
-trap 'monarchy_sudo_release; monarchy_report_incomplete; monarchy_summary' EXIT
+trap 'monarchy_sudo_release; monarchy_restart_shell_on_exit; monarchy_report_incomplete; monarchy_summary' EXIT
 
 monarchy_cli() {
     case "$1" in
@@ -243,6 +243,7 @@ case "$MODE" in
             # or not Omarchy's update finished happily.
             omarchy_rc=0
             monarchy_mark_incomplete
+            monarchy_shell_files_replaced
             monarchy_real_omarchy_update "${OMARCHY_UPDATE_ARGS[@]}" || omarchy_rc=$?
             if [ "$omarchy_rc" -ne 0 ]; then
                 monarchy_warn "omarchy-update exited $omarchy_rc; applying monarchy over the tree it left"
