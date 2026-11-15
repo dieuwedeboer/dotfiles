@@ -308,6 +308,7 @@ monarchy_ensure_settings_pkg() {
         # still carries what the row excludes.
         if ! monarchy_settings_owns_skipped "$skip"; then
             monarchy_trace "omarchy-settings-monarchy $have already tracks $MONARCHY_SETTINGS_UPSTREAM=$ver"
+            monarchy_catch_up_omarchy_pkg
             return 0
         fi
         monarchy_log "omarchy-settings-monarchy $have carries a path settings.skip now excludes; rebuilding"
@@ -373,6 +374,21 @@ monarchy_ensure_settings_pkg() {
         monarchy_reload_hyprland "after upgrading $MONARCHY_OMARCHY_PACKAGE"
         monarchy_changed "$MONARCHY_OMARCHY_PACKAGE upgraded with omarchy-settings-monarchy"
     fi
+}
+
+# Settings already current under an older Omarchy package is the state a run
+# before 4e675dc left behind, and its omarchy-update cannot get out of it.
+monarchy_catch_up_omarchy_pkg() {
+    monarchy_pkg_exactly "$MONARCHY_OMARCHY_PACKAGE" || return 0
+    monarchy_omarchy_pkg_behind || return 0
+    local locked
+    locked=$(monarchy_fetch_locked_pkg) || exit 1
+    monarchy_log "pacman -U $(basename "$locked"), to match omarchy-settings-monarchy"
+    monarchy_shell_files_replaced
+    monarchy_sudo pacman -U --noconfirm --needed "$locked" \
+        || monarchy_die "pacman -U failed for $locked"
+    monarchy_reload_hyprland "after upgrading $MONARCHY_OMARCHY_PACKAGE"
+    monarchy_changed "$MONARCHY_OMARCHY_PACKAGE caught up with omarchy-settings-monarchy"
 }
 
 monarchy_omarchy_pkg_behind() {
