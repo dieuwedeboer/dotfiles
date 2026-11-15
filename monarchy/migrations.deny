@@ -14,3 +14,15 @@
 # [omarchy] carries quickshell, nvidia dkms builds, kernels and the real
 # limine packages, which would then win over CachyOS and the boot stub.
 1791403252.sh
+
+# Replaces CachyOS's power-profiles-daemon with [omarchy]'s build through
+# pacman -S. It is meant for ARM laptops but checks only that the stock
+# package is installed, so it fires on x86 too. The build is the same 0.30
+# with NVIDIA Spark and Snapdragon profiles; on these boxes it gains nothing
+# and moves the power daemon from CachyOS to [omarchy].
+1791554699.sh
+
+# Renames the hibernation resume device and runs omarchy-hibernation-setup,
+# which bin.deny blocks. It acts only on a Limine resume drop-in and the
+# omarchy_resume mkinitcpio hook, and this host has neither.
+1792965062.sh
