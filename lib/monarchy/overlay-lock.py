@@ -62,15 +62,14 @@ WAKE_NEW = (
     "        onSwitchUserRequested: root.runSwitchUser()\n"
 )
 
-# Anchored on the tail of finishUnlock, which stable and edge share; its
-# opening guard differs between them (root.locked vs currentlyLocked()).
+# Anchored on the tail of finishUnlock up to the name of the next function;
+# its opening guard and armBlankTimer's parameters have both changed upstream.
 FINISH_OLD = """    sessionLock.locked = false
     logEvent("unlocked")
     runWake()
   }
 
-  function armBlankTimer() {
-"""
+  function armBlankTimer("""
 
 FINISH_NEW = """    sessionLock.locked = false
     Qt.callLater(function() { root.unlockSettled++ })
@@ -84,8 +83,7 @@ FINISH_NEW = """    sessionLock.locked = false
     if (!switchUserProc.running) switchUserProc.running = true
   }
 
-  function armBlankTimer() {
-"""
+  function armBlankTimer("""
 
 # Since Quickshell 0.3.2 no lockStateChanged arrives when the shell unlocks, so
 # `locked` last re-evaluates on secureStateChanged, while sessionLock.locked
