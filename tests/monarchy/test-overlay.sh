@@ -148,4 +148,14 @@ fi
 ( MONARCHY_OMARCHY_PACKAGE=omarchy monarchy_check_overrides_exist ) >/dev/null 2>&1 \
     || fail "override check stopped a tagged release over a name it has not shipped yet"
 
+# --- the update root: the packaged omarchy-update, never the wrap ---------
+
+# 4.5.0's omarchy-update dropped the source-root check that used to get it
+# copied here. The wrap left in its place ran monarchy-update, which ran this
+# again: 71 nested updates, each with a ZFS snapshot.
+monarchy_sudo() { "$@"; }
+monarchy_build_update_root "$tmp/update-root" >/dev/null
+cmp -s "$tmp/update-root/bin/omarchy-update" "$tmp/src/bin/omarchy-update" \
+    || fail "the update root's omarchy-update is not the packaged one"
+
 echo "overlay tests passed"

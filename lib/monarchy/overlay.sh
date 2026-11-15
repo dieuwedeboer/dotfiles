@@ -172,11 +172,13 @@ monarchy_build_update_root() {
     # The commands that check their source root, copied from the package
     # tree as it is now rather than taken from the overlay, which the apply
     # only rebuilds after this run.
+    # omarchy-update always: 4.5.0 dropped its source-root check, the wrap
+    # stayed in this root, and the update recursed into monarchy-update.
     while read -r name; do
         [ "$name" = omarchy-update ] || ! monarchy_overrides "$name" || continue
         monarchy_sudo rm -f "$root/bin/$name"
         monarchy_sudo install -m 755 "$(readlink -e "$MONARCHY_SRC/bin/$name")" "$root/bin/$name"
-    done < <(monarchy_source_root_checked "$MONARCHY_SRC/bin")
+    done < <({ echo omarchy-update; monarchy_source_root_checked "$MONARCHY_SRC/bin"; } | sort -u)
     # Skipped in this root only, not system-wide as bin.skip is: they still
     # run, from monarchy_after_omarchy_update, once the overlay is back.
     for name in "${MONARCHY_UPDATE_DEFERRED[@]}"; do

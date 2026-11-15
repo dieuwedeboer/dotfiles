@@ -7,6 +7,13 @@
 #
 # omarchy-update-system-pkgs is no longer wrapped onto this, because the real
 # omarchy-update calls it and that would recurse.
+# Reached from inside the bracketed update means the update root holds this
+# wrap instead of the real omarchy-update. Each pass took a ZFS snapshot and
+# re-entered; 16 November 2026 went 71 deep.
+if [ "${MONARCHY_IN_OMARCHY_UPDATE:-0}" = 1 ]; then
+    echo "omarchy-update: reached the monarchy wrap from inside monarchy-update; refusing to recurse" >&2
+    exit 1
+fi
 cmd=${MONARCHY_UPDATE:-/usr/local/bin/monarchy-update}
 if [ ! -x "$cmd" ]; then
     echo "monarchy-update: $cmd is missing" >&2
