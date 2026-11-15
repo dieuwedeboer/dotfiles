@@ -237,27 +237,45 @@ monarchy_hyprland_hold_wanted() {
     esac
 }
 
-# $1 with the hold block removed, then put back under [options] when $2 is 1.
+# $1 with the hold block removed, then put back under [options] holding $2,
+# a space-separated list of names, when $2 is not empty.
 monarchy_pacman_conf_with_hold() {
-    awk -v b="$MONARCHY_HOLD_BEGIN" -v e="$MONARCHY_HOLD_END" -v want="$2" '
+    awk -v b="$MONARCHY_HOLD_BEGIN" -v e="$MONARCHY_HOLD_END" -v names="$2" '
         $0 == b { skip = 1; next }
         skip && $0 == e { skip = 0; next }
         skip { next }
         { print }
-        want == 1 && $0 == "[options]" { print b; print "IgnorePkg = hyprland"; print e }
+        names != "" && $0 == "[options]" { print b; print "IgnorePkg = " names; print e }
     ' "$1"
 }
 
-monarchy_hyprland_hold_state() {
-    if monarchy_hyprland_hold_wanted; then echo 1; else echo 0; fi
+# What has to be held with Hyprland: the packages whose upgrade would take a
+# library version from it, and those that need one only a newer Hyprland stack
+# provides. Empty when nothing is held.
+monarchy_hyprland_hold_set() {
+    monarchy_hyprland_hold_wanted || return 0
+    local tmp names rc=0
+    tmp=$(mktemp -d)
+    pacman -Qi >"$tmp/installed" || rc=1
+    # Names no repo carries make -Si exit 1; the rest still print.
+    # shellcheck disable=SC2046  # one name per word
+    pacman -Si $(pacman -Qq) >"$tmp/repo" 2>/dev/null || true
+    pacman -Qu >"$tmp/pending" 2>/dev/null || true
+    # shellcheck disable=SC2154  # monarchy_lib_dir is set by common.sh
+    names=$(python3 -I "$monarchy_lib_dir/hold.py" --installed "$tmp/installed" \
+        --repo "$tmp/repo" --pending "$tmp/pending" hyprland) || rc=1
+    rm -rf "$tmp"
+    [ "$rc" = 0 ] && [ -n "$names" ] || return 1
+    printf '%s\n' "$names" | paste -sd' ' -
 }
 
 monarchy_apply_hyprland_hold() {
-    local conf=${MONARCHY_PACMAN_CONF:-/etc/pacman.conf} want tmp
+    local conf=${MONARCHY_PACMAN_CONF:-/etc/pacman.conf} names tmp
     grep -qx '\[options\]' "$conf" || monarchy_die "$conf has no [options] section"
-    want=$(monarchy_hyprland_hold_state)
+    names=$(monarchy_hyprland_hold_set) \
+        || monarchy_die "could not work out what to hold with hyprland; $conf left as it is"
     tmp=$(mktemp)
-    monarchy_pacman_conf_with_hold "$conf" "$want" >"$tmp"
+    monarchy_pacman_conf_with_hold "$conf" "$names" >"$tmp"
     if cmp -s "$tmp" "$conf"; then
         rm -f "$tmp"
         return 0
@@ -265,8 +283,8 @@ monarchy_apply_hyprland_hold() {
     monarchy_sudo install -m 644 "$tmp" "$conf"
     rm -f "$tmp"
     monarchy_preserve_pacman_conf
-    if [ "$want" = 1 ]; then
-        monarchy_changed "held hyprland at $(monarchy_installed_pkg_version hyprland): omarchy-hyprland-titlebars pins $(monarchy_titlebars_hyprland_pin)"
+    if [ -n "$names" ]; then
+        monarchy_changed "held $names: omarchy-hyprland-titlebars pins hyprland $(monarchy_titlebars_hyprland_pin)"
     else
         monarchy_changed "released the hyprland hold; omarchy-hyprland-titlebars matches the repo again"
     fi
@@ -274,7 +292,10 @@ monarchy_apply_hyprland_hold() {
 
 monarchy_assert_hyprland_hold() {
     local conf=${MONARCHY_PACMAN_CONF:-/etc/pacman.conf}
-    monarchy_pacman_conf_with_hold "$conf" "$(monarchy_hyprland_hold_state)" | cmp -s - "$conf" \
+    local names
+    names=$(monarchy_hyprland_hold_set) \
+        || monarchy_die "could not work out what to hold with hyprland"
+    monarchy_pacman_conf_with_hold "$conf" "$names" | cmp -s - "$conf" \
         || monarchy_die "the hyprland hold in $conf does not match what omarchy-hyprland-titlebars needs"
 }
 

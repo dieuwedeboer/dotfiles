@@ -34,13 +34,13 @@ Include = /etc/pacman.d/mirrorlist
 EOF
 
 held=$WORK/held.conf
-monarchy_pacman_conf_with_hold "$conf" 1 >"$held"
-expected=$(printf '[options]\n# BEGIN monarchy-hold\nIgnorePkg = hyprland\n# END monarchy-hold\n')
+monarchy_pacman_conf_with_hold "$conf" "aquamarine hyprland" >"$held"
+expected=$(printf '[options]\n# BEGIN monarchy-hold\nIgnorePkg = aquamarine hyprland\n# END monarchy-hold\n')
 [ "$(head -4 "$held")" = "$expected" ] || fail "hold block is not straight under [options]"
 [ "$(sed '2,4d' "$held")" = "$(cat "$conf")" ] || fail "holding changed a line outside the block"
 
-monarchy_pacman_conf_with_hold "$held" 1 | cmp -s - "$held" || fail "holding twice added a second block"
-monarchy_pacman_conf_with_hold "$held" 0 | cmp -s - "$conf" || fail "releasing did not restore the file byte for byte"
+monarchy_pacman_conf_with_hold "$held" "aquamarine hyprland" | cmp -s - "$held" || fail "holding twice added a second block"
+monarchy_pacman_conf_with_hold "$held" "" | cmp -s - "$conf" || fail "releasing did not restore the file byte for byte"
 
 # Held exactly when [omarchy]'s plugin pins a version the repo no longer has.
 monarchy_pkg_installed() { [ "$1" = omarchy-hyprland-titlebars ]; }
@@ -56,5 +56,58 @@ if monarchy_hyprland_hold_wanted; then fail "held although the repo has the pinn
 REPO=0.57.2-1.1
 monarchy_pkg_installed() { return 1; }
 if monarchy_hyprland_hold_wanted; then fail "held hyprland with no titlebars plugin installed"; fi
+
+# What goes with hyprland, from the stack as it stood on 16 November 2026:
+# aquamarine and hyprgraphics bump their sonames, hyprtoolkit's new build needs
+# the bumped ones, and hyprcursor and hyprland-guiutils take nothing away.
+# The second aquamarine is a lower-priority repo; pacman installs the first.
+cat >"$WORK/installed" <<'PKGS'
+Name            : hyprland
+Depends On      : libaquamarine.so=14-64  libhyprgraphics.so=4-64  libhyprcursor.so=0-64
+
+Name            : aquamarine
+Provides        : libaquamarine.so=14-64
+
+Name            : hyprgraphics
+Provides        : libhyprgraphics.so=4-64
+
+Name            : hyprcursor
+Provides        : libhyprcursor.so=0-64
+
+Name            : hyprtoolkit
+Provides        : libhyprtoolkit.so=6-64
+Depends On      : libaquamarine.so=14-64  libhyprgraphics.so=4-64
+
+Name            : hyprland-guiutils
+Depends On      : libhyprtoolkit.so=6-64
+PKGS
+cat >"$WORK/repo" <<'PKGS'
+Name            : hyprland
+Depends On      : libaquamarine.so=15-64  libhyprgraphics.so=5-64  libhyprcursor.so=0-64
+
+Name            : aquamarine
+Provides        : libaquamarine.so=15-64
+
+Name            : hyprgraphics
+Provides        : libhyprgraphics.so=5-64
+
+Name            : hyprcursor
+Provides        : libhyprcursor.so=0-64
+
+Name            : hyprtoolkit
+Provides        : libhyprtoolkit.so=6-64
+Depends On      : libaquamarine.so=15-64  libhyprgraphics.so=5-64
+
+Name            : hyprland-guiutils
+Depends On      : libhyprtoolkit.so=6-64
+
+Name            : aquamarine
+Provides        : libaquamarine.so=14-64
+PKGS
+printf '%s\n' hyprland aquamarine hyprgraphics hyprcursor hyprtoolkit hyprland-guiutils >"$WORK/pending"
+held_set=$(python3 -I "$LIB/hold.py" --installed "$WORK/installed" --repo "$WORK/repo" \
+    --pending "$WORK/pending" hyprland | paste -sd' ' -)
+[ "$held_set" = "aquamarine hyprgraphics hyprland hyprtoolkit" ] \
+    || fail "held with hyprland: $held_set"
 
 echo "pacman hold tests passed"
