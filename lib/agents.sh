@@ -62,7 +62,12 @@ PY
         source=${line%%$'\t'*}
         names=${line#*$'\t'}
         # shellcheck disable=SC2086
-        npx --yes skills add "$source" -g -y --skill $names
+        # A skill gone from its source fails the whole add, and under set -e
+        # that ended the update before rEFInd, services or ZFS ran.
+        if ! npx --yes skills add "$source" -g -y --skill $names; then
+            monarchy_warn "could not restore skills from $source: $names. Drop any the source no longer has from $lock"
+            continue
+        fi
         monarchy_changed "restored skills from $source: $names"
     done <<<"$plan"
 }
