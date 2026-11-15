@@ -2,7 +2,8 @@
 # monarchy-migrate: omarchy-migrate, once the pending migrations have been
 # checked against the few things that can brick this host. ADR 0005.
 #
-# Every Omarchy migration runs by default. One that matches a brick path
+# Every Omarchy migration runs by default, except those in migrations.deny,
+# which are marked complete without running. One that matches a brick path
 # below, and has no row in migrations.deny or migrations.allow, stops the run
 # before anything executes, so a human classifies it. The update guard in
 # lib/monarchy/update.sh sources this file for the same check.
@@ -132,7 +133,21 @@ monarchy_migrate_main() {
         echo "Nothing has run. Add each to monarchy/migrations.allow or migrations.deny, run monarchy-update, then run this again." >&2
         exit 1
     fi
+    monarchy_mark_denied_complete "$dir" "${OMARCHY_MIGRATION_STATE:-$HOME/.local/state/omarchy/migrations}"
     exec "$real"
+}
+
+# The user unit marks denied migrations too, but only on a run that reaches
+# it. On 23 October 2026 an update stopped before that unit, the next
+# omarchy update came through here, and denied 1791403252 ran.
+monarchy_mark_denied_complete() {
+    local dir=$1 state=$2 name
+    mkdir -p "$state"
+    for name in "${MONARCHY_MIGRATION_DENIED[@]}"; do
+        [ -f "$dir/$name" ] && [ ! -e "$state/$name" ] || continue
+        : >"$state/$name"
+        echo "monarchy-migrate: $name is in migrations.deny; marked complete without running it" >&2
+    done
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

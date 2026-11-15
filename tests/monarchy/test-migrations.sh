@@ -67,6 +67,18 @@ monarchy_mark_denied_migrations >/dev/null
 after=$(find "$STATE" -maxdepth 1 -type f | sort)
 [ "$before" = "$after" ] || fail "a second run changed the marker set"
 
+# monarchy-migrate marks them itself, for a run that never reached the user
+# unit. Fresh state, same rows.
+# shellcheck source=../../lib/monarchy/migrate.sh
+source "$LIB/migrate.sh"
+# shellcheck disable=SC2034  # read by monarchy_mark_denied_complete
+MONARCHY_MIGRATION_DENIED=("${MONARCHY_MIGRATE_DENY[@]}")
+rm -rf "$STATE"
+monarchy_mark_denied_complete "$MONARCHY_SRC/migrations" "$STATE" 2>/dev/null
+markers=$(cd "$STATE" && printf '%s\n' * | LC_ALL=C sort | paste -sd' ' -)
+[ "$markers" = "1000000001.sh 1000000003.sh" ] \
+    || fail "monarchy-migrate marked: $markers"
+
 # No package tree yet (a box before the omarchy package lands) is not a
 # failure: there is nothing to mark and nothing to assert.
 rm -rf "$MONARCHY_SRC/migrations"
