@@ -207,6 +207,77 @@ EOF
     monarchy_install_omarchy_keyring
 }
 
+# omarchy-hyprland-titlebars is built against one exact Hyprland. Stock Omarchy
+# keeps the two in step by taking Hyprland from its own Arch snapshot; this
+# box takes it from CachyOS, which runs ahead. So Hyprland is held while
+# [omarchy]'s plugin pins a version CachyOS no longer offers, and released as
+# soon as they agree again.
+MONARCHY_HOLD_BEGIN='# BEGIN monarchy-hold'
+MONARCHY_HOLD_END='# END monarchy-hold'
+
+# The Hyprland version [omarchy]'s plugin pins, or nothing.
+monarchy_titlebars_hyprland_pin() {
+    pacman -Si omarchy-hyprland-titlebars 2>/dev/null \
+        | awk -F': ' '$1 ~ /^Depends On/ { print $2 }' \
+        | tr ' ' '\n' \
+        | sed -n 's/^hyprland=//p' \
+        | head -1
+}
+
+monarchy_hyprland_hold_wanted() {
+    monarchy_pkg_installed omarchy-hyprland-titlebars || return 1
+    local pin repo
+    pin=$(monarchy_titlebars_hyprland_pin)
+    repo=$(monarchy_repo_pkg_version hyprland)
+    [ -n "$pin" ] && [ -n "$repo" ] || return 1
+    # A pin without a pkgrel matches any build of that version.
+    case "$pin" in
+        *-*) [ "$repo" != "$pin" ] ;;
+        *) [ "${repo%-*}" != "$pin" ] ;;
+    esac
+}
+
+# $1 with the hold block removed, then put back under [options] when $2 is 1.
+monarchy_pacman_conf_with_hold() {
+    awk -v b="$MONARCHY_HOLD_BEGIN" -v e="$MONARCHY_HOLD_END" -v want="$2" '
+        $0 == b { skip = 1; next }
+        skip && $0 == e { skip = 0; next }
+        skip { next }
+        { print }
+        want == 1 && $0 == "[options]" { print b; print "IgnorePkg = hyprland"; print e }
+    ' "$1"
+}
+
+monarchy_hyprland_hold_state() {
+    if monarchy_hyprland_hold_wanted; then echo 1; else echo 0; fi
+}
+
+monarchy_apply_hyprland_hold() {
+    local conf=${MONARCHY_PACMAN_CONF:-/etc/pacman.conf} want tmp
+    grep -qx '\[options\]' "$conf" || monarchy_die "$conf has no [options] section"
+    want=$(monarchy_hyprland_hold_state)
+    tmp=$(mktemp)
+    monarchy_pacman_conf_with_hold "$conf" "$want" >"$tmp"
+    if cmp -s "$tmp" "$conf"; then
+        rm -f "$tmp"
+        return 0
+    fi
+    monarchy_sudo install -m 644 "$tmp" "$conf"
+    rm -f "$tmp"
+    monarchy_preserve_pacman_conf
+    if [ "$want" = 1 ]; then
+        monarchy_changed "held hyprland at $(monarchy_installed_pkg_version hyprland): omarchy-hyprland-titlebars pins $(monarchy_titlebars_hyprland_pin)"
+    else
+        monarchy_changed "released the hyprland hold; omarchy-hyprland-titlebars matches the repo again"
+    fi
+}
+
+monarchy_assert_hyprland_hold() {
+    local conf=${MONARCHY_PACMAN_CONF:-/etc/pacman.conf}
+    monarchy_pacman_conf_with_hold "$conf" "$(monarchy_hyprland_hold_state)" | cmp -s - "$conf" \
+        || monarchy_die "the hyprland hold in $conf does not match what omarchy-hyprland-titlebars needs"
+}
+
 monarchy_nvidia_keep_chwd() {
     if [ -x "$MONARCHY_SRC/install/hardware/nvidia.sh" ]; then
         :

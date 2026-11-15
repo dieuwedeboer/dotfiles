@@ -136,12 +136,14 @@ monarchy_guards_apply() { :; }
 monarchy_pacman_check() {
     monarchy_preserve_pacman_conf
     monarchy_assert_omarchy_channel
+    monarchy_assert_hyprland_hold
     monarchy_refuse_archzfs
     monarchy_refuse_omarchy_zfs_repo
 }
 
 monarchy_pacman_apply() {
     monarchy_add_omarchy_repo
+    monarchy_apply_hyprland_hold
 }
 
 # ---- packaging: the two local packages, then the real omarchy ------------

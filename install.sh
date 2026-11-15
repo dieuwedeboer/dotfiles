@@ -161,6 +161,8 @@ monarchy_cli() {
             # cachy-update used to keep the DB fresh; ADR 0003 took that away.
             monarchy_sudo pacman -Sy >/dev/null \
                 || monarchy_die "pacman -Sy failed; cannot prepare the local packages"
+            # Read against the DB just refreshed, before omarchy-update's -Syu.
+            monarchy_apply_hyprland_hold
             # Before the upgrade, not after. omarchy 4.0.5 depends on
             # omarchy-settings=4.0.5; our replacement still provides 4.0.4,
             # so a --noconfirm -Syu would resolve that by pulling upstream's
