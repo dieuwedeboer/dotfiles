@@ -337,14 +337,9 @@ monarchy_ensure_settings_pkg() {
     unset MONARCHY_SETTINGS_PKGVER MONARCHY_SETTINGS_DEPENDS MONARCHY_SETTINGS_PROVIDES
     rm -rf "$tmp"
 
-    # A release bump. The installed omarchy still pins the old settings
-    # version, so installing ours alone "breaks dependency" and pacman
-    # refuses; the new omarchy cannot come first either, because -Syu then
-    # wants the upstream omarchy-settings we conflict with. Deadlock, unless
-    # pacman is told the old version stays satisfied for this one
-    # transaction. The full upgrade that follows replaces omarchy and the
-    # pin matches again. Pulling the new omarchy in here instead would be a
-    # partial upgrade, which cachy-update owns.
+    # The installed omarchy still pins the old settings version, so ours
+    # alone "breaks dependency". Only reached when the package that holds the
+    # pin is about to be replaced by monarchy_ensure_omarchy_pkg.
     local pinned
     local -a assume=()
     pinned=$(monarchy_installed_settings_pin)
@@ -352,18 +347,21 @@ monarchy_ensure_settings_pkg() {
         assume=(--assume-installed "omarchy-settings=$pinned")
     fi
 
-    # A file upstream moved out of the Omarchy package and into settings is
-    # still owned by the installed Omarchy package, and pacman refuses ours on
-    # its own. It hands a file between packages only inside one transaction,
-    # so the new Omarchy package comes along in this one. --overwrite instead
-    # would leave the file listed under both, and the upgrade that drops it
-    # from Omarchy would then delete it. ADR 0004.
+    # Settings and the Omarchy package go in together whenever the sync DB
+    # has a newer Omarchy package: a file moved between them is handed over
+    # only inside one transaction, and the installed omarchy-update sources
+    # helpers settings ships, so a newer settings under an older
+    # omarchy-update can kill it before its own pacman -Syu. ADR 0004.
     local -a handover=()
     monarchy_plan_overwrites "$built"
-    if [ "${#MONARCHY_HANDOVER_PATHS[@]}" -gt 0 ] \
-        && monarchy_pkg_exactly "$MONARCHY_OMARCHY_PACKAGE"; then
-        printf '  %s\n' "${MONARCHY_HANDOVER_PATHS[@]}"
-        monarchy_log "the paths above move from $MONARCHY_OMARCHY_PACKAGE to settings; upgrading both together"
+    if monarchy_pkg_exactly "$MONARCHY_OMARCHY_PACKAGE" \
+        && { [ "${#MONARCHY_HANDOVER_PATHS[@]}" -gt 0 ] || monarchy_omarchy_pkg_behind; }; then
+        if [ "${#MONARCHY_HANDOVER_PATHS[@]}" -gt 0 ]; then
+            printf '  %s\n' "${MONARCHY_HANDOVER_PATHS[@]}"
+            monarchy_log "the paths above move from $MONARCHY_OMARCHY_PACKAGE to settings; upgrading both together"
+        else
+            monarchy_log "upgrading $MONARCHY_OMARCHY_PACKAGE with omarchy-settings-monarchy, so omarchy-update matches the helpers it sources"
+        fi
         local locked
         locked=$(monarchy_fetch_locked_pkg) || exit 1
         handover=("$locked")
@@ -373,23 +371,15 @@ monarchy_ensure_settings_pkg() {
     MONARCHY_PKG_REINSTALL=$reinstall monarchy_install_built_pkg "$built" "${assume[@]}" "${handover[@]}"
     if [ "${#handover[@]}" -gt 0 ]; then
         monarchy_reload_hyprland "after upgrading $MONARCHY_OMARCHY_PACKAGE"
-        monarchy_changed "$MONARCHY_OMARCHY_PACKAGE upgraded with omarchy-settings-monarchy, to hand over moved files"
+        monarchy_changed "$MONARCHY_OMARCHY_PACKAGE upgraded with omarchy-settings-monarchy"
     fi
+}
 
-    # Switching between omarchy and omarchy-dev is the other way out of the
-    # old pin: monarchy_ensure_omarchy_pkg replaces the package that holds it.
-    if [ ${#assume[@]} -gt 0 ] && monarchy_pkg_exactly "$MONARCHY_OMARCHY_PACKAGE"; then
-        # This is a handoff, not a failure: the settings package now tracks
-        # the new version and what it is waiting for is the full upgrade. When
-        # that upgrade is the next thing this run does, saying so and carrying
-        # on is the whole point. Dying here instead would abort the update
-        # immediately before the step it is asking for.
-        if [ "${MONARCHY_EXPECT_FULL_UPGRADE:-0}" = 1 ]; then
-            monarchy_changed "omarchy-settings-monarchy now tracks $MONARCHY_SETTINGS_UPSTREAM=$ver; the upgrade below brings $MONARCHY_OMARCHY_PACKAGE up to it"
-            return 0
-        fi
-        monarchy_die "omarchy-settings-monarchy now tracks $MONARCHY_SETTINGS_UPSTREAM=$ver; installed $MONARCHY_OMARCHY_PACKAGE still pins $pinned. Run 'omarchy update' (or sudo pacman -Syu) to bring it up to that, then re-run monarchy-update"
-    fi
+monarchy_omarchy_pkg_behind() {
+    local have repo
+    have=$(monarchy_installed_pkg_version "$MONARCHY_OMARCHY_PACKAGE")
+    repo=$(monarchy_repo_pkg_version "$MONARCHY_OMARCHY_PACKAGE")
+    [ -n "$have" ] && [ -n "$repo" ] && [ "$(vercmp "$have" "$repo")" -lt 0 ]
 }
 
 # While pacman replaces /usr/share/omarchy/default/hypr, a running Hyprland

@@ -38,9 +38,13 @@ holds both is one monarchy runs itself.
 
 ## Consequences
 
-- It applies only when `monarchy_plan_overwrites` finds a path in the built
-  settings package owned by the installed Omarchy package. On an ordinary
-  release, nothing changes.
+- It applies whenever settings is rebuilt and the sync DB has a newer Omarchy
+  package, not only when `monarchy_plan_overwrites` finds a moved path. On
+  16 November 2026, settings 4.5.0 went in alone under `omarchy` 4.5.0rc2.
+  The installed `omarchy-update` sources `omarchy-security-functions` from
+  settings, 4.5.0 had dropped a function rc2 called, and `omarchy-update`
+  died before its `pacman -Syu`, so nothing could bring `omarchy` up. The two
+  packages are a matched pair and change together.
 - The Omarchy package is fetched with `pacman -Sddw`, so pacman checks the
   signature. Its dependencies are resolved by the `-U` itself and can pull
   packages from the sync repos. For `omarchy-dev`, a script package with no
