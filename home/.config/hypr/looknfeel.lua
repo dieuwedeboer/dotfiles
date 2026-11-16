@@ -152,3 +152,20 @@ o.window("^(mpv|vlc)$", { idle_inhibit = "fullscreen" })
 -- file name the PKGBUILD installs; it embeds libmpv and never takes an inhibitor.
 -- Not stremio-enhanced, stremio-linux-shell, or the Flatpak.
 o.window("^com\\.stremio\\.stremio$", { idle_inhibit = "fullscreen" })
+
+-- Chrome opens Document Picture-in-Picture (Teams, when you leave its tab) as a
+-- floating window titled after the page, which Omarchy's rule only catches for
+-- video. Normal Chrome windows always carry the " - Google Chrome" suffix, even
+-- while opening, so a Chrome window without it is treated as Picture-in-Picture.
+-- Matching on float = true is too late: Chrome floats the window after it maps.
+-- Omarchy's tag = "pip" rule is evaluated before this file adds the tag, so the
+-- placement is repeated here.
+o.window({ class = "^google-chrome$", title = "negative:.* - Google Chrome" }, {
+  tag = "+pip",
+  float = true,
+  pin = true,
+  size = { 600, 338 },
+  keep_aspect_ratio = true,
+  border_size = 0,
+  move = { "(monitor_w-window_w-40)", "(monitor_h*0.04)" },
+})
