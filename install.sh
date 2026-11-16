@@ -146,11 +146,8 @@ monarchy_cli() {
             monarchy_guards_check
             monarchy_snapshot_first
             # Only when the upgrade it prepares for is actually going to run.
-            # --only and --no-omarchy-update skip that upgrade, and building
-            # against a release bump without it leaves omarchy installed with
-            # an unsatisfied omarchy-settings pin -- and silently, because
-            # MONARCHY_EXPECT_FULL_UPGRADE turns the guard that would have
-            # said so into a note.
+            # --only and --no-omarchy-update skip that upgrade, and
+            # monarchy_update builds the packages for them anyway.
             [ "$MONARCHY_RUN_OMARCHY_UPDATE" = 1 ] || return 0
             # Refresh the sync DB first. Everything below reads `pacman -Si`,
             # and the first -Sy in this flow is inside omarchy-update-keyring,

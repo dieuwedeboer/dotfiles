@@ -114,8 +114,7 @@ monarchy_seed_branding() {
     monarchy_copy_if_missing "$MONARCHY_SRC/logo.txt" "$dest/logo.txt"
     monarchy_copy_if_missing "$MONARCHY_SRC/icon.txt" "$dest/icon.txt"
     [ -f "$MONARCHY_SRC/icon.png" ] && monarchy_copy_if_missing "$MONARCHY_SRC/icon.png" "$dest/icon.png"
-    # Omarchy skel names. ttfx reads screensaver.txt; missing it crash-loops the
-    # fullscreen terminal so a key cannot dismiss it.
+    # Omarchy skel names. The screensaver reads screensaver.txt.
     monarchy_copy_if_missing "$MONARCHY_SRC/logo.txt" "$dest/screensaver.txt"
     monarchy_copy_if_missing "$MONARCHY_SRC/icon.txt" "$dest/about.txt"
 }

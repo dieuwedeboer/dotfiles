@@ -206,7 +206,7 @@ household_refresh() {
     monarchy_step "agent tools (mise)"
     agents_install_tools
 
-    monarchy_step "rEFInd theme"
+    monarchy_step "rEFInd theme and memtest"
     "$LIB_DIR/refind.sh"
 
     household_services

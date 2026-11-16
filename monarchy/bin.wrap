@@ -2,12 +2,12 @@ omarchy-agent-usage-update
 omarchy-battery-status
 omarchy-disk-speedtest
 omarchy-display-text-size
+omarchy-keyboard-toprow
 omarchy-migrate
 omarchy-plymouth-reset
 omarchy-plymouth-set
 omarchy-refresh-plymouth
 omarchy-refresh-sddm
-omarchy-screensaver
 omarchy-snapshot
 omarchy-sudo-passwordless
 omarchy-update
