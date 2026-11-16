@@ -8,11 +8,9 @@ itself or moves back to stable.
 
 ## Why
 
-Omarchy 4.5.0, with the Qt 6.12 fix that took a box to edge (ADR 0003,
-track-omarchy-dev-on-edge), reached stable on 16 November 2026. Holding every
-change to "works on all channels" cost a day of the 4.5.0 upgrade on skew
-between rc and the release, and the same three breaks were fixed twice, once
-per channel.
+Omarchy 4.5.0 reached stable on 16 November 2026. Holding every change to
+"works on all channels" cost a day of the 4.5.0 upgrade on skew between rc and
+the release, and the same three breaks were fixed twice, once per channel.
 
 ## Considered
 
