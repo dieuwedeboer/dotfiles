@@ -14,9 +14,3 @@ omarchy-settings-dev
 ufw-docker
 superwhisper-bin
 vi
-
-# [omarchy]'s ARM build of power-profiles-daemon, listed in
-# omarchy-base.packages from 4.5.0. It conflicts with CachyOS's
-# power-profiles-daemon and gains nothing on x86; migration 1791554699,
-# which makes the same swap, is denied for the same reason.
-omarchy-power-profiles-daemon

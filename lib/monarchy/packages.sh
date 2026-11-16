@@ -27,6 +27,25 @@ monarchy_record_packages() {
     rm -f "$tmp"
 }
 
+# Whether the sync package conflicts with an installed package it also
+# provides: a drop-in replacement Omarchy chose over what CachyOS installed,
+# such as omarchy-power-profiles-daemon. --noconfirm answers no to removing
+# the old one and the whole transaction fails, so these go in on their own
+# with --ask 4, as Omarchy's own migration for that swap does.
+monarchy_replaces_installed() {
+    local info provides conflicts name
+    info=$(LC_ALL=C pacman -Si "$1" 2>/dev/null | awk '/^Repository/ { n++ } n == 1')
+    provides=" $(sed -n 's/^Provides *: //p' <<<"$info" | sed 's/[<>=][^ ]*//g') "
+    conflicts=$(sed -n 's/^Conflicts With *: //p' <<<"$info")
+    for name in $conflicts; do
+        name=${name%%[<>=]*}
+        [ "$name" != None ] || continue
+        [[ $provides == *" $name "* ]] || continue
+        monarchy_pkg_exactly "$name" && return 0
+    done
+    return 1
+}
+
 monarchy_install_packages() {
     if [ "${MONARCHY_NO_PACKAGES:-0}" = 1 ]; then
         monarchy_trace "skipping packages (--no-packages)"
@@ -62,8 +81,20 @@ monarchy_install_packages() {
     if [ "${#need[@]}" -eq 0 ]; then
         monarchy_trace "filtered leaf packages already installed (${#pkgs[@]})"
     else
-        monarchy_log "pacman -S --needed ${#need[@]} of ${#pkgs[@]} filtered leaf packages"
-        monarchy_sudo pacman -S --needed --noconfirm "${need[@]}"
+        local -a swap=() rest=()
+        local pkg
+        for pkg in "${need[@]}"; do
+            if monarchy_replaces_installed "$pkg"; then swap+=("$pkg"); else rest+=("$pkg"); fi
+        done
+        if [ "${#swap[@]}" -gt 0 ]; then
+            monarchy_log "pacman -S --ask 4 ${swap[*]}, replacing what each provides"
+            monarchy_sudo pacman -S --needed --noconfirm --ask 4 "${swap[@]}"
+            monarchy_changed "installed ${swap[*]} in place of the packages each replaces"
+        fi
+        if [ "${#rest[@]}" -gt 0 ]; then
+            monarchy_log "pacman -S --needed ${#rest[@]} of ${#pkgs[@]} filtered leaf packages"
+            monarchy_sudo pacman -S --needed --noconfirm "${rest[@]}"
+        fi
         monarchy_trace "packages installed"
     fi
     monarchy_record_packages
