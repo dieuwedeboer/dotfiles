@@ -48,10 +48,16 @@ monarchy_refuse_omarchy_zfs_repo() {
 # ran before `packaging` could clear the pending upgrade. See monarchy_leaves_check.
 monarchy_refuse_partial_upgrade() {
     local pending n
-    pending=$(pacman -Qu 2>/dev/null || true)
+    pending=$(monarchy_pending_upgrades)
     [ -n "$pending" ] || return 0
     n=$(printf '%s\n' "$pending" | grep -c .)
     monarchy_die "pacman has $n pending upgrades. Run 'omarchy update' (or sudo pacman -Syu), then re-run install.sh. Installing Omarchy leaves against a refreshed DB pulls new ffmpeg/gstreamer without their dependents"
+}
+
+# Upgrades -Syu would make. What the hold leaves out is pending by design
+# (ADR 0012), and pacman -Qu still lists it, marked [ignored].
+monarchy_pending_upgrades() {
+    pacman -Qu 2>/dev/null | grep -v ' \[ignored\]$' || true
 }
 
 monarchy_omarchy_key_present() {

@@ -507,7 +507,7 @@ monarchy_ensure_omarchy_pkg() {
     # in -- and now that the stub, the settings package and the symlink are
     # sorted, that upgrade resolves cleanly. Hand off rather than force it.
     local pending
-    pending=$(pacman -Qu 2>/dev/null | grep -c . || true)
+    pending=$(monarchy_pending_upgrades | grep -c . || true)
     if [ "${pending:-0}" -gt 0 ]; then
         if [ "${MONARCHY_EXPECT_FULL_UPGRADE:-0}" = 1 ]; then
             monarchy_trace "omarchy is not installed; the upgrade below pulls it in through flea"

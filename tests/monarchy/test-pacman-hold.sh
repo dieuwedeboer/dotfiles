@@ -110,4 +110,14 @@ held_set=$(python3 -I "$LIB/hold.py" --installed "$WORK/installed" --repo "$WORK
 [ "$held_set" = "aquamarine hyprgraphics hyprland hyprtoolkit" ] \
     || fail "held with hyprland: $held_set"
 
+# What the hold leaves behind is not a partial upgrade, or every run stops on it.
+pacman() {
+    printf 'hyprland 0.56.2-4.1 -> 0.57.2-1.1 [ignored]\n'
+    [ "${UNHELD:-0}" = 0 ] || printf 'ffmpeg 2:8.0-1 -> 2:9.0-1\n'
+}
+(monarchy_refuse_partial_upgrade) || fail "the partial-upgrade guard stopped on a held package"
+if (UNHELD=1 monarchy_refuse_partial_upgrade) >/dev/null 2>&1; then
+    fail "the partial-upgrade guard let a real pending upgrade through"
+fi
+
 echo "pacman hold tests passed"
