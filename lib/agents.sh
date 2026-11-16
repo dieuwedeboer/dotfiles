@@ -71,3 +71,23 @@ PY
         monarchy_changed "restored skills from $source: $names"
     done <<<"$plan"
 }
+
+# The agent-browser skill in the lock drives a CLI it does not install. `mise
+# use -g` writes the row into ~/.config/mise/config.toml, which mise owns and
+# this repo does not track (see home/.config/mise/conf.d/10-ai-tools.toml).
+agents_install_tools() {
+    if ! command -v mise >/dev/null 2>&1; then
+        monarchy_warn "mise not installed; agent-browser not installed"
+        return 0
+    fi
+    if household_mise which agent-browser >/dev/null 2>&1; then
+        monarchy_trace "agent-browser already installed through mise"
+        return 0
+    fi
+    monarchy_log "mise use -g agent-browser@latest"
+    if ! household_mise use -g agent-browser@latest >/dev/null; then
+        monarchy_warn "mise use -g agent-browser@latest failed"
+        return 0
+    fi
+    monarchy_changed "installed agent-browser through mise"
+}

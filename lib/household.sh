@@ -203,6 +203,9 @@ household_refresh() {
     monarchy_step "agent skills from lock"
     agents_restore_skills
 
+    monarchy_step "agent tools (mise)"
+    agents_install_tools
+
     monarchy_step "rEFInd theme"
     "$LIB_DIR/refind.sh"
 
