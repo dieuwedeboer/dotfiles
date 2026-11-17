@@ -160,7 +160,7 @@ o.window("^com\\.stremio\\.stremio$", { idle_inhibit = "fullscreen" })
 -- Matching on float = true is too late: Chrome floats the window after it maps.
 -- Omarchy's tag = "pip" rule is evaluated before this file adds the tag, so the
 -- placement is repeated here.
-o.window({ class = "^google-chrome$", title = "negative:.* - Google Chrome" }, {
+o.window({ class = "^google-chrome$", title = "negative:(.* - )?Google Chrome" }, {
   tag = "+pip",
   float = true,
   pin = true,
