@@ -323,6 +323,13 @@ home directory are overwritten.
   `hyprctl eval 'hl.monitor({ output = "eDP-1", mirror = "T", ... })'`,
   then `hyprctl output remove T`.
 
+`sandman.lua` is the exception: Monarchy only requires it and creates it empty.
+The Sandman plugin writes its lid-close override there, because
+`~/.config/uwsm/env.d/30-monarchy-sandman` sets `SANDMAN_HYPR_BINDINGS_PATH`.
+Its default is `bindings.lua`, which is the checkout, so one box's lid choice
+would reach every box through git. With that variable set, Sandman skips its
+own `hyprctl reload`, so a changed lid action applies at the next reload or login.
+
 `lib/packages.sh` installs the shared set before apply. After apply or `--update` it strips competing copies (pacman emacs/bun/gh, Spotify/Discord flatpaks, curl-pipe cursor-agent, python-pipx, omarchy-emacs, AUR zoom) once `/etc/omarchy.conf` exists, so a box that has not finished apply is still usable. Zoom is the Omarchy webapp (`zoommtg://`), not AUR `zoom`.
 
 

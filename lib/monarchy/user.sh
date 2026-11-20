@@ -39,7 +39,28 @@ monarchy_seed_hyprland_config() {
     # boot-color: first Hyprland frame matches Unlock #1a1b26, not default grey.
     monarchy_seed_hypr_module boot-color
     monarchy_seed_hypr_module rehome-workspaces
+    monarchy_seed_sandman_local
     monarchy_trace "seeded $dest (existing files left in place)"
+}
+
+# Sandman writes its lid-close override into bindings.lua, which is the
+# checkout, so one box's lid choice would ride git onto every other box.
+monarchy_seed_sandman_local() {
+    local hypr="$HOME/.config/hypr/hyprland.lua"
+    local dest="$HOME/.config/hypr/sandman.lua"
+    local env="$HOME/.config/uwsm/env.d/30-monarchy-sandman"
+    # shellcheck disable=SC2016
+    local line='export SANDMAN_HYPR_BINDINGS_PATH="$HOME/.config/hypr/sandman.lua"'
+    mkdir -p "$(dirname "$dest")" "$(dirname "$env")"
+    [ -e "$dest" ] || : >"$dest"
+    if [ "$(cat "$env" 2>/dev/null)" != "$line" ]; then
+        printf '%s\n' "$line" >"$env"
+        monarchy_changed "pointed Sandman at $dest (takes effect at next login)"
+    fi
+    [ -f "$hypr" ] || return 0
+    monarchy_seed_block "$hypr" sandman <<EOF
+require("hypr.sandman")
+EOF
 }
 
 # Copies monarchy/hypr/<name>.lua over the home copy on every apply and
