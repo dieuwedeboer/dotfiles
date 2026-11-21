@@ -81,6 +81,15 @@ else
     say "  $IT87_MODPROBE already configured"
 fi
 
+# An earlier experiment forced every channel to manual from udev. It contradicts
+# the decision above, and systemd 262.2 rejects its RUN line, so it is removed.
+IT87_PWM_MANUAL="/etc/udev/rules.d/99-it87-pwm-manual.rules"
+if [ -f "$IT87_PWM_MANUAL" ]; then
+    sudo rm -f "$IT87_PWM_MANUAL"
+    sudo udevadm control --reload
+    echo "  removed $IT87_PWM_MANUAL: fans stay on the BIOS curves"
+fi
+
 IT87_MODULES_LOAD="/etc/modules-load.d/it87.conf"
 if [ ! -f "$IT87_MODULES_LOAD" ] || ! sudo grep -qx "it87" "$IT87_MODULES_LOAD" 2>/dev/null; then
     echo "it87" | sudo tee "$IT87_MODULES_LOAD" > /dev/null
