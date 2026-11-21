@@ -55,7 +55,7 @@ xmcl_ensure_dataset() {
 xmcl_ensure_layout() {
     local dir wrong
     for dir in "$XMCL_ROOT" "$XMCL_ACCOUNTS" "$XMCL_ACCOUNTS/secret"; do
-        [ -d "$dir" ] || monarchy_sudo mkdir "$dir"
+        monarchy_sudo test -d "$dir" || monarchy_sudo mkdir "$dir"
     done
     wrong=$(monarchy_sudo find "$XMCL_ROOT" -xdev ! -type l \
         \( ! -group "$GAMES_GROUP" -o ! -perm -0060 -o -perm /0007 -o \( -type d ! -perm -2070 \) \) \
@@ -92,12 +92,16 @@ xmcl_running_for() {
     pgrep -u "$1" -f '^/opt/xmcl/xmcl' >/dev/null 2>&1
 }
 
+# Every test of a path in this file goes through monarchy_sudo: the king's own
+# account cannot see into another player's home, and a plain [ -L ] there
+# answered "not a link", so a correct link was moved aside on every run.
+
 # One of a player's own XMCL files becomes a link into the shared accounts.
 # A login of their own is moved aside, not deleted: it cannot be read by
 # anyone else, so they sign in once more on the shared one.
 xmcl_ensure_account_link() {
     local user=$1 path=$2 target=$3
-    if [ -L "$path" ] && [ "$(monarchy_sudo readlink "$path")" = "$target" ]; then
+    if monarchy_sudo test -L "$path" && [ "$(monarchy_sudo readlink "$path")" = "$target" ]; then
         return 0
     fi
     if monarchy_sudo test -e "$path" -o -L "$path"; then
@@ -136,9 +140,9 @@ xmcl_lock_root() {
 # the same name both survive the move.
 xmcl_free_name() {
     local dir=$1 name=$2 user=$3 n=2 try
-    [ -e "$dir/$name" ] || { printf '%s\n' "$name"; return; }
+    monarchy_sudo test -e "$dir/$name" || { printf '%s\n' "$name"; return; }
     try="$name ($user)"
-    while [ -e "$dir/$try" ]; do
+    while monarchy_sudo test -e "$dir/$try"; do
         try="$name ($user $n)"
         n=$((n + 1))
     done
@@ -156,7 +160,7 @@ xmcl_repoint_instance() {
             "$old" | "$old"/*) monarchy_sudo ln -sfn "$XMCL_ROOT${target#"$old"}" "$link" ;;
         esac
     done < <(monarchy_sudo find "$dir" -mindepth 1 -maxdepth 1 -type l -print0)
-    [ -f "$dir/instance.json" ] || return 0
+    monarchy_sudo test -f "$dir/instance.json" || return 0
     tmp=$(mktemp)
     # shellcheck disable=SC2016  # jq variables, not shell ones
     if monarchy_sudo jq --arg old "$old" --arg new "$XMCL_ROOT" --arg dir "$dir" '
@@ -178,7 +182,7 @@ xmcl_repoint_instance() {
 xmcl_adopt_root() {
     local user=$1 old=$2 kind src name dest entry aside
     for kind in instances saves; do
-        [ -d "$old/$kind" ] && [ ! -L "$old/$kind" ] || continue
+        monarchy_sudo test -d "$old/$kind" -a ! -L "$old/$kind" || continue
         monarchy_sudo mkdir -p "$XMCL_ROOT/$kind"
         while IFS= read -r -d '' src; do
             name=${src##*/}
@@ -193,19 +197,19 @@ xmcl_adopt_root() {
         done < <(monarchy_sudo find "$old/$kind" -mindepth 1 -maxdepth 1 -print0)
     done
     for entry in assets jre libraries labymod-neo modpacks mods resourcepacks shaderpacks versions; do
-        [ -d "$old/$entry" ] && [ ! -L "$old/$entry" ] || continue
+        monarchy_sudo test -d "$old/$entry" -a ! -L "$old/$entry" || continue
         monarchy_sudo mkdir -p "$XMCL_ROOT/$entry"
         monarchy_sudo cp -a --update=none "$old/$entry/." "$XMCL_ROOT/$entry/"
     done
     for entry in authlib-injection.json ely-authlib.json launcher_profiles.json options.txt servers.dat; do
-        [ -f "$old/$entry" ] && [ ! -e "$XMCL_ROOT/$entry" ] || continue
+        monarchy_sudo test -f "$old/$entry" -a ! -e "$XMCL_ROOT/$entry" || continue
         monarchy_sudo cp -a "$old/$entry" "$XMCL_ROOT/$entry"
     done
     case "$old" in
         "$XMCL_ROOT" | "$XMCL_ROOT"/* | */.config/xmcl) return 0 ;;
     esac
     aside="$old.before-monarchy"
-    [ ! -e "$aside" ] || aside="$aside-$(date +%Y%m%d%H%M%S)"
+    ! monarchy_sudo test -e "$aside" || aside="$aside-$(date +%Y%m%d%H%M%S)"
     monarchy_sudo mv -T "$old" "$aside"
     monarchy_changed "kept the rest of $user's old Minecraft data at $aside; every instance and world in it was moved, and it can be deleted"
 }
