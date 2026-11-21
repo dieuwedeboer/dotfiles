@@ -18,6 +18,11 @@ MISC="$REPO/monarchy"
 # shellcheck disable=SC2034
 HARDWARE="$REPO/hardware"
 
+# The real log is owned by the king so apply can write it without sudo, which
+# also let every test run as the king append fixture errors to it. A test that
+# reads the log sets its own after this.
+export MONARCHY_LOG=/dev/null
+
 # Named after the sourcing test file, so failures say which test spoke.
 TEST_NAME=$(basename "${BASH_SOURCE[1]:-test}" .sh)
 
