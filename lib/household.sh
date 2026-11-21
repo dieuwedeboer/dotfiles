@@ -222,4 +222,8 @@ household_refresh() {
     # shellcheck source=games.sh
     source "$LIB_DIR/games.sh"
     games_apply
+
+    # shellcheck source=xmcl.sh
+    source "$LIB_DIR/xmcl.sh"
+    xmcl_apply
 }

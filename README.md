@@ -119,6 +119,14 @@ sudo systemctl start sanoid.timer
 
 When another player's Steam first sees a shared game, it shows it as not installed. Install it to the default library: Steam finds the files already there, checks them, and downloads only what differs.
 
+### Shared Minecraft
+
+`lib/xmcl.sh` makes `/games/xmcl` the XMCL data root for every player, so every account on a box sees the same instances, versions, mods and worlds. It is the dataset `zpcachyos/games/xmcl` and, unlike the rest of `/games`, sanoid snapshots it, because worlds cannot be downloaded again. It is open to the `games` group only. See ADR 0014.
+
+The Microsoft logins are shared per box: each player's `~/.config/xmcl/secret` and `user.json` are links into `/games/xmcl/accounts`, and XMCL is started with `--password-store=basic` so every player can read what another signed in. The first apply moves each player's own login aside to `*.before-monarchy`. Open XMCL afterwards and sign in to each Minecraft account once; every player on the box then has all of them.
+
+The data location is not a choice. Each apply moves any player's XMCL data that is somewhere else into `/games/xmcl`, with Minecraft closed (a player with XMCL open is left until the next run). Instances and worlds never overwrite each other: one whose name is taken gets the account name added, such as `Survival (kid)`. What is left of the old folder is kept as `~/.minecraftx.before-monarchy` and can be deleted. Each player's `~/.config/xmcl/root` is then owned by root and immutable, so changing the location in XMCL Settings fails and XMCL moves the files back. To delete such an account's home, run `sudo chattr -i ~/.config/xmcl/root` first.
+
 ### First Boot Setups (todo: shift this to the chroot step)
 
 1. Enable CachyOS updater from greeter and install the gaming packages.

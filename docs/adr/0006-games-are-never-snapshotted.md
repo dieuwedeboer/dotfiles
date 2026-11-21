@@ -1,5 +1,8 @@
 # Games are shared and never snapshotted
 
+The child dataset `<pool>/games/xmcl` is the exception: Minecraft is
+snapshotted. See ADR 0014.
+
 Steam's game files live in `<pool>/games`, mounted at `/games`, and are
 shared by every player on the machine. No snapshot of that dataset is ever
 kept. `lib/games.sh` sets it up on every apply.
