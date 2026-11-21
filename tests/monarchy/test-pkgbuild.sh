@@ -32,8 +32,8 @@ TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$TEST_DIR/../helpers.sh"
 # shellcheck source=../../lib/monarchy/common.sh
 source "$LIB/common.sh"
-# shellcheck source=../../lib/monarchy/denylist.sh
-source "$LIB/denylist.sh"
+# shellcheck source=../../lib/monarchy/blacklist.sh
+source "$LIB/blacklist.sh"
 # shellcheck source=../../lib/monarchy/pkgbuild.sh
 source "$LIB/pkgbuild.sh"
 

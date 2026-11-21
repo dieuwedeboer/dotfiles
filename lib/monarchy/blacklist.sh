@@ -31,7 +31,7 @@ monarchy_in_list() {
     return 1
 }
 
-# There is no allow list any more: an unlisted name is simply not overridden,
+# There is no whitelist any more: an unlisted name is simply not overridden,
 # and resolves from /usr/bin like any other packaged binary. "Do we override
 # this?" is the only question left to ask.
 monarchy_overrides() {

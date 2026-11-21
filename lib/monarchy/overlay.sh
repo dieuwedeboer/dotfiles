@@ -253,13 +253,13 @@ monarchy_prune_stale_overlay_links() {
     done
 }
 
-# What the exhaustive allow list was actually protecting against: a binary
+# What the exhaustive whitelist was actually protecting against: a binary
 # that reconfigures the bootloader, replaces pacman.conf, or drives snapper
 # appearing upstream under a name nobody classified.
 #
 # Matching on content rather than on a list of 438 names is both smaller and
 # stronger: it still catches a hazard that arrives under a brand new name, and
-# it catches one that gets *renamed*, which an allow list by construction
+# it catches one that gets *renamed*, which a whitelist by construction
 # cannot. Same shape as monarchy_check_migrations, which has always worked
 # this way.
 MONARCHY_BIN_HAZARD_RE='limine-entry-tool|limine-mkinitcpio|limine-install|limine-snapper|omarchy-refresh-pacman|use_omarchy_pacman_config|pacman-.*\.conf|zroot/ROOT|/etc/pam\.d/zfs-key|snapper -c|snapper create|snapper --csvout'

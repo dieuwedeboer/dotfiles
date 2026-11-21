@@ -72,7 +72,7 @@ Three layers:
 
 1. Official `[omarchy]` appended after CachyOS. Pacman first-match keeps `hyprland`, `quickshell`, `linux`, and `zfs-utils` on CachyOS. Names that exist only in Omarchy (`omarchy-nvim`, `omarchy-keyring`, `omacalc`, …) come from `[omarchy]`.
 2. The locked Omarchy package, plus a working prefix of symlinks into the tree it owns. Same idea as `omarchy-dev-link`, without a git checkout.
-3. Two local packages, not a denylist. `omarchy` or `omarchy-dev` is installed; the packaging unit replaces one with the other when the lock changes, since they conflict. `omarchy-settings` and `omarchy-settings-dev` are replaced by `omarchy-settings-monarchy`, built from whichever of the two goes with the locked package and providing both names; `limine*` and `snapper` are satisfied by `monarchy-boot-stub`. `omarchy-dev`, `omarchy-settings` and `omarchy-settings-dev` stay in `packages.deny`, which only filters the `omarchy-base.packages` leaves.
+3. Two local packages, not a blacklist. `omarchy` or `omarchy-dev` is installed; the packaging unit replaces one with the other when the lock changes, since they conflict. `omarchy-settings` and `omarchy-settings-dev` are replaced by `omarchy-settings-monarchy`, built from whichever of the two goes with the locked package and providing both names; `limine*` and `snapper` are satisfied by `monarchy-boot-stub`. `omarchy-dev`, `omarchy-settings` and `omarchy-settings-dev` stay in `packages.deny`, which only filters the `omarchy-base.packages` leaves.
 
 Do not add `[omarchy-zfs]` or `[archzfs]`. Do not replace `/etc/pacman.d/mirrorlist` or any `cachyos-*-mirrorlist`.
 
@@ -92,11 +92,11 @@ env-bootstrap and `envs.lua` both prepend `$OMARCHY_PATH/bin`. That directory is
 
 ### Overlay bin
 
-The overlay mirrors every packaged name. There is still no allow list: what a name gets is decided by `bin.wrap` and `bin.deny`, not by being listed.
+The overlay mirrors every packaged name. There is still no whitelist: what a name gets is decided by `bin.wrap` and `bin.deny`, not by being listed.
 
 `omarchy` installs its 428 binaries into `/usr/bin`, with `/usr/share/omarchy/bin/` as symlinks to them. `$OMARCHY_PATH/bin` and `/usr/local/bin` both precede `/usr/bin` on PATH and in sudo's `secure_path`, so a stub or a wrap wins on PATH alone. That is what retired `monarchy/bin.allow` (438 rows) and `lib/monarchy/generate-inventories.py`.
 
-Retiring the allow list is not a reason to stop mirroring, and for one release it was taken as one. `$OMARCHY_PATH/bin` is an advertised path, not just a PATH element — packaged scripts resolve siblings through it absolutely, and so does `lib/monarchy/plugins.sh`:
+Retiring the whitelist is not a reason to stop mirroring, and for one release it was taken as one. `$OMARCHY_PATH/bin` is an advertised path, not just a PATH element — packaged scripts resolve siblings through it absolutely, and so does `lib/monarchy/plugins.sh`:
 
 | Caller | Absolute reference |
 | --- | --- |
@@ -137,7 +137,7 @@ Commands that call upstream's `omarchy_security_require_source_root` are copied 
 
 `monarchy_check_bin_hazards` greps the package `bin/` for the things that actually brick this host — `limine-entry-tool`, `limine-mkinitcpio`, `limine-install`, `limine-snapper`, `omarchy-refresh-pacman`, `use_omarchy_pacman_config`, a `pacman-*.conf`, `zroot/ROOT`, `/etc/pam.d/zfs-key`, or a `snapper` invocation — and fails on any hit that is neither denied nor wrapped. Same shape as `monarchy_check_migrations`.
 
-Matching on content rather than on a list of names is both smaller and stronger: an allow list cannot notice a hazard that arrives under a *renamed* binary, and this does. `monarchy_check_overrides_exist` is the other half — a wrap or deny for a name upstream dropped is dead weight that would hide exactly that rename.
+Matching on content rather than on a list of names is both smaller and stronger: a whitelist cannot notice a hazard that arrives under a *renamed* binary, and this does. `monarchy_check_overrides_exist` is the other half — a wrap or deny for a name upstream dropped is dead weight that would hide exactly that rename.
 
 There is nothing to regenerate after an upgrade. Classify a reported name into `monarchy/bin.deny` or `monarchy/bin.wrap` and re-run.
 
@@ -145,7 +145,7 @@ There is nothing to regenerate after an upgrade. Classify a reported name into `
 
 `AppLibrary.qml` reads exactly one path, `$OMARCHY_PATH/default/omarchy/launcher.hides`, and hides every desktop id listed in it. There is no user-level override and no second file it merges, so putting an application back in the launcher means owning that file. `monarchy/launcher.unhides` names what to put back.
 
-The overlay is **subtractive**, not a replacement. `monarchy_overlay_launcher_hides` copies the packaged list, drops the names in `launcher.unhides` with a single `grep -vxF -f`, and writes the rest into the exploded `default/omarchy/`. A row a later Omarchy release adds still hides, which a Monarchy-owned list would have quietly stopped doing. Same reason `bin.wrap` is not an allow list: the interesting case is the name that arrives *after* the decision was made.
+The overlay is **subtractive**, not a replacement. `monarchy_overlay_launcher_hides` copies the packaged list, drops the names in `launcher.unhides` with a single `grep -vxF -f`, and writes the rest into the exploded `default/omarchy/`. A row a later Omarchy release adds still hides, which a Monarchy-owned list would have quietly stopped doing. Same reason `bin.wrap` is not a whitelist: the interesting case is the name that arrives *after* the decision was made.
 
 `monarchy_check_launcher_unhides` fails when a row is no longer in the packaged list. A name upstream stops hiding makes the row a no-op, and a no-op row is indistinguishable from one that works — the same rot `monarchy_check_overrides_exist` catches for a dropped binary, and `monarchy_check_applications_drop` for a dropped `.desktop`. It runs in `monarchy_classify_check`, so an update refuses before apply rather than after.
 
@@ -343,7 +343,7 @@ lib/monarchy/
   ui.sh                  # one voice, and the changed/left-alone/warned ledger
   common.sh              # logging, snapshot-first, layout guards, seed ledger
   pacman.sh              # preserve CachyOS, append [omarchy]
-  denylist.sh            # loads packages.deny, bin.*, migrations.deny/.allow,
+  blacklist.sh           # loads packages.deny, bin.*, migrations.deny/.allow,
                          #   applications.drop, launcher.unhides
   migrate.sh             # /usr/local/bin/monarchy-migrate and the migration brick check
   overlay.sh             # rebuild overlay bin, hazard scan, explode-and-patch
@@ -499,9 +499,9 @@ These abort apply or check when the host has drifted. Full clash rows are `docs/
 | `monarchy_keep_sddm` | Enable `sddm`, remove `plasma-login-manager`, write `zz-omarchy-sddm.conf`, overlay `Main.qml`. |
 | `monarchy_nvidia_keep_chwd` | Never run Omarchy `nvidia.sh`. Lives in `pacman.sh`. Apply does not call it. |
 
-Install scripts the bridge never invokes, even when a binary of the same name is allowlisted: `install/helpers/pacman.sh`, `install/post-install/pacman.sh`, `install/config/zfs.sh`, snapper, enable-services, firewall, increase-lockout-limit, nvidia, intel ptl-kernel, network, tuxedo backlight, hardware/pacman, `install/user/all.sh`. `install/config/lockscreen-pam.sh` is invoked as overlay `omarchy-apply-lock`.
+Install scripts the bridge never invokes, even when a binary of the same name is whitelisted: `install/helpers/pacman.sh`, `install/post-install/pacman.sh`, `install/config/zfs.sh`, snapper, enable-services, firewall, increase-lockout-limit, nvidia, intel ptl-kernel, network, tuxedo backlight, hardware/pacman, `install/user/all.sh`. `install/config/lockscreen-pam.sh` is invoked as overlay `omarchy-apply-lock`.
 
-`omarchy-provision-first-run` is allowlisted. Apply seeds `~/.local/state/omarchy/first-run-user` so a later run no-ops. That also skips the first-run invitations (fingerprint, default agent) and speaker tuning, except Superwhisper's setup, which apply runs itself until the account has it; the Dictate wrap sends a missing voxtype to the install flow instead (`omarchy-install-dictation-voxtype` from 4.5, `omarchy-voxtype-install` before it).
+`omarchy-provision-first-run` is whitelisted. Apply seeds `~/.local/state/omarchy/first-run-user` so a later run no-ops. That also skips the first-run invitations (fingerprint, default agent) and speaker tuning, except Superwhisper's setup, which apply runs itself until the account has it; the Dictate wrap sends a missing voxtype to the install flow instead (`omarchy-install-dictation-voxtype` from 4.5, `omarchy-voxtype-install` before it).
 
 Every Omarchy migration runs unless it cannot run without a risk of bricking this host (ADR 0005). `lib/monarchy/migrate.sh` holds the check: a short list of brick paths (boot loader and initramfs config, Omarchy's kernel packages, ZFS, package sources, PAM, sudoers, SDDM, USB authorisation), plus any call to a `bin.deny` or `bin.wrap` name and any `omarchy-pkg-add` of a `packages.deny` package. Limine and snapper are not on it: upstream's migrations check for them before acting, and `bin.alias` maps the Limine rebuild onto `mkinitcpio -P`.
 

@@ -15,7 +15,7 @@ manual step, even though nearly all of them are wanted, and with boxes on
 different channels (ADR 0009) a stable box and an edge box rewrote each
 other's copy.
 
-## Why a deny list alone is not enough
+## Why a blacklist alone is not enough
 
 A dependency on a denied package does not stop a new row: `monarchy-boot-stub`
 provides `limine` and `snapper`, so anything depending on them resolves. The

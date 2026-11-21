@@ -10,8 +10,8 @@ source "$_monarchy_dir/ui.sh"
 source "$_monarchy_dir/common.sh"
 # shellcheck source=monarchy/users.sh
 source "$_monarchy_dir/users.sh"
-# shellcheck source=monarchy/denylist.sh
-source "$_monarchy_dir/denylist.sh"
+# shellcheck source=monarchy/blacklist.sh
+source "$_monarchy_dir/blacklist.sh"
 # shellcheck source=monarchy/prefix.sh
 source "$_monarchy_dir/prefix.sh"
 # shellcheck source=monarchy/overlay.sh
