@@ -381,6 +381,16 @@ monarchy_assert_denied_migrations_marked() {
     return 0
 }
 
+# Omarchy sets up Superwhisper, its default dictation backend, in first-run,
+# which apply marks done without running. Its own script does nothing unless
+# the package is installed and the account's default is superwhisper, so an
+# account that chose another backend keeps it. Setup creates app/current, the
+# same marker Omarchy's migration 1793667581 checks, so it runs once.
+monarchy_user_superwhisper() {
+    [ ! -e "${XDG_DATA_HOME:-$HOME/.local/share}/superwhisper/app/current" ] || return 0
+    monarchy_run_install_script "$MONARCHY_SRC/install/user/first-run/superwhisper.sh"
+}
+
 monarchy_mark_first_run_done() {
     local dir="$HOME/.local/state/omarchy/done"
     mkdir -p "$dir" "$HOME/.local/state/omarchy"
@@ -496,6 +506,7 @@ monarchy_setup_user() {
     monarchy_run_install_script "$MONARCHY_SRC/install/user/default-keyring.sh"
     monarchy_run_install_script "$MONARCHY_SRC/install/user/first-run/gnome-theme.sh"
     monarchy_run_install_script "$MONARCHY_SRC/install/user/first-run/gtk-primary-paste.sh"
+    monarchy_user_superwhisper
     monarchy_enable_user_units
     monarchy_mark_denied_migrations
     monarchy_mark_first_run_done

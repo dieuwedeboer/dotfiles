@@ -38,7 +38,7 @@ Source: the official `omarchy` package from `[omarchy]` stable (428 `bin/` names
 | Nautilus vs Dolphin | Install nautilus. No user-global mimeapps |
 | `ufw-docker` | Deny. Never run `firewall.sh` |
 | `vi` | Deny. CachyOS's `ex-vi-compat` already provides `vi` and conflicts with a package of that name |
-| `superwhisper-bin` | Deny. Proprietary dictation app; Voxtype stays the dictation backend. Revisit if the household wants it |
+| `superwhisper-bin` | Install, and follow Omarchy in making Superwhisper the default dictation backend (decided 2026-11-21, reversing the 2026-10-10 deny). Apply runs Omarchy's first-run Superwhisper setup, which acts only for an account whose default is `superwhisper`; an account that chose another backend keeps it |
 | `hype`, `monologue` | Install. Basecamp slides and webcam recorder, wanted on this box |
 | `usbguard` | Follow Omarchy, which dropped it with USB approval on 14 October 2026. It is no longer an Omarchy package; migration `1791769486.sh` removes it where Omarchy granted it |
 | `gliff` | Install. Remote desktop over SSH; inert until used |
