@@ -1,8 +1,11 @@
 # Track omarchy-dev on the edge channel until a stable release has the Qt 6.12 fix
 
 The repo-wide lock this describes is replaced by ADR 0009: the package and
-channel are now per box. The reason edge was taken still holds for the box
-that took it.
+channel are now per box. The reason edge was taken no longer holds: stable
+4.5.0 (16 November 2026) qualifies the colours as `Commons.Color`. On
+21 November 2026 the box that took edge was moved back to `omarchy` on
+stable, because edge had renamed or dropped binaries the override lists
+still name for stable (ADR 0013).
 
 Monarchy tracked `omarchy` on `[omarchy]` stable. On 9 October 2026 a full
 upgrade brought Qt 6.12 from CachyOS, and the shell lost most of its theme
